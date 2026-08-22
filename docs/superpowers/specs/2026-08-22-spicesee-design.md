@@ -1,4 +1,4 @@
-# SpiceViewer — Design
+# SpiceSee — Design
 
 Date: 2026-08-22
 Status: approved for planning
@@ -37,7 +37,7 @@ Sources/
   SpiceMedia/    video streams -> VideoToolbox; playback -> CoreAudio
   SpiceAgent/    vdagent: clipboard, monitors config, mouse mode
   SpiceKit/      facade: `SpiceSession`, the only type the app sees
-  SpiceViewer/   SwiftUI + AppKit app, .vv handling, connection manager
+  SpiceSee/      SwiftUI + AppKit app, .vv handling, connection manager
 Tools/spicerec   TCP proxy that records every channel's raw bytes for replay tests
 Tests/
 ```
