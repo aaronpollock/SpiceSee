@@ -30,6 +30,10 @@ enum Metric {
         /// The +/− bar. Taller than the design's 30pt so the 22pt buttons clear the separator
         /// above them and the window's rounded bottom corner below.
         static let bottomBarHeight: CGFloat = 38
+        /// Lines the +/− pair up with the leading edge of a selected row's fill, which the List
+        /// insets further than the bar's own 6pt.
+        static let bottomBarInsetLeading: CGFloat = 16
+        static let bottomBarInsetTrailing: CGFloat = 6
         /// Secondary text in a selected row sits at 78% so it reads against the accent fill.
         static let selectedSecondaryOpacity: CGFloat = 0.78
     }

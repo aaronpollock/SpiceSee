@@ -113,9 +113,11 @@ struct ConnectionDetailView: View {
 
     private var footer: some View {
             HStack(alignment: .center, spacing: Metric.Form.labelGap) {
-                Text(footerText)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                if isConnected {
+                    Text(displayCount)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 if isConnected {
                     Button("Disconnect", action: session.disconnect)
@@ -160,26 +162,9 @@ struct ConnectionDetailView: View {
         return "HiDPI \(a.hiDPI ? "on" : "off") · ⌘→\(a.commandMapsTo.label) · ⌥→\(a.optionMapsTo.label) · release \(a.releaseChord.display)"
     }
 
-    private var footerText: String {
-        if isConnected {
-            let count = session.viewports.count
-            return "Connected · \(count) display\(count == 1 ? "" : "s")"
-        }
-        guard let lastConnected = connection.lastConnected else { return "Never connected" }
-        let formatter = DateFormatter()
-        let when: String
-        if Calendar.current.isDateInToday(lastConnected) {
-            formatter.dateFormat = "HH:mm"
-            when = "Today \(formatter.string(from: lastConnected))"
-        } else if Calendar.current.isDateInYesterday(lastConnected) {
-            formatter.dateFormat = "HH:mm"
-            when = "Yesterday \(formatter.string(from: lastConnected))"
-        } else {
-            formatter.dateFormat = "d MMM"
-            when = formatter.string(from: lastConnected)
-        }
-        let agentClause = connection.agentWasPresent ? " · agent was present" : ""
-        return "Last connected \(when)\(agentClause)"
+    private var displayCount: String {
+        let count = session.viewports.count
+        return "Connected · \(count) display\(count == 1 ? "" : "s")"
     }
 }
 

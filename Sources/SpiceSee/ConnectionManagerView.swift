@@ -10,6 +10,9 @@ struct ConnectionManagerView: View {
 
     @Environment(\.openWindow) private var openWindow
 
+    /// Set by the − button; non-nil is what presents the confirmation.
+    @State private var pendingDeletion: SavedConnection?
+
     var body: some View {
         NavigationSplitView {
             sidebar
@@ -19,6 +22,24 @@ struct ConnectionManagerView: View {
         }
         .sizesWindow(to: Metric.Window.connectionManager)
         .opensSessionWindows(session: session, settings: settings)
+        .alert(deletionTitle, isPresented: isConfirmingDeletion) {
+            // Cancel is the default action: deleting a host is destructive and unrecoverable.
+            Button("Cancel", role: .cancel) {}
+                .keyboardShortcut(.defaultAction)
+            Button("Delete", role: .destructive) {
+                if let pendingDeletion { store.remove(pendingDeletion.id) }
+            }
+        } message: {
+            Text("This removes the saved connection from SpiceSee. The guest itself is not affected.")
+        }
+    }
+
+    private var deletionTitle: String {
+        "Delete “\(pendingDeletion?.name ?? "")”?"
+    }
+
+    private var isConfirmingDeletion: Binding<Bool> {
+        Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } })
     }
 
     // MARK: Sidebar
@@ -56,7 +77,8 @@ struct ConnectionManagerView: View {
             sidebarButton(systemName: "minus", action: removeSelected, disabled: store.selection == nil)
             Spacer()
         }
-        .padding(.horizontal, 6)
+        .padding(.leading, Metric.Sidebar.bottomBarInsetLeading)
+        .padding(.trailing, Metric.Sidebar.bottomBarInsetTrailing)
         .frame(height: Metric.Sidebar.bottomBarHeight)
         .overlay(alignment: .top) {
             Rectangle().fill(Color(nsColor: .separatorColor)).frame(height: 0.5)
@@ -76,8 +98,7 @@ struct ConnectionManagerView: View {
     }
 
     private func removeSelected() {
-        guard let id = store.selection else { return }
-        store.remove(id)
+        pendingDeletion = store.selected
     }
 
     private func isConnecting(_ connection: SavedConnection) -> Bool {
