@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+  body { margin:0; background:#E7E7E9; font-family:-apple-system,"SF Pro Text","Helvetica Neue",Helvetica,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#C0392B; text-decoration:none; }
+  a:hover { color:#93261A; text-decoration:underline; }
+</style>
+</helmet>
+
+<section id="1a" style="padding:56px 64px 96px;display:flex;flex-direction:column;gap:72px;background:#E7E7E9">
+
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:820px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(180deg,#F2F2F4,#DCDCDF);box-shadow:inset 0 0 0 0.5px rgba(0,0,0,.12);position:relative;overflow:hidden">
+        <div style="position:absolute;left:9px;top:11px;width:26px;height:18px;border-radius:3px;background:#1E1E20"></div>
+        <div style="position:absolute;left:19px;top:14px;width:11px;height:15px;background:#C0392B;border-radius:60% 45% 55% 50% / 40% 40% 70% 70%;transform:rotate(18deg)"></div>
+        <div style="position:absolute;left:22px;top:12px;width:7px;height:2.5px;background:#3E7A3A;border-radius:2px;transform:rotate(-28deg)"></div>
+      </div>
+      <div>
+        <div style="font-size:26px;font-weight:700;letter-spacing:-.02em;color:#1D1D1F">SpiceSee — macOS UI</div>
+        <div style="font-size:13px;color:#6E6E73;margin-top:2px">Native SPICE client · SwiftUI chrome + AppKit/Metal viewports · macOS 14+</div>
+      </div>
+      <div style="margin-left:auto;font:600 11px/1 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;color:#86868B;border:1px solid #CFCFD2;border-radius:5px;padding:6px 9px">1a</div>
+    </div>
+    <div style="font-size:13.5px;line-height:1.55;color:#48484A;text-wrap:pretty">Artboards are drawn at 1× logical points; every dimension below is in points — export assets at 2× (and 3× for the icon). System font only. One accent: <b style="color:#C0392B">Chili&nbsp;Red · #C0392B</b> (light) / <b style="color:#E05C4B">#E05C4B</b> (dark), which is the only tint token; everything else is a macOS semantic color, named in the spec notes.</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:26px">
+    <div style="font:600 12px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#3C3C43">01 · Connection manager — 760 × 520 pt</div>
+    <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Light · saved host selected, Advanced expanded</div>
+        <div style="width:760px;height:520px;border-radius:10px;background:#FFFFFF;box-shadow:0 0 0 .5px rgba(0,0,0,.16),0 26px 60px -14px rgba(0,0,0,.32);overflow:hidden;display:flex">
+          <div style="width:232px;background:#F0F0F2;border-right:.5px solid #D8D8DC;display:flex;flex-direction:column">
+            <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 14px 0 20px">
+              <div style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#FEBC2E"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#28C840"></div>
+            </div>
+            <div style="padding:0 10px 8px">
+              <div style="height:24px;border-radius:6px;background:#E3E3E6;display:flex;align-items:center;gap:5px;padding:0 7px">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#8E8E93" stroke-width="1.3"><circle cx="4.6" cy="4.6" r="3.4"></circle><path d="M7.2 7.2 L10 10" stroke-linecap="round"></path></svg>
+                <div style="font-size:12px;color:#8E8E93">Search</div>
+              </div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px;padding:0 8px">
+              <div style="border-radius:6px;background:#C0392B;padding:6px 8px;display:flex;flex-direction:column;gap:1px">
+                <div style="font-size:13px;font-weight:600;color:#FFFFFF">win11-desk</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.78)">192.168.1.20:5900 · Today 09:14</div>
+              </div>
+              <div style="border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:1px">
+                <div style="font-size:13px;font-weight:600;color:#1D1D1F">ubuntu-build</div>
+                <div style="font-size:11px;color:#8E8E93">pve.lan:5901 · Yesterday 17:02</div>
+              </div>
+              <div style="border-radius:6px;padding:6px 8px;display:flex;align-items:center;gap:8px">
+                <div style="display:flex;flex-direction:column;gap:1px;flex:1">
+                  <div style="font-size:13px;font-weight:600;color:#1D1D1F">opnsense</div>
+                  <div style="font-size:11px;color:#8E8E93">10.0.0.4:5900 · Connecting…</div>
+                </div>
+                <div style="width:14px;height:14px;border-radius:50%;border:1.6px solid #D3D3D7;border-top-color:#8E8E93"></div>
+              </div>
+              <div style="border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:1px">
+                <div style="font-size:13px;font-weight:600;color:#1D1D1F">truenas-console</div>
+                <div style="font-size:11px;color:#8E8E93">10.0.0.9:5902 · 12 Aug</div>
+              </div>
+            </div>
+            <div style="height:30px;border-top:.5px solid #D8D8DC;display:flex;align-items:center;gap:2px;padding:0 6px">
+              <div style="width:24px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:15px;color:#3C3C43;background:#E3E3E6">+</div>
+              <div style="width:24px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:15px;color:#8E8E93">−</div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;background:#FFFFFF;min-width:0">
+            <div style="height:52px;border-bottom:.5px solid #E2E2E5;display:flex;align-items:center;padding:0 16px;gap:10px">
+              <div style="font-size:13px;font-weight:600;color:#1D1D1F">win11-desk</div>
+              <div style="font-size:11px;color:#8E8E93">SPICE · TLS</div>
+            </div>
+            <div style="flex:1;padding:20px 22px;display:flex;flex-direction:column;gap:12px;min-width:0">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:78px;text-align:right;font-size:13px;color:#1D1D1F">Host:</div>
+                <div style="flex:1;height:24px;border-radius:6px;background:#FFFFFF;box-shadow:inset 0 0 0 .5px #B4B4B8,inset 0 1px 1px rgba(0,0,0,.05);display:flex;align-items:center;padding:0 8px;font-size:13px;color:#1D1D1F">192.168.1.20</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:78px;text-align:right;font-size:13px;color:#1D1D1F">Port:</div>
+                <div style="width:84px;height:24px;border-radius:6px;box-shadow:inset 0 0 0 .5px #B4B4B8,inset 0 1px 1px rgba(0,0,0,.05);display:flex;align-items:center;padding:0 8px;font-size:13px;color:#1D1D1F">5900</div>
+                <div style="width:52px;text-align:right;font-size:13px;color:#1D1D1F">TLS:</div>
+                <div style="width:84px;height:24px;border-radius:6px;box-shadow:inset 0 0 0 .5px #B4B4B8,inset 0 1px 1px rgba(0,0,0,.05);display:flex;align-items:center;padding:0 8px;font-size:13px;color:#1D1D1F">5901</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:78px;text-align:right;font-size:13px;color:#1D1D1F">Password:</div>
+                <div style="flex:1;height:24px;border-radius:6px;box-shadow:inset 0 0 0 .5px #B4B4B8,inset 0 1px 1px rgba(0,0,0,.05);display:flex;align-items:center;padding:0 8px;font-size:13px;letter-spacing:.14em;color:#1D1D1F">••••••••••</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:78px"></div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div style="width:14px;height:14px;border-radius:3.5px;background:#C0392B;display:flex;align-items:center;justify-content:center">
+                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M1.6 4.8 3.5 6.7 7.4 2.4"></path></svg>
+                  </div>
+                  <div style="font-size:13px;color:#1D1D1F">Save password in Keychain</div>
+                </div>
+              </div>
+              <div style="height:.5px;background:#E2E2E5;margin:4px 0 0"></div>
+              <div style="display:flex;align-items:center;gap:5px;margin-top:-2px">
+                <svg width="9" height="9" viewBox="0 0 9 9" fill="#3C3C43"><path d="M0.8 0.6 L8 4.5 L0.8 8.4 Z" transform="rotate(90 4.5 4.5)"></path></svg>
+                <div style="font-size:13px;font-weight:600;color:#1D1D1F">Advanced</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:11px;padding-left:14px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:110px;text-align:right;font-size:13px;color:#1D1D1F">HiDPI:</div>
+                  <div style="width:38px;height:22px;border-radius:11px;background:#E4E4E7;box-shadow:inset 0 0 0 .5px #C9C9CD;position:relative">
+                    <div style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,.22)"></div>
+                  </div>
+                  <div style="font-size:11px;color:#8E8E93">Send backing pixels · guest renders at 2×</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:110px;text-align:right;font-size:13px;color:#1D1D1F">⌘ maps to:</div>
+                  <div style="display:inline-flex;background:#E9E9EC;border-radius:7px;padding:2px;gap:2px">
+                    <div style="padding:3px 11px;border-radius:5px;background:#FFFFFF;box-shadow:0 .5px 2px rgba(0,0,0,.18);font-size:12px;color:#1D1D1F">Super</div>
+                    <div style="padding:3px 11px;border-radius:5px;font-size:12px;color:#3C3C43">Ctrl</div>
+                  </div>
+                  <div style="width:74px;text-align:right;font-size:13px;color:#1D1D1F">⌥ maps to:</div>
+                  <div style="display:inline-flex;background:#E9E9EC;border-radius:7px;padding:2px;gap:2px">
+                    <div style="padding:3px 11px;border-radius:5px;background:#FFFFFF;box-shadow:0 .5px 2px rgba(0,0,0,.18);font-size:12px;color:#1D1D1F">Alt</div>
+                    <div style="padding:3px 11px;border-radius:5px;font-size:12px;color:#3C3C43">Super</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:110px;text-align:right;font-size:13px;color:#1D1D1F">Release chord:</div>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <div style="min-width:24px;height:22px;border-radius:5px;background:#FFFFFF;box-shadow:0 0 0 .5px #C0C0C4,0 1px 0 #DBDBDE;display:flex;align-items:center;justify-content:center;font-size:12px;color:#1D1D1F;padding:0 6px">⌃</div>
+                    <div style="min-width:24px;height:22px;border-radius:5px;background:#FFFFFF;box-shadow:0 0 0 .5px #C0C0C4,0 1px 0 #DBDBDE;display:flex;align-items:center;justify-content:center;font-size:12px;color:#1D1D1F;padding:0 6px">⌥</div>
+                    <div style="font-size:11px;color:#8E8E93;margin-left:4px">Releases a captured pointer in server mode</div>
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top:auto;display:flex;align-items:center;gap:10px;justify-content:flex-end">
+                <div style="font-size:11px;color:#8E8E93;margin-right:auto">Last connected Today 09:14 · agent was present</div>
+                <div style="height:28px;border-radius:7px;padding:0 14px;display:flex;align-items:center;font-size:13px;color:#1D1D1F;background:#FFFFFF;box-shadow:0 0 0 .5px #C0C0C4,0 1px 1.5px rgba(0,0,0,.1)">Duplicate</div>
+                <div style="height:28px;border-radius:7px;padding:0 18px;display:flex;align-items:center;font-size:13px;font-weight:600;color:#FFFFFF;background:#C0392B;box-shadow:0 1px 2px rgba(0,0,0,.18)">Connect</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:740px">
+            <div>NavigationSplitView · sidebar 232pt (min 200, max 280) · .listStyle(.sidebar) · row: 6/8pt insets, 6pt radius, 13pt semibold + 11pt secondaryLabel</div>
+            <div>Titlebar 52pt (.toolbar unified) · form: label column 78pt trailing-aligned, 10pt gap, 12pt row rhythm · TextField 24pt tall, 6pt radius</div>
+            <div>Colors: sidebar = .windowBackground w/ vibrancy, detail = .controlBackground, separator = .separator, secondary text = .secondaryLabel</div>
+            <div>Connect = .borderedProminent .tint(chiliRed) 28pt, keyboardShortcut(.defaultAction) · Advanced = DisclosureGroup persisted per-connection</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="{{ darkStyle }}">
+        <div style="flex-direction:column;gap:12px;display:flex">
+          <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Dark · same window, Advanced collapsed</div>
+          <div style="width:760px;height:520px;border-radius:10px;background:#1E1E1E;box-shadow:0 0 0 .5px rgba(0,0,0,.6),0 26px 60px -14px rgba(0,0,0,.5);overflow:hidden;display:flex">
+            <div style="width:232px;background:#2A2A2C;border-right:.5px solid #000000;display:flex;flex-direction:column">
+              <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 14px 0 20px">
+                <div style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></div>
+                <div style="width:12px;height:12px;border-radius:50%;background:#FEBC2E"></div>
+                <div style="width:12px;height:12px;border-radius:50%;background:#28C840"></div>
+              </div>
+              <div style="padding:0 10px 8px">
+                <div style="height:24px;border-radius:6px;background:#1F1F21;box-shadow:inset 0 0 0 .5px #3A3A3C;display:flex;align-items:center;gap:5px;padding:0 7px">
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#8E8E93" stroke-width="1.3"><circle cx="4.6" cy="4.6" r="3.4"></circle><path d="M7.2 7.2 L10 10" stroke-linecap="round"></path></svg>
+                  <div style="font-size:12px;color:#8E8E93">Search</div>
+                </div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;padding:0 8px">
+                <div style="border-radius:6px;background:#E05C4B;padding:6px 8px;display:flex;flex-direction:column;gap:1px">
+                  <div style="font-size:13px;font-weight:600;color:#FFFFFF">win11-desk</div>
+                  <div style="font-size:11px;color:rgba(255,255,255,.8)">192.168.1.20:5900 · Today 09:14</div>
+                </div>
+                <div style="border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:1px">
+                  <div style="font-size:13px;font-weight:600;color:#F5F5F7">ubuntu-build</div>
+                  <div style="font-size:11px;color:#98989D">pve.lan:5901 · Yesterday 17:02</div>
+                </div>
+                <div style="border-radius:6px;padding:6px 8px;display:flex;align-items:center;gap:8px">
+                  <div style="display:flex;flex-direction:column;gap:1px;flex:1">
+                    <div style="font-size:13px;font-weight:600;color:#F5F5F7">opnsense</div>
+                    <div style="font-size:11px;color:#98989D">10.0.0.4:5900 · Connecting…</div>
+                  </div>
+                  <div style="width:14px;height:14px;border-radius:50%;border:1.6px solid #48484A;border-top-color:#98989D"></div>
+                </div>
+                <div style="border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:1px">
+                  <div style="font-size:13px;font-weight:600;color:#F5F5F7">truenas-console</div>
+                  <div style="font-size:11px;color:#98989D">10.0.0.9:5902 · 12 Aug</div>
+                </div>
+              </div>
+              <div style="height:30px;border-top:.5px solid #3A3A3C;display:flex;align-items:center;gap:2px;padding:0 6px">
+                <div style="width:24px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:15px;color:#F5F5F7;background:#3A3A3C">+</div>
+                <div style="width:24px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:15px;color:#98989D">−</div>
+              </div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;background:#1E1E1E;min-width:0">
+              <div style="height:52px;border-bottom:.5px solid #303032;display:flex;align-items:center;padding:0 16px;gap:10px">
+                <div style="font-size:13px;font-weight:600;color:#F5F5F7">win11-desk</div>
+                <div style="font-size:11px;color:#98989D">SPICE · TLS</div>
+              </div>
+              <div style="flex:1;padding:20px 22px;display:flex;flex-direction:column;gap:12px;min-width:0">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:78px;text-align:right;font-size:13px;color:#F5F5F7">Host:</div>
+                  <div style="flex:1;height:24px;border-radius:6px;background:#1C1C1E;box-shadow:inset 0 0 0 .5px #48484A;display:flex;align-items:center;padding:0 8px;font-size:13px;color:#F5F5F7">192.168.1.20</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:78px;text-align:right;font-size:13px;color:#F5F5F7">Port:</div>
+                  <div style="width:84px;height:24px;border-radius:6px;background:#1C1C1E;box-shadow:inset 0 0 0 .5px #48484A;display:flex;align-items:center;padding:0 8px;font-size:13px;color:#F5F5F7">5900</div>
+                  <div style="width:52px;text-align:right;font-size:13px;color:#F5F5F7">TLS:</div>
+                  <div style="width:84px;height:24px;border-radius:6px;background:#1C1C1E;box-shadow:inset 0 0 0 .5px #48484A;display:flex;align-items:center;padding:0 8px;font-size:13px;color:#F5F5F7">5901</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:78px;text-align:right;font-size:13px;color:#F5F5F7">Password:</div>
+                  <div style="flex:1;height:24px;border-radius:6px;background:#1C1C1E;box-shadow:inset 0 0 0 .5px #48484A;display:flex;align-items:center;padding:0 8px;font-size:13px;letter-spacing:.14em;color:#F5F5F7">••••••••••</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:78px"></div>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div style="width:14px;height:14px;border-radius:3.5px;background:#E05C4B;display:flex;align-items:center;justify-content:center">
+                      <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M1.6 4.8 3.5 6.7 7.4 2.4"></path></svg>
+                    </div>
+                    <div style="font-size:13px;color:#F5F5F7">Save password in Keychain</div>
+                  </div>
+                </div>
+                <div style="height:.5px;background:#303032;margin:4px 0 0"></div>
+                <div style="display:flex;align-items:center;gap:5px;margin-top:-2px">
+                  <svg width="9" height="9" viewBox="0 0 9 9" fill="#98989D"><path d="M0.8 0.6 L8 4.5 L0.8 8.4 Z"></path></svg>
+                  <div style="font-size:13px;font-weight:600;color:#F5F5F7">Advanced</div>
+                  <div style="font-size:11px;color:#98989D;margin-left:6px">HiDPI off · ⌘→Super · ⌥→Alt · release ⌃⌥</div>
+                </div>
+                <div style="margin-top:auto;display:flex;align-items:center;gap:10px;justify-content:flex-end">
+                  <div style="font-size:11px;color:#98989D;margin-right:auto">Last connected Today 09:14 · agent was present</div>
+                  <div style="height:28px;border-radius:7px;padding:0 14px;display:flex;align-items:center;font-size:13px;color:#F5F5F7;background:#3A3A3C;box-shadow:inset 0 0 0 .5px #4E4E50">Duplicate</div>
+                  <div style="height:28px;border-radius:7px;padding:0 18px;display:flex;align-items:center;font-size:13px;font-weight:600;color:#FFFFFF;background:#E05C4B">Connect</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">First launch · empty state</div>
+        <div style="width:760px;height:520px;border-radius:10px;background:#FFFFFF;box-shadow:0 0 0 .5px rgba(0,0,0,.16),0 26px 60px -14px rgba(0,0,0,.32);overflow:hidden;display:flex">
+          <div style="width:232px;background:#F0F0F2;border-right:.5px solid #D8D8DC;display:flex;flex-direction:column">
+            <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 14px 0 20px">
+              <div style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#FEBC2E"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#28C840"></div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:0 26px">
+              <div style="width:96px;height:64px;border-radius:8px;background:repeating-linear-gradient(135deg,#E2E2E6 0 6px,#EAEAEE 6px 12px);box-shadow:inset 0 0 0 .5px #D2D2D6"></div>
+              <div style="font:10px/1.4 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0;text-align:center">empty-state illustration<br>(3 stacked VM windows)</div>
+              <div style="font-size:12px;color:#8E8E93;text-align:center;text-wrap:pretty">No saved connections</div>
+            </div>
+            <div style="height:30px;border-top:.5px solid #D8D8DC;display:flex;align-items:center;gap:2px;padding:0 6px">
+              <div style="width:24px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:15px;color:#3C3C43;background:#E3E3E6">+</div>
+              <div style="width:24px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:15px;color:#C6C6CA">−</div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;background:#FFFFFF">
+            <div style="height:52px;border-bottom:.5px solid #E2E2E5;display:flex;align-items:center;padding:0 16px">
+              <div style="font-size:13px;font-weight:600;color:#8E8E93">SpiceSee</div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:0 64px">
+              <div style="width:56px;height:56px;border-radius:13px;background:linear-gradient(180deg,#F4F4F6,#E2E2E6);box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1);position:relative;overflow:hidden">
+                <div style="position:absolute;left:11px;top:14px;width:34px;height:24px;border-radius:4px;background:#1E1E20"></div>
+                <div style="position:absolute;left:25px;top:18px;width:14px;height:19px;background:#C0392B;border-radius:60% 45% 55% 50% / 40% 40% 70% 70%;transform:rotate(18deg)"></div>
+                <div style="position:absolute;left:29px;top:15px;width:9px;height:3px;background:#3E7A3A;border-radius:2px;transform:rotate(-28deg)"></div>
+              </div>
+              <div style="font-size:17px;font-weight:600;color:#1D1D1F">No Connection Selected</div>
+              <div style="font-size:13px;line-height:1.5;color:#6E6E73;text-align:center;max-width:340px;text-wrap:pretty">Add a QEMU or Proxmox host to connect directly — or open a <b style="color:#1D1D1F">.vv</b> file downloaded from the Proxmox web console and SpiceSee will connect straight away.</div>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+                <div style="height:28px;border-radius:7px;padding:0 16px;display:flex;align-items:center;font-size:13px;font-weight:600;color:#FFFFFF;background:#C0392B">Add Connection…</div>
+                <div style="height:28px;border-radius:7px;padding:0 14px;display:flex;align-items:center;font-size:13px;color:#1D1D1F;background:#FFFFFF;box-shadow:0 0 0 .5px #C0C0C4,0 1px 1.5px rgba(0,0,0,.1)">Open .vv File…</div>
+              </div>
+              <div style="font:10.5px/1.4 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0;margin-top:6px">⌘N   ⌘O</div>
+            </div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:740px">
+            <div>ContentUnavailableView-style layout: 56pt app-icon glyph, 14pt gap, 17pt semibold title, 13pt secondary body ≤340pt wide, centered</div>
+            <div>Sidebar empty state replaces the List; "−" is disabled (.tertiaryLabel). Illustration ships as a 96×64pt asset with dark variant.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:26px">
+    <div style="font:600 12px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#3C3C43">02 · Connecting &amp; failure states</div>
+    <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Inline progress · detail pane, 528 × 210 pt crop</div>
+        <div style="width:528px;height:210px;background:#FFFFFF;border-radius:8px;box-shadow:0 0 0 .5px rgba(0,0,0,.16),0 14px 34px -12px rgba(0,0,0,.26);overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:52px;border-bottom:.5px solid #E2E2E5;display:flex;align-items:center;padding:0 16px;gap:8px">
+            <div style="width:13px;height:13px;border-radius:50%;border:1.6px solid #E0E0E4;border-top-color:#C0392B"></div>
+            <div style="font-size:13px;font-weight:600;color:#1D1D1F">win11-desk</div>
+            <div style="font-size:11px;color:#8E8E93">Connecting…</div>
+          </div>
+          <div style="flex:1;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:13px;color:#1D1D1F">Connecting to <b>192.168.1.20:5901</b> over TLS</div>
+            <div style="height:4px;border-radius:2px;background:#E4E4E7;overflow:hidden">
+              <div style="width:62%;height:100%;border-radius:2px;background:#C0392B"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-top:2px">
+              <div style="display:flex;align-items:center;gap:7px;font-size:11px;color:#6E6E73">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#2E9E4B" stroke-width="1.7" stroke-linecap="round"><path d="M2 6 4.3 8.3 9 2.7"></path></svg>TLS handshake · host-subject verified
+              </div>
+              <div style="display:flex;align-items:center;gap:7px;font-size:11px;color:#6E6E73">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#2E9E4B" stroke-width="1.7" stroke-linecap="round"><path d="M2 6 4.3 8.3 9 2.7"></path></svg>Ticket accepted · main channel linked
+              </div>
+              <div style="display:flex;align-items:center;gap:7px;font-size:11px;color:#8E8E93">
+                <div style="width:11px;height:11px;border-radius:50%;border:1.5px solid #DCDCE0;border-top-color:#8E8E93"></div>Opening display, inputs, cursor, playback channels…
+              </div>
+            </div>
+            <div style="margin-top:auto;display:flex;justify-content:flex-end">
+              <div style="height:24px;border-radius:6px;padding:0 12px;display:flex;align-items:center;font-size:13px;color:#1D1D1F;background:#FFFFFF;box-shadow:0 0 0 .5px #C0C0C4,0 1px 1.5px rgba(0,0,0,.08)">Cancel</div>
+            </div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:520px">
+            <div>Progress is inline in the detail pane — never a modal. ProgressView(.linear) 4pt, tinted accent. Step rows 11pt, checkmark.circle → "checkmark" 11pt.</div>
+            <div>Steps mirror SpiceCore bring-up: TLS → ticket (MAIN_INIT) → MAIN_CHANNELS_LIST. A failing secondary channel degrades, it does not fail the connect.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Failure sheet · TLS host-subject mismatch</div>
+        <div style="width:760px;height:520px;border-radius:10px;background:#FFFFFF;box-shadow:0 0 0 .5px rgba(0,0,0,.16),0 26px 60px -14px rgba(0,0,0,.32);overflow:hidden;display:flex;position:relative">
+          <div style="width:232px;background:#F0F0F2;border-right:.5px solid #D8D8DC;display:flex;flex-direction:column;filter:saturate(.4);opacity:.55">
+            <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 14px 0 20px">
+              <div style="width:12px;height:12px;border-radius:50%;background:#D6D6D8"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#D6D6D8"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#D6D6D8"></div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px;padding:8px 8px 0">
+              <div style="border-radius:6px;background:#DCDCDF;padding:6px 8px;display:flex;flex-direction:column;gap:1px">
+                <div style="font-size:13px;font-weight:600;color:#3C3C43">win11-desk</div>
+                <div style="font-size:11px;color:#8E8E93">192.168.1.20:5900</div>
+              </div>
+              <div style="border-radius:6px;padding:6px 8px;font-size:13px;font-weight:600;color:#8E8E93">ubuntu-build</div>
+              <div style="border-radius:6px;padding:6px 8px;font-size:13px;font-weight:600;color:#8E8E93">opnsense</div>
+            </div>
+          </div>
+          <div style="flex:1;background:#FFFFFF;opacity:.5;display:flex;flex-direction:column">
+            <div style="height:52px;border-bottom:.5px solid #E2E2E5"></div>
+          </div>
+          <div style="position:absolute;left:50%;top:0;transform:translateX(-50%);width:420px;background:#ECECEE;border-radius:0 0 12px 12px;box-shadow:0 18px 40px -8px rgba(0,0,0,.4);padding:20px 22px 16px;display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(180deg,#F4F4F6,#E2E2E6);box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1);position:relative;overflow:hidden">
+              <div style="position:absolute;left:10px;top:13px;width:32px;height:22px;border-radius:4px;background:#1E1E20"></div>
+              <div style="position:absolute;left:23px;top:17px;width:13px;height:18px;background:#C0392B;border-radius:60% 45% 55% 50% / 40% 40% 70% 70%;transform:rotate(18deg)"></div>
+              <div style="position:absolute;right:-4px;bottom:-4px;width:24px;height:24px;border-radius:50%;background:#F0B429;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#4A3400">!</div>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:#1D1D1F;text-align:center">The server's certificate doesn't match this connection</div>
+            <div style="font-size:11px;line-height:1.5;color:#3C3C43;text-align:center;text-wrap:pretty">SpiceSee expected the certificate to be issued to the subject in your <b>.vv</b> file. Someone may be intercepting the connection, or the host's certificate was reissued.</div>
+            <div style="width:100%;background:#FFFFFF;border-radius:7px;box-shadow:inset 0 0 0 .5px #D6D6DA;padding:8px 10px;display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;gap:8px;font:10.5px/1.45 ui-monospace,'SF Mono',Menlo,monospace"><span style="color:#8E8E93;width:76px;flex:none">expected</span><span style="color:#1D1D1F">CN=pve1,O=PVE Cluster Manager CA</span></div>
+              <div style="display:flex;gap:8px;font:10.5px/1.45 ui-monospace,'SF Mono',Menlo,monospace"><span style="color:#8E8E93;width:76px;flex:none">presented</span><span style="color:#C0392B">CN=pve3,O=PVE Cluster Manager CA</span></div>
+              <div style="display:flex;gap:8px;font:10.5px/1.45 ui-monospace,'SF Mono',Menlo,monospace"><span style="color:#8E8E93;width:76px;flex:none">host</span><span style="color:#1D1D1F">192.168.1.20:5901</span></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;width:100%;margin-top:4px">
+              <div style="font-size:11px;color:#6E6E73;margin-right:auto">Download a fresh .vv from the console</div>
+              <div style="height:24px;border-radius:6px;padding:0 12px;display:flex;align-items:center;font-size:13px;color:#1D1D1F;background:#FFFFFF;box-shadow:0 0 0 .5px #C0C0C4,0 1px 1.5px rgba(0,0,0,.08)">Cancel</div>
+              <div style="height:24px;border-radius:6px;padding:0 14px;display:flex;align-items:center;font-size:13px;font-weight:600;color:#FFFFFF;background:#C0392B">Retry</div>
+            </div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:740px">
+            <div>Sheet 420pt wide, 20/22pt insets, 10pt stack gap. App icon 52pt with warning badge 24pt (exclamationmark.triangle.fill for non-icon contexts).</div>
+            <div>Title 13pt bold, message 11pt · technical detail in a 7pt-radius .textBackground box, SF Mono 10.5pt, presented value tinted accent. Retry = defaultAction.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Connection refused · light</div>
+          <div style="width:380px;background:#ECECEE;border-radius:12px;box-shadow:0 0 0 .5px rgba(0,0,0,.14),0 18px 40px -14px rgba(0,0,0,.3);padding:18px 20px 14px;display:flex;flex-direction:column;align-items:center;gap:9px">
+            <div style="width:48px;height:48px;border-radius:11px;background:linear-gradient(180deg,#F4F4F6,#E2E2E6);box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1);position:relative;overflow:hidden">
+              <div style="position:absolute;left:9px;top:12px;width:30px;height:21px;border-radius:4px;background:#1E1E20"></div>
+              <div style="position:absolute;left:21px;top:15px;width:12px;height:17px;background:#C0392B;border-radius:60% 45% 55% 50% / 40% 40% 70% 70%;transform:rotate(18deg)"></div>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:#1D1D1F;text-align:center">Nothing is listening on 10.0.0.4:5900</div>
+            <div style="font-size:11px;line-height:1.5;color:#3C3C43;text-align:center;text-wrap:pretty">The host refused the connection. The VM may be powered off, or its SPICE console may not be enabled in Proxmox.</div>
+            <div style="display:flex;align-items:center;gap:8px;width:100%;margin-top:4px;justify-content:flex-end">
+              <div style="height:24px;border-radius:6px;padding:0 12px;display:flex;align-items:center;font-size:13px;color:#1D1D1F;background:#FFFFFF;box-shadow:0 0 0 .5px #C0C0C4,0 1px 1.5px rgba(0,0,0,.08)">Edit Connection…</div>
+              <div style="height:24px;border-radius:6px;padding:0 14px;display:flex;align-items:center;font-size:13px;font-weight:600;color:#FFFFFF;background:#C0392B">Retry</div>
+            </div>
+          </div>
+        </div>
+        <div style="{{ darkStyle }}">
+          <div style="flex-direction:column;gap:12px;display:flex">
+            <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Wrong password · dark</div>
+            <div style="width:380px;background:#323234;border-radius:12px;box-shadow:0 0 0 .5px rgba(0,0,0,.6),0 18px 40px -14px rgba(0,0,0,.55);padding:18px 20px 14px;display:flex;flex-direction:column;align-items:center;gap:9px">
+              <div style="width:48px;height:48px;border-radius:11px;background:linear-gradient(180deg,#3E3E40,#2A2A2C);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.1);position:relative;overflow:hidden">
+                <div style="position:absolute;left:9px;top:12px;width:30px;height:21px;border-radius:4px;background:#0E0E10"></div>
+                <div style="position:absolute;left:21px;top:15px;width:12px;height:17px;background:#E05C4B;border-radius:60% 45% 55% 50% / 40% 40% 70% 70%;transform:rotate(18deg)"></div>
+              </div>
+              <div style="font-size:13px;font-weight:700;color:#F5F5F7;text-align:center">The password was rejected</div>
+              <div style="font-size:11px;line-height:1.5;color:#C7C7CC;text-align:center;text-wrap:pretty">Proxmox SPICE tickets expire a few seconds after they're issued. If this connection came from a .vv file, open a new console from the web UI.</div>
+              <div style="width:100%;display:flex;align-items:center;gap:8px;margin-top:2px">
+                <div style="font-size:11px;color:#C7C7CC;width:64px;text-align:right">Password:</div>
+                <div style="flex:1;height:22px;border-radius:6px;background:#1C1C1E;box-shadow:inset 0 0 0 .5px #E05C4B;display:flex;align-items:center;padding:0 8px;font-size:12px;letter-spacing:.14em;color:#F5F5F7">••••••••</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;width:100%;margin-top:4px;justify-content:flex-end">
+                <div style="height:24px;border-radius:6px;padding:0 12px;display:flex;align-items:center;font-size:13px;color:#F5F5F7;background:#48484A">Cancel</div>
+                <div style="height:24px;border-radius:6px;padding:0 14px;display:flex;align-items:center;font-size:13px;font-weight:600;color:#FFFFFF;background:#E05C4B">Retry</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">05 · VM migrated — reconnect?</div>
+          <div style="width:380px;background:#ECECEE;border-radius:12px;box-shadow:0 0 0 .5px rgba(0,0,0,.14),0 18px 40px -14px rgba(0,0,0,.3);padding:18px 20px 14px;display:flex;flex-direction:column;align-items:center;gap:9px">
+            <div style="width:48px;height:48px;border-radius:11px;background:linear-gradient(180deg,#F4F4F6,#E2E2E6);box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1);position:relative;overflow:hidden">
+              <div style="position:absolute;left:9px;top:12px;width:30px;height:21px;border-radius:4px;background:#1E1E20"></div>
+              <div style="position:absolute;left:21px;top:15px;width:12px;height:17px;background:#C0392B;border-radius:60% 45% 55% 50% / 40% 40% 70% 70%;transform:rotate(18deg)"></div>
+              <div style="position:absolute;right:-3px;bottom:-3px;width:22px;height:22px;border-radius:50%;background:#0A84FF;display:flex;align-items:center;justify-content:center">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M2 6h8"></path><path d="M7 3l3 3-3 3"></path></svg>
+              </div>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:#1D1D1F;text-align:center">“win11-desk” moved to another host</div>
+            <div style="font-size:11px;line-height:1.5;color:#3C3C43;text-align:center;text-wrap:pretty">The cluster migrated this VM while it was running. Reconnect to keep using the console — the guest keeps running either way.</div>
+            <div style="width:100%;display:flex;flex-direction:column;gap:6px;margin-top:2px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="font-size:11px;color:#6E6E73;width:56px;text-align:right">New host:</div>
+                <div style="flex:1;height:22px;border-radius:6px;background:#FFFFFF;box-shadow:inset 0 0 0 .5px #B4B4B8;display:flex;align-items:center;padding:0 8px;font-size:12px;color:#1D1D1F">pve3.lan</div>
+                <div style="width:64px;height:22px;border-radius:6px;background:#FFFFFF;box-shadow:inset 0 0 0 .5px #B4B4B8;display:flex;align-items:center;padding:0 8px;font-size:12px;color:#1D1D1F">5904</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;padding-left:64px">
+                <div style="width:14px;height:14px;border-radius:3.5px;background:#C0392B;display:flex;align-items:center;justify-content:center">
+                  <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M1.6 4.8 3.5 6.7 7.4 2.4"></path></svg>
+                </div>
+                <div style="font-size:11px;color:#3C3C43">Reconnect automatically next time</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;width:100%;margin-top:4px;justify-content:flex-end">
+              <div style="height:24px;border-radius:6px;padding:0 12px;display:flex;align-items:center;font-size:13px;color:#1D1D1F;background:#FFFFFF;box-shadow:0 0 0 .5px #C0C0C4,0 1px 1.5px rgba(0,0,0,.08)">Cancel</div>
+              <div style="height:24px;border-radius:6px;padding:0 14px;display:flex;align-items:center;font-size:13px;font-weight:600;color:#FFFFFF;background:#C0392B">Reconnect</div>
+            </div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:380px">
+            <div>Alert-shaped sheets 380pt. Titles are plain-language and name the host; the SPICE error code never reaches this text (it goes to the log).</div>
+            <div>Migration dialog is presented on the session window that received MAIN_MIGRATE_SWITCH_HOST, prefilled from the message.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:26px">
+    <div style="font:600 12px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#3C3C43">03 · Session window &amp; 04 · captured-pointer HUD</div>
+    <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Windowed · light · agent connected · 900 × 600 pt</div>
+        <div style="width:900px;height:600px;border-radius:10px;background:#111112;box-shadow:0 0 0 .5px rgba(0,0,0,.2),0 26px 60px -14px rgba(0,0,0,.34);overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:52px;flex:none;background:#F0F0F2;border-bottom:.5px solid #D2D2D6;display:flex;align-items:center;padding:0 12px 0 20px;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px;flex:none">
+              <div style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#FEBC2E"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#28C840"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;margin-left:8px;min-width:0">
+              <div style="font-size:13px;font-weight:600;color:#1D1D1F">win11-desk</div>
+              <div style="font-size:10px;color:#8E8E93">Display 1 of 2 · 1920 × 1080</div>
+            </div>
+            <div style="flex:1"></div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="height:22px;border-radius:6px;padding:0 8px;display:flex;align-items:center;gap:3px;background:#E3E3E6;box-shadow:inset 0 0 0 .5px #D2D2D6">
+                <div style="font-size:10px;color:#1D1D1F">⌃</div><div style="font-size:10px;color:#1D1D1F">⌥</div><div style="font-size:10px;color:#1D1D1F">⌦</div>
+              </div>
+              <div style="width:1px;height:18px;background:#D8D8DC"></div>
+              <div style="display:inline-flex;background:#E9E9EC;border-radius:7px;padding:2px;gap:2px">
+                <div style="padding:2px 9px;border-radius:5px;background:#FFFFFF;box-shadow:0 .5px 2px rgba(0,0,0,.18);font-size:11px;color:#1D1D1F">Fit</div>
+                <div style="padding:2px 9px;border-radius:5px;font-size:11px;color:#3C3C43">1:1</div>
+              </div>
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#8E8E93">2×</div>
+              <div style="width:28px;height:22px;border-radius:6px;background:#E3E3E6;display:flex;align-items:center;justify-content:center">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1D1D1F" stroke-width="1.2"><rect x="2.5" y="1.5" width="8" height="10" rx="1.6"></rect><path d="M5.5 4.5h8.0v10a1.6 1.6 0 0 1-1.6 1.6H7.1a1.6 1.6 0 0 1-1.6-1.6" transform="translate(-.5 0)"></path></svg>
+              </div>
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1D1D1F" stroke-width="1.2" stroke-linecap="round"><path d="M2 6h2.4L8 3v10L4.4 10H2z" fill="#1D1D1F" stroke="none"></path><path d="M11 5.6l3.4 4.8M14.4 5.6L11 10.4"></path></svg>
+              </div>
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1D1D1F" stroke-width="1.25" stroke-linecap="round"><path d="M2.2 5.6V3.2A1 1 0 0 1 3.2 2.2h2.4"></path><path d="M13.8 5.6V3.2a1 1 0 0 0-1-1h-2.4"></path><path d="M2.2 10.4v2.4a1 1 0 0 0 1 1h2.4"></path><path d="M13.8 10.4v2.4a1 1 0 0 1-1 1h-2.4"></path></svg>
+              </div>
+              <div style="width:1px;height:18px;background:#D8D8DC"></div>
+              <div style="height:22px;border-radius:6px;padding:0 8px;display:flex;align-items:center;gap:5px;background:#E9F3EC;box-shadow:inset 0 0 0 .5px #C6E2CE">
+                <div style="width:9px;height:9px;border-radius:2.5px;background:#2E9E4B;box-shadow:0 0 0 2px rgba(46,158,75,.18)"></div>
+                <div style="font-size:11px;color:#1F6B34">Agent</div>
+              </div>
+            </div>
+          </div>
+          <div style="flex:1;background:repeating-linear-gradient(135deg,#17171A 0 9px,#1C1C20 9px 18px);display:flex;align-items:center;justify-content:center;position:relative">
+            <div style="font:11px/1.6 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;text-align:center">VM framebuffer · CAMetalLayer<br>guest 1920 × 1080 → scaled to fit (0.469×)<br>no chrome, no inset, no overlay</div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:880px">
+            <div>Unified toolbar 52pt, .toolbar(.unifiedCompact) · items 28×22pt, 6pt radius, 6pt gap, 1pt dividers at 18pt tall · glyphs 15pt, .medium weight</div>
+            <div>SF Symbols — fullscreen: arrow.up.left.and.arrow.down.right · clipboard: doc.on.clipboard (off state: doc.on.clipboard + .secondaryLabel) · mute: speaker.slash.fill / speaker.wave.2.fill</div>
+            <div>Custom glyphs — Ctrl-Alt-Del: three 10pt keycap chars ⌃⌥⌦ in one 22pt pill · HiDPI: "2×" 11pt semibold (on = accent tint, off = .secondaryLabel) · Scaling: Picker(.segmented) 11pt</div>
+            <div>Window title = VM name (falls back to host); subtitle = window's viewport index + guest resolution. Content view has zero padding — the framebuffer is the content.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="{{ darkStyle }}">
+        <div style="flex-direction:column;gap:12px;display:flex">
+          <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Fullscreen · toolbar revealed on hover at top edge · pointer captured</div>
+          <div style="width:900px;height:562px;border-radius:6px;background:#0B0B0C;box-shadow:0 26px 60px -14px rgba(0,0,0,.5);overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center">
+            <div style="position:absolute;inset:0;background:repeating-linear-gradient(135deg,#141417 0 9px,#191A1D 9px 18px)"></div>
+            <div style="position:relative;font:11px/1.6 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;text-align:center">VM framebuffer · native fullscreen on Mac display 2<br>guest 2560 × 1440 → 1:1</div>
+            <div style="position:absolute;left:50%;top:0;transform:translateX(-50%);height:44px;width:max-content;background:rgba(40,40,42,.82);backdrop-filter:blur(24px);border-radius:0 0 12px 12px;box-shadow:0 8px 24px -6px rgba(0,0,0,.6),inset 0 0 0 .5px rgba(255,255,255,.12);display:flex;align-items:center;gap:6px;padding:0 12px">
+              <div style="font-size:12px;font-weight:600;color:#F5F5F7;padding-right:6px;white-space:nowrap;flex:none">win11-desk</div>
+              <div style="width:1px;height:18px;background:rgba(255,255,255,.16)"></div>
+              <div style="height:22px;border-radius:6px;padding:0 8px;display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.1)">
+                <div style="font-size:10px;color:#F5F5F7">⌃</div><div style="font-size:10px;color:#F5F5F7">⌥</div><div style="font-size:10px;color:#F5F5F7">⌦</div>
+              </div>
+              <div style="display:inline-flex;background:rgba(255,255,255,.1);border-radius:7px;padding:2px;gap:2px">
+                <div style="padding:2px 9px;border-radius:5px;font-size:11px;color:#C7C7CC">Fit</div>
+                <div style="padding:2px 9px;border-radius:5px;background:rgba(255,255,255,.22);font-size:11px;color:#FFFFFF">1:1</div>
+              </div>
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#E05C4B;background:rgba(224,92,75,.16)">2×</div>
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#8E8E93" stroke-width="1.2"><rect x="2.5" y="1.5" width="8" height="10" rx="1.6"></rect><path d="M5 4.5h8v10a1.6 1.6 0 0 1-1.6 1.6H6.6A1.6 1.6 0 0 1 5 14.5"></path></svg>
+              </div>
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#F5F5F7" stroke-width="1.2" stroke-linecap="round"><path d="M2 6h2.4L8 3v10L4.4 10H2z" fill="#F5F5F7" stroke="none"></path><path d="M11 5.6l3.4 4.8M14.4 5.6L11 10.4"></path></svg>
+              </div>
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#F5F5F7" stroke-width="1.25" stroke-linecap="round"><path d="M5.6 5.6 2.2 2.2M2.2 5.4V2.2h3.2"></path><path d="M10.4 10.4l3.4 3.4M13.8 10.6v3.2h-3.2"></path></svg>
+              </div>
+              <div style="width:1px;height:18px;background:rgba(255,255,255,.16)"></div>
+              <div style="height:22px;border-radius:6px;padding:0 8px;display:flex;align-items:center;gap:5px;background:rgba(240,180,41,.18)">
+                <div style="width:9px;height:9px;border-radius:2.5px;background:transparent;box-shadow:inset 0 0 0 1.6px #F0B429"></div>
+                <div style="font-size:11px;color:#F0B429">No agent</div>
+              </div>
+            </div>
+            <div style="position:absolute;left:50%;bottom:44px;transform:translateX(-50%);display:flex;align-items:center;gap:9px;height:36px;padding:0 16px;border-radius:18px;background:rgba(20,20,22,.78);backdrop-filter:blur(24px);box-shadow:0 10px 30px -8px rgba(0,0,0,.7),inset 0 0 0 .5px rgba(255,255,255,.14)">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="#F5F5F7"><path d="M3.4 1.6 12.6 8.2 8.6 9.1 11 14 9.2 14.7 6.8 9.8 3.4 12.4z"></path></svg>
+              <div style="font-size:12px;color:#FFFFFF">Pointer captured — press <b style="font-weight:600">⌃⌥</b> to release</div>
+            </div>
+            <div style="position:absolute;right:14px;top:56px;display:flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:11px;background:rgba(20,20,22,.6);backdrop-filter:blur(18px);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.12)">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="#E05C4B"><path d="M3.4 1.6 12.6 8.2 8.6 9.1 11 14 9.2 14.7 6.8 9.8 3.4 12.4z"></path></svg>
+              <div style="font-size:10px;color:#E8E8EA">⌃⌥</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Narrow window · 640 pt · toolbar condensed</div>
+          <div style="width:640px;height:400px;border-radius:10px;background:#111112;box-shadow:0 0 0 .5px rgba(0,0,0,.2),0 22px 50px -14px rgba(0,0,0,.32);overflow:hidden;display:flex;flex-direction:column">
+            <div style="height:52px;flex:none;background:#F0F0F2;border-bottom:.5px solid #D2D2D6;display:flex;align-items:center;padding:0 10px 0 20px;gap:8px">
+              <div style="display:flex;align-items:center;gap:8px;flex:none">
+                <div style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></div>
+                <div style="width:12px;height:12px;border-radius:50%;background:#FEBC2E"></div>
+                <div style="width:12px;height:12px;border-radius:50%;background:#28C840"></div>
+              </div>
+              <div style="font-size:13px;font-weight:600;color:#1D1D1F;margin-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">opnsense</div>
+              <div style="flex:1"></div>
+              <div style="display:flex;align-items:center;gap:4px">
+                <div style="height:22px;border-radius:6px;padding:0 7px;display:flex;align-items:center;gap:2px;background:#E3E3E6;box-shadow:inset 0 0 0 .5px #D2D2D6">
+                  <div style="font-size:10px;color:#1D1D1F">⌃</div><div style="font-size:10px;color:#1D1D1F">⌥</div><div style="font-size:10px;color:#1D1D1F">⌦</div>
+                </div>
+                <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1D1D1F" stroke-width="1.25" stroke-linecap="round"><path d="M2.2 5.6V3.2A1 1 0 0 1 3.2 2.2h2.4"></path><path d="M13.8 5.6V3.2a1 1 0 0 0-1-1h-2.4"></path><path d="M2.2 10.4v2.4a1 1 0 0 0 1 1h2.4"></path><path d="M13.8 10.4v2.4a1 1 0 0 1-1 1h-2.4"></path></svg>
+                </div>
+                <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:2px">
+                  <div style="width:3px;height:3px;border-radius:50%;background:#1D1D1F"></div>
+                  <div style="width:3px;height:3px;border-radius:50%;background:#1D1D1F"></div>
+                  <div style="width:3px;height:3px;border-radius:50%;background:#1D1D1F"></div>
+                </div>
+                <div style="width:22px;height:22px;border-radius:6px;background:#FDF3DE;box-shadow:inset 0 0 0 .5px #EDDFBB;display:flex;align-items:center;justify-content:center">
+                  <div style="width:9px;height:9px;border-radius:2.5px;box-shadow:inset 0 0 0 1.6px #C88A05"></div>
+                </div>
+              </div>
+            </div>
+            <div style="flex:1;background:repeating-linear-gradient(135deg,#17171A 0 9px,#1C1C20 9px 18px);display:flex;align-items:center;justify-content:center;position:relative">
+              <div style="font:10.5px/1.6 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;text-align:center">VM framebuffer · text console 720 × 400<br>agent absent → server-mode mouse</div>
+              <div style="position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;height:32px;padding:0 14px;border-radius:16px;background:rgba(20,20,22,.78);backdrop-filter:blur(24px);box-shadow:0 10px 30px -8px rgba(0,0,0,.7),inset 0 0 0 .5px rgba(255,255,255,.14)">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="#F5F5F7"><path d="M3.4 1.6 12.6 8.2 8.6 9.1 11 14 9.2 14.7 6.8 9.8 3.4 12.4z"></path></svg>
+                <div style="font-size:11.5px;color:#FFFFFF">Press <b style="font-weight:600">⌃⌥</b> to release the pointer</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:640px">
+            <div>At ≤700pt the scaling picker, HiDPI, clipboard and mute collapse into one ellipsis.circle overflow menu; Ctrl-Alt-Del, fullscreen and the agent chip never collapse.</div>
+            <div>Agent chip compresses to the 22pt dot-only form; the tooltip keeps the full explanation.</div>
+            <div>HUD: 32–36pt capsule, 11.5–12pt text, 20–44pt from the bottom edge, .thickMaterial + 0.5pt inner stroke. Appears on capture, fades over 0.25s after 2.0s.</div>
+            <div>Persistent cue while captured: 22pt capsule top-trailing, 14pt inset below the toolbar edge, 60% opacity, non-interactive (allowsHitTesting false).</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:26px">
+    <div style="font:600 12px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#3C3C43">06 · Preferences (⌘,) — 580 × 380 pt &nbsp;·&nbsp; 07 · Acknowledgements — 620 × 460 pt</div>
+    <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">General · light</div>
+        <div style="width:580px;height:340px;border-radius:10px;background:#ECECEE;box-shadow:0 0 0 .5px rgba(0,0,0,.16),0 22px 50px -14px rgba(0,0,0,.3);overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:52px;flex:none;background:#F0F0F2;border-bottom:.5px solid #D8D8DC;display:flex;align-items:center;padding:0 14px 0 20px;gap:16px">
+            <div style="display:flex;align-items:center;gap:8px;flex:none">
+              <div style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#D6D6D8"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#D6D6D8"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:2px;margin-left:auto;margin-right:auto">
+              <div style="width:64px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px 0;border-radius:6px;background:#DEDEE1">
+                <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#1D1D1F" stroke-width="1.2"><circle cx="8" cy="8" r="2.4"></circle><path d="M8 1.4v1.8M8 12.8v1.8M1.4 8h1.8M12.8 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M12.6 3.4l-1.3 1.3M4.7 11.3l-1.3 1.3"></path></svg>
+                <div style="font-size:10px;color:#1D1D1F">General</div>
+              </div>
+              <div style="width:64px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px 0;border-radius:6px">
+                <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#3C3C43" stroke-width="1.2"><rect x="1.3" y="3.6" width="13.4" height="8.8" rx="1.8"></rect><path d="M4.4 10.4h7.2" stroke-linecap="round"></path></svg>
+                <div style="font-size:10px;color:#3C3C43">Keyboard</div>
+              </div>
+              <div style="width:64px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px 0;border-radius:6px">
+                <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#3C3C43" stroke-width="1.2" stroke-linecap="round"><path d="M8 12.6V3.4"></path><path d="M4.6 6.8 8 3.4l3.4 3.4"></path><path d="M2.6 13.6h10.8"></path></svg>
+                <div style="font-size:10px;color:#3C3C43">Updates</div>
+              </div>
+            </div>
+          </div>
+          <div style="flex:1;padding:22px 26px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:150px;text-align:right;font-size:13px;color:#1D1D1F">Default scaling:</div>
+              <div style="display:inline-flex;background:#E1E1E4;border-radius:7px;padding:2px;gap:2px">
+                <div style="padding:3px 12px;border-radius:5px;background:#FFFFFF;box-shadow:0 .5px 2px rgba(0,0,0,.18);font-size:12px;color:#1D1D1F">Fit window</div>
+                <div style="padding:3px 12px;border-radius:5px;font-size:12px;color:#3C3C43">1:1 pixels</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <div style="width:150px;text-align:right;font-size:13px;color:#1D1D1F;padding-top:3px">HiDPI by default:</div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="width:38px;height:22px;border-radius:11px;background:#E4E4E7;box-shadow:inset 0 0 0 .5px #C9C9CD;position:relative">
+                  <div style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,.22)"></div>
+                </div>
+                <div style="font-size:11px;line-height:1.45;color:#6E6E73;max-width:300px;text-wrap:pretty">Off sends logical points, so the guest renders at 1×. On sends backing pixels — sharper, but the guest desktop gets very small unless it scales.</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <div style="width:150px;text-align:right;font-size:13px;color:#1D1D1F;padding-top:1px">On connect:</div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div style="width:14px;height:14px;border-radius:3.5px;background:#C0392B;display:flex;align-items:center;justify-content:center">
+                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M1.6 4.8 3.5 6.7 7.4 2.4"></path></svg>
+                  </div>
+                  <div style="font-size:13px;color:#1D1D1F">Open one window per guest monitor</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div style="width:14px;height:14px;border-radius:3.5px;background:#C0392B;display:flex;align-items:center;justify-content:center">
+                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M1.6 4.8 3.5 6.7 7.4 2.4"></path></svg>
+                  </div>
+                  <div style="font-size:13px;color:#1D1D1F">Sync clipboard when the agent is available</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div style="width:14px;height:14px;border-radius:3.5px;background:#FFFFFF;box-shadow:inset 0 0 0 .5px #B4B4B8"></div>
+                  <div style="font-size:13px;color:#1D1D1F">Delete .vv files after connecting</div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:auto;display:flex;align-items:center">
+              <div style="font-size:11px;color:#8E8E93">Per-connection settings in Advanced override these defaults.</div>
+              <a href="#ack" style="margin-left:auto;font-size:11px">Acknowledgements…</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="{{ darkStyle }}">
+        <div style="flex-direction:column;gap:12px;display:flex">
+          <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Keyboard · dark · keycap picker</div>
+          <div style="width:580px;height:340px;border-radius:10px;background:#232325;box-shadow:0 0 0 .5px rgba(0,0,0,.6),0 22px 50px -14px rgba(0,0,0,.5);overflow:hidden;display:flex;flex-direction:column">
+            <div style="height:52px;flex:none;background:#2E2E30;border-bottom:.5px solid #000000;display:flex;align-items:center;padding:0 14px 0 20px;gap:16px">
+              <div style="display:flex;align-items:center;gap:8px;flex:none">
+                <div style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></div>
+                <div style="width:12px;height:12px;border-radius:50%;background:#4A4A4C"></div>
+                <div style="width:12px;height:12px;border-radius:50%;background:#4A4A4C"></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:2px;margin-left:auto;margin-right:auto">
+                <div style="width:64px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px 0;border-radius:6px">
+                  <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#C7C7CC" stroke-width="1.2"><circle cx="8" cy="8" r="2.4"></circle><path d="M8 1.4v1.8M8 12.8v1.8M1.4 8h1.8M12.8 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M12.6 3.4l-1.3 1.3M4.7 11.3l-1.3 1.3"></path></svg>
+                  <div style="font-size:10px;color:#C7C7CC">General</div>
+                </div>
+                <div style="width:64px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px 0;border-radius:6px;background:#3D3D3F">
+                  <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#F5F5F7" stroke-width="1.2"><rect x="1.3" y="3.6" width="13.4" height="8.8" rx="1.8"></rect><path d="M4.4 10.4h7.2" stroke-linecap="round"></path></svg>
+                  <div style="font-size:10px;color:#F5F5F7">Keyboard</div>
+                </div>
+                <div style="width:64px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px 0;border-radius:6px">
+                  <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#C7C7CC" stroke-width="1.2" stroke-linecap="round"><path d="M8 12.6V3.4"></path><path d="M4.6 6.8 8 3.4l3.4 3.4"></path><path d="M2.6 13.6h10.8"></path></svg>
+                  <div style="font-size:10px;color:#C7C7CC">Updates</div>
+                </div>
+              </div>
+            </div>
+            <div style="flex:1;padding:20px 26px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;align-items:flex-start;gap:12px">
+                <div style="width:132px;text-align:right;font-size:13px;color:#F5F5F7;padding-top:5px">Modifier mapping:</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="min-width:34px;height:26px;border-radius:6px;background:#3A3A3C;box-shadow:inset 0 0 0 .5px #55555A,0 1px 0 rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 7px">
+                      <div style="font-size:12px;color:#F5F5F7">⌘</div>
+                    </div>
+                    <svg width="16" height="10" viewBox="0 0 16 10" fill="none" stroke="#98989D" stroke-width="1.3" stroke-linecap="round"><path d="M1 5h12M10 2l3 3-3 3"></path></svg>
+                    <div style="display:inline-flex;background:#1C1C1E;border-radius:7px;padding:2px;gap:2px;box-shadow:inset 0 0 0 .5px #3A3A3C">
+                      <div style="padding:3px 11px;border-radius:5px;background:#E05C4B;font-size:12px;color:#FFFFFF">Super</div>
+                      <div style="padding:3px 11px;border-radius:5px;font-size:12px;color:#C7C7CC">Ctrl</div>
+                      <div style="padding:3px 11px;border-radius:5px;font-size:12px;color:#C7C7CC">Alt</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div style="min-width:34px;height:26px;border-radius:6px;background:#3A3A3C;box-shadow:inset 0 0 0 .5px #55555A,0 1px 0 rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:0 7px">
+                      <div style="font-size:12px;color:#F5F5F7">⌥</div>
+                    </div>
+                    <svg width="16" height="10" viewBox="0 0 16 10" fill="none" stroke="#98989D" stroke-width="1.3" stroke-linecap="round"><path d="M1 5h12M10 2l3 3-3 3"></path></svg>
+                    <div style="display:inline-flex;background:#1C1C1E;border-radius:7px;padding:2px;gap:2px;box-shadow:inset 0 0 0 .5px #3A3A3C">
+                      <div style="padding:3px 11px;border-radius:5px;font-size:12px;color:#C7C7CC">Super</div>
+                      <div style="padding:3px 11px;border-radius:5px;font-size:12px;color:#C7C7CC">Ctrl</div>
+                      <div style="padding:3px 11px;border-radius:5px;background:#E05C4B;font-size:12px;color:#FFFFFF">Alt</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px">
+                <div style="width:132px;text-align:right;font-size:13px;color:#F5F5F7;padding-top:5px">Release chord:</div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;align-items:center;gap:5px">
+                    <div style="min-width:34px;height:26px;border-radius:6px;background:#E05C4B;display:flex;align-items:center;justify-content:center;padding:0 7px;font-size:12px;color:#FFFFFF">⌃</div>
+                    <div style="min-width:34px;height:26px;border-radius:6px;background:#E05C4B;display:flex;align-items:center;justify-content:center;padding:0 7px;font-size:12px;color:#FFFFFF">⌥</div>
+                    <div style="min-width:34px;height:26px;border-radius:6px;background:#2A2A2C;box-shadow:inset 0 0 0 .5px #48484A;display:flex;align-items:center;justify-content:center;padding:0 7px;font-size:12px;color:#6E6E73">⇧</div>
+                    <div style="min-width:34px;height:26px;border-radius:6px;background:#2A2A2C;box-shadow:inset 0 0 0 .5px #48484A;display:flex;align-items:center;justify-content:center;padding:0 7px;font-size:12px;color:#6E6E73">⌘</div>
+                    <div style="font-size:11px;color:#98989D;margin-left:6px">Click keycaps to build the chord — two modifiers minimum</div>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:132px"></div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div style="width:14px;height:14px;border-radius:3.5px;background:#E05C4B;display:flex;align-items:center;justify-content:center">
+                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M1.6 4.8 3.5 6.7 7.4 2.4"></path></svg>
+                  </div>
+                  <div style="font-size:13px;color:#F5F5F7">Send lock keys (⇪, Num, Scroll) to the guest</div>
+                </div>
+              </div>
+              <div style="margin-top:auto;font-size:11px;line-height:1.45;color:#98989D;max-width:440px;text-wrap:pretty">Mapping is positional and layout-independent (kVK_* → XT set-1 scancodes). macOS keeps system shortcuts such as ⌘Tab; use Ctrl-Alt-Del in the toolbar for the guest's secure attention sequence.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">Updates · light · Sparkle 2</div>
+        <div style="width:580px;height:230px;border-radius:10px;background:#ECECEE;box-shadow:0 0 0 .5px rgba(0,0,0,.16),0 22px 50px -14px rgba(0,0,0,.3);overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:52px;flex:none;background:#F0F0F2;border-bottom:.5px solid #D8D8DC;display:flex;align-items:center;padding:0 14px 0 20px">
+            <div style="display:flex;align-items:center;gap:8px;flex:none">
+              <div style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#D6D6D8"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#D6D6D8"></div>
+            </div>
+            <div style="margin:0 auto;font-size:13px;font-weight:600;color:#1D1D1F">Updates</div>
+          </div>
+          <div style="flex:1;padding:20px 26px;display:flex;flex-direction:column;gap:11px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="width:14px;height:14px;border-radius:3.5px;background:#C0392B;display:flex;align-items:center;justify-content:center">
+                <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M1.6 4.8 3.5 6.7 7.4 2.4"></path></svg>
+              </div>
+              <div style="font-size:13px;color:#1D1D1F">Check for updates automatically</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;padding-left:20px">
+              <div style="width:14px;height:14px;border-radius:3.5px;background:#FFFFFF;box-shadow:inset 0 0 0 .5px #B4B4B8"></div>
+              <div style="font-size:13px;color:#1D1D1F">Download and install in the background</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;padding-left:20px">
+              <div style="width:14px;height:14px;border-radius:3.5px;background:#FFFFFF;box-shadow:inset 0 0 0 .5px #B4B4B8"></div>
+              <div style="font-size:13px;color:#1D1D1F">Include pre-release builds</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:auto">
+              <div style="font-size:11px;color:#6E6E73">SpiceSee 1.0 (build 142) · last checked today at 08:57</div>
+              <div style="margin-left:auto;height:28px;border-radius:7px;padding:0 14px;display:flex;align-items:center;font-size:13px;color:#1D1D1F;background:#FFFFFF;box-shadow:0 0 0 .5px #C0C0C4,0 1px 1.5px rgba(0,0,0,.1)">Check Now</div>
+            </div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:580px">
+            <div>SwiftUI Settings scene, TabView(.automatic) — toolbar tabs 64pt wide, 17pt symbol + 10pt label. Panes: General 340pt, Keyboard 340pt, Updates 230pt (window resizes per tab).</div>
+            <div>Tab symbols: gearshape (General) · keyboard (Keyboard) · arrow.up.circle → square.and.arrow.up on the sheet (Updates). Label column 132–150pt trailing-aligned; 14pt row rhythm.</div>
+            <div>Keycap picker: 34×26pt caps, 5pt gap, selected = accent fill / white glyph, unselected = .controlBackground + .separator stroke.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="ack" style="display:flex;flex-direction:column;gap:12px">
+        <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">07 · Acknowledgements · light · 620 × 460 pt</div>
+        <div style="width:620px;height:460px;border-radius:10px;background:#FFFFFF;box-shadow:0 0 0 .5px rgba(0,0,0,.16),0 22px 50px -14px rgba(0,0,0,.3);overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:52px;flex:none;background:#F0F0F2;border-bottom:.5px solid #D8D8DC;display:flex;align-items:center;padding:0 14px 0 20px">
+            <div style="display:flex;align-items:center;gap:8px;flex:none">
+              <div style="width:12px;height:12px;border-radius:50%;background:#FF5F57"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#FEBC2E"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#28C840"></div>
+            </div>
+            <div style="margin:0 auto;font-size:13px;font-weight:600;color:#1D1D1F">Acknowledgements</div>
+          </div>
+          <div style="flex:1;display:flex;min-height:0">
+            <div style="width:200px;background:#F6F6F8;border-right:.5px solid #E2E2E5;display:flex;flex-direction:column;gap:2px;padding:8px">
+              <div style="border-radius:6px;background:#C0392B;padding:5px 8px;display:flex;flex-direction:column">
+                <div style="font-size:12px;font-weight:600;color:#FFFFFF">spice-common codecs</div>
+                <div style="font-size:10px;color:rgba(255,255,255,.78)">LGPL-2.1-or-later</div>
+              </div>
+              <div style="border-radius:6px;padding:5px 8px;display:flex;flex-direction:column">
+                <div style="font-size:12px;font-weight:600;color:#1D1D1F">spice-protocol</div>
+                <div style="font-size:10px;color:#8E8E93">BSD-3-Clause</div>
+              </div>
+              <div style="border-radius:6px;padding:5px 8px;display:flex;flex-direction:column">
+                <div style="font-size:12px;font-weight:600;color:#1D1D1F">libopus</div>
+                <div style="font-size:10px;color:#8E8E93">BSD-3-Clause</div>
+              </div>
+              <div style="border-radius:6px;padding:5px 8px;display:flex;flex-direction:column">
+                <div style="font-size:12px;font-weight:600;color:#1D1D1F">Sparkle</div>
+                <div style="font-size:10px;color:#8E8E93">MIT</div>
+              </div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+              <div style="padding:16px 20px 12px;display:flex;flex-direction:column;gap:7px;border-bottom:.5px solid #E2E2E5">
+                <div style="font-size:15px;font-weight:600;color:#1D1D1F">QUIC, LZ and GLZ decoders</div>
+                <div style="font-size:11px;line-height:1.5;color:#3C3C43;text-wrap:pretty">From spice-common / spice-gtk, used decode-only. Licensed under the GNU Lesser General Public License, version 2.1 or later.</div>
+                <div style="background:#F6F6F8;border-radius:7px;box-shadow:inset 0 0 0 .5px #E2E2E5;padding:9px 11px;display:flex;flex-direction:column;gap:4px">
+                  <div style="font-size:11px;font-weight:600;color:#1D1D1F">You can replace this framework</div>
+                  <div style="font-size:11px;line-height:1.5;color:#3C3C43;text-wrap:pretty">These decoders ship as <b>CSpiceCodec.framework</b> inside the app bundle, and library validation is disabled so you can substitute your own build. Source and the written offer are linked below.</div>
+                  <div style="display:flex;gap:14px;margin-top:2px">
+                    <a href="#ack" style="font-size:11px">Get the source…</a>
+                    <a href="#ack" style="font-size:11px">Show in Finder</a>
+                  </div>
+                </div>
+              </div>
+              <div style="flex:1;padding:12px 20px;overflow:hidden;font:10.5px/1.6 ui-monospace,'SF Mono',Menlo,monospace;color:#3C3C43">
+                GNU LESSER GENERAL PUBLIC LICENSE<br>Version 2.1, February 1999<br><br>Copyright (C) 1991, 1999 Free Software Foundation, Inc.<br>51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA<br><br>Everyone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.<br><br>[This is the first released version of the Lesser GPL. It also counts as the successor of the GNU Library Public License, version 2, hence the version number 2.1.]<br><br>Preamble<br><br>The licenses for most software are designed to take away your…
+              </div>
+              <div style="height:38px;flex:none;border-top:.5px solid #E2E2E5;display:flex;align-items:center;padding:0 20px;gap:10px">
+                <div style="font-size:11px;color:#8E8E93">4 components</div>
+                <div style="margin-left:auto;height:24px;border-radius:6px;padding:0 12px;display:flex;align-items:center;font-size:12px;color:#1D1D1F;background:#FFFFFF;box-shadow:0 0 0 .5px #C0C0C4,0 1px 1.5px rgba(0,0,0,.08)">Copy License Text</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:620px">
+            <div>Split view: 200pt component list (12pt semibold name + 10pt SPDX id), detail = 15pt title, 11pt summary, callout box, then verbatim license in SF Mono 10.5pt / 1.6 line height, selectable.</div>
+            <div>The LGPL §6(b) written offer lives in the callout, not buried in the license body — it is a shipping requirement, so it gets a heading.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:26px">
+    <div style="font:600 12px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#3C3C43">08 · App icon &amp; .vv document icon</div>
+    <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">App icon — mark study, 176 / 96 / 48 / 32 / 16 pt</div>
+        <div style="display:flex;align-items:flex-end;gap:24px;background:#FFFFFF;border-radius:12px;padding:26px 28px;box-shadow:0 0 0 .5px rgba(0,0,0,.12)">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="width:176px;height:176px;border-radius:40px;background:linear-gradient(180deg,#FBFBFC,#DEDEE2);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08),0 8px 18px -6px rgba(0,0,0,.28);position:relative;overflow:hidden">
+              <div style="position:absolute;left:26px;top:38px;width:124px;height:86px;border-radius:11px;background:linear-gradient(180deg,#232328,#111114);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.1)"></div>
+              <div style="position:absolute;left:76px;top:56px;width:40px;height:64px;background:linear-gradient(160deg,#E4523E,#A82419);border-radius:56% 50% 46% 44% / 30% 30% 82% 82%;transform:rotate(16deg);box-shadow:0 6px 14px -4px rgba(0,0,0,.5)"></div>
+              <div style="position:absolute;left:80px;top:52px;width:28px;height:8px;background:#3E7A3A;border-radius:5px;transform:rotate(-24deg)"></div>
+              <div style="position:absolute;left:60px;top:132px;width:56px;height:9px;border-radius:5px;background:#C6C6CB"></div>
+            </div>
+            <div style="font:10px/1.3 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0">1024 px master</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="width:96px;height:96px;border-radius:22px;background:linear-gradient(180deg,#FBFBFC,#DEDEE2);box-shadow:inset 0 0 0 .8px rgba(0,0,0,.08),0 5px 12px -4px rgba(0,0,0,.26);position:relative;overflow:hidden">
+              <div style="position:absolute;left:14px;top:21px;width:68px;height:47px;border-radius:6px;background:linear-gradient(180deg,#232328,#111114)"></div>
+              <div style="position:absolute;left:38px;top:29px;width:29px;height:40px;background:linear-gradient(160deg,#E4523E,#A82419);border-radius:62% 46% 54% 50% / 38% 38% 72% 72%;transform:rotate(16deg)"></div>
+              <div style="position:absolute;left:45px;top:24px;width:19px;height:5px;background:#3E7A3A;border-radius:3px;transform:rotate(-26deg)"></div>
+              <div style="position:absolute;left:33px;top:72px;width:30px;height:5px;border-radius:3px;background:#C6C6CB"></div>
+            </div>
+            <div style="font:10px/1.3 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0">128</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="width:48px;height:48px;border-radius:11px;background:linear-gradient(180deg,#FBFBFC,#DEDEE2);box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1);position:relative;overflow:hidden">
+              <div style="position:absolute;left:7px;top:11px;width:34px;height:24px;border-radius:3px;background:#191A1D"></div>
+              <div style="position:absolute;left:19px;top:15px;width:15px;height:20px;background:#D0392A;border-radius:62% 46% 54% 50% / 38% 38% 72% 72%;transform:rotate(16deg)"></div>
+              <div style="position:absolute;left:23px;top:12px;width:11px;height:3px;background:#3E7A3A;border-radius:2px;transform:rotate(-26deg)"></div>
+            </div>
+            <div style="font:10px/1.3 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0">48</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="width:32px;height:32px;border-radius:7.5px;background:linear-gradient(180deg,#FAFAFB,#DEDEE2);box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1);position:relative;overflow:hidden">
+              <div style="position:absolute;left:4px;top:7px;width:24px;height:17px;border-radius:2px;background:#191A1D"></div>
+              <div style="position:absolute;left:13px;top:9px;width:11px;height:15px;background:#D0392A;border-radius:62% 46% 54% 50% / 38% 38% 72% 72%;transform:rotate(16deg)"></div>
+              <div style="position:absolute;left:16px;top:7px;width:8px;height:2.5px;background:#3E7A3A;border-radius:2px;transform:rotate(-26deg)"></div>
+            </div>
+            <div style="font:10px/1.3 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0">32</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="width:16px;height:16px;border-radius:4px;background:#E7E7EA;position:relative;overflow:hidden;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)">
+              <div style="position:absolute;left:1.5px;top:3px;width:13px;height:10px;border-radius:1.5px;background:#191A1D"></div>
+              <div style="position:absolute;left:6px;top:4px;width:6.5px;height:9px;background:#D0392A;border-radius:60% 46% 54% 50% / 38% 38% 72% 72%;transform:rotate(14deg)"></div>
+            </div>
+            <div style="font:10px/1.3 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0">16</div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:700px">
+            <div>Concept: a display, seen head-on, with a single chili pepper as the thing on screen — "spice" you can see. Two shapes only, so it survives 16px.</div>
+            <div>Legibility ladder: 128 keeps the stand; 48 and below drop it; 16 drops the stem and the bezel highlight, leaving a dark rectangle + red form (the strongest 2-value silhouette).</div>
+            <div>Pepper red #D0392A at small sizes / gradient #E4523E→#A82419 at large. Stem #3E7A3A. Screen #191A1D. Plate is a neutral light-grey squircle — no colour behind the pepper, so it stays the only saturated element in the Dock.</div>
+            <div>Deliver as .icon (Icon Composer, macOS 26) plus a 1024 PNG set for 14/15; light, dark and tinted variants — dark plate = #2C2C2E→#1C1C1E, pepper unchanged.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font:600 11px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#86868B">.vv document icon — 128 / 48 / 32 / 16 pt</div>
+        <div style="display:flex;align-items:flex-end;gap:22px;background:#FFFFFF;border-radius:12px;padding:26px 28px;box-shadow:0 0 0 .5px rgba(0,0,0,.12)">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="width:100px;height:126px;border-radius:8px 8px 8px 8px;background:linear-gradient(180deg,#FFFFFF,#F2F2F4);box-shadow:0 0 0 .5px rgba(0,0,0,.16),0 6px 14px -6px rgba(0,0,0,.24);position:relative;overflow:hidden">
+              <div style="position:absolute;right:0;top:0;width:26px;height:26px;background:#E4E4E8;clip-path:polygon(0 0,100% 100%,100% 0)"></div>
+              <div style="position:absolute;left:12px;top:26px;display:flex;flex-direction:column;gap:5px">
+                <div style="width:52px;height:3px;border-radius:2px;background:#DCDCE0"></div>
+                <div style="width:66px;height:3px;border-radius:2px;background:#DCDCE0"></div>
+                <div style="width:44px;height:3px;border-radius:2px;background:#DCDCE0"></div>
+              </div>
+              <div style="position:absolute;left:11px;bottom:9px;font:700 13px/1 -apple-system,'SF Pro Text',sans-serif;color:#8E8E93;letter-spacing:.02em">VV</div>
+              <div style="position:absolute;right:-6px;bottom:-6px;width:52px;height:52px;border-radius:12px;background:linear-gradient(180deg,#FBFBFC,#DEDEE2);box-shadow:0 0 0 .5px rgba(0,0,0,.14),0 3px 8px -3px rgba(0,0,0,.3);overflow:hidden">
+                <div style="position:absolute;left:8px;top:12px;width:36px;height:25px;border-radius:3px;background:#191A1D"></div>
+                <div style="position:absolute;left:20px;top:16px;width:16px;height:21px;background:#D0392A;border-radius:62% 46% 54% 50% / 38% 38% 72% 72%;transform:rotate(16deg)"></div>
+                <div style="position:absolute;left:25px;top:13px;width:11px;height:3px;background:#3E7A3A;border-radius:2px;transform:rotate(-26deg)"></div>
+              </div>
+            </div>
+            <div style="font:10px/1.3 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0">128</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="width:38px;height:48px;border-radius:4px;background:linear-gradient(180deg,#FFFFFF,#F2F2F4);box-shadow:0 0 0 .5px rgba(0,0,0,.16);position:relative;overflow:hidden">
+              <div style="position:absolute;right:0;top:0;width:11px;height:11px;background:#E4E4E8;clip-path:polygon(0 0,100% 100%,100% 0)"></div>
+              <div style="position:absolute;left:4px;bottom:3px;font:700 7px/1 -apple-system,sans-serif;color:#9A9AA0">VV</div>
+              <div style="position:absolute;right:-3px;bottom:-3px;width:24px;height:24px;border-radius:6px;background:linear-gradient(180deg,#FBFBFC,#DEDEE2);box-shadow:0 0 0 .5px rgba(0,0,0,.14);overflow:hidden">
+                <div style="position:absolute;left:3.5px;top:5.5px;width:17px;height:12px;border-radius:1.5px;background:#191A1D"></div>
+                <div style="position:absolute;left:9px;top:7px;width:8px;height:10px;background:#D0392A;border-radius:60% 46% 54% 50% / 38% 38% 72% 72%;transform:rotate(15deg)"></div>
+              </div>
+            </div>
+            <div style="font:10px/1.3 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0">48</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="width:25px;height:32px;border-radius:3px;background:linear-gradient(180deg,#FFFFFF,#F2F2F4);box-shadow:0 0 0 .5px rgba(0,0,0,.16);position:relative;overflow:hidden">
+              <div style="position:absolute;right:0;top:0;width:8px;height:8px;background:#E4E4E8;clip-path:polygon(0 0,100% 100%,100% 0)"></div>
+              <div style="position:absolute;right:-2px;bottom:-2px;width:17px;height:17px;border-radius:4px;background:#EDEDF0;box-shadow:0 0 0 .5px rgba(0,0,0,.14);overflow:hidden">
+                <div style="position:absolute;left:2px;top:4px;width:13px;height:9px;border-radius:1px;background:#191A1D"></div>
+                <div style="position:absolute;left:6px;top:5px;width:6px;height:8px;background:#D0392A;border-radius:60% 46% 54% 50% / 38% 38% 72% 72%;transform:rotate(14deg)"></div>
+              </div>
+            </div>
+            <div style="font:10px/1.3 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0">32</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+            <div style="width:13px;height:16px;border-radius:2px;background:#F4F4F6;box-shadow:0 0 0 .5px rgba(0,0,0,.18);position:relative;overflow:hidden">
+              <div style="position:absolute;left:2px;bottom:2px;width:9px;height:7px;border-radius:1px;background:#191A1D"></div>
+              <div style="position:absolute;left:4.5px;bottom:2.5px;width:5px;height:6.5px;background:#D0392A;border-radius:60% 46% 54% 50% / 38% 38% 72% 72%;transform:rotate(12deg)"></div>
+            </div>
+            <div style="font:10px/1.3 ui-monospace,'SF Mono',Menlo,monospace;color:#9A9AA0">16</div>
+          </div>
+        </div>
+        <div style="{{ specStyle }}">
+          <div style="flex-direction:column;gap:2px;font:11px/1.55 ui-monospace,'SF Mono',Menlo,monospace;color:#6E6E73;border-left:2px solid #CFCFD2;padding-left:10px;display:flex;max-width:520px">
+            <div>Standard document page (folded corner) + app-icon badge at 40% of the page width, trailing-bottom, overhanging 6% on both edges — the Apple convention.</div>
+            <div>At 16px the page and badge merge: keep the dark screen + red pepper only, no "VV" text (it is illegible below 32px). UTI: <b>org.spice-space.vv</b>, Editor role Viewer, LSHandlerRank Owner.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:26px">
+    <div style="font:600 12px/1.2 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#3C3C43">09 · Component sheet</div>
+    <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+      <div style="background:#FFFFFF;border-radius:12px;padding:22px 24px;box-shadow:0 0 0 .5px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:16px;width:560px">
+        <div style="font-size:13px;font-weight:600;color:#1D1D1F">Toolbar items · 28 × 22 pt hit area, 15 pt glyph</div>
+        <div style="display:flex;flex-wrap:wrap;gap:18px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:96px">
+            <div style="height:22px;border-radius:6px;padding:0 8px;display:flex;align-items:center;gap:3px;background:#E3E3E6;box-shadow:inset 0 0 0 .5px #D2D2D6">
+              <div style="font-size:10px;color:#1D1D1F">⌃</div><div style="font-size:10px;color:#1D1D1F">⌥</div><div style="font-size:10px;color:#1D1D1F">⌦</div>
+            </div>
+            <div style="font:9.5px/1.35 ui-monospace,'SF Mono',Menlo,monospace;color:#8E8E93;text-align:center">custom<br>Ctrl-Alt-Del</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:96px">
+            <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:#F2F2F4">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1D1D1F" stroke-width="1.25" stroke-linecap="round"><path d="M2.2 5.6V3.2A1 1 0 0 1 3.2 2.2h2.4"></path><path d="M13.8 5.6V3.2a1 1 0 0 0-1-1h-2.4"></path><path d="M2.2 10.4v2.4a1 1 0 0 0 1 1h2.4"></path><path d="M13.8 10.4v2.4a1 1 0 0 1-1 1h-2.4"></path></svg>
+            </div>
+            <div style="font:9.5px/1.35 ui-monospace,'SF Mono',Menlo,monospace;color:#8E8E93;text-align:center">arrow.up.left.<br>and.arrow.down.right</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:96px">
+            <div style="display:inline-flex;background:#E9E9EC;border-radius:7px;padding:2px;gap:2px">
+              <div style="padding:2px 9px;border-radius:5px;background:#FFFFFF;box-shadow:0 .5px 2px rgba(0,0,0,.18);font-size:11px;color:#1D1D1F">Fit</div>
+              <div style="padding:2px 9px;border-radius:5px;font-size:11px;color:#3C3C43">1:1</div>
+            </div>
+            <div style="font:9.5px/1.35 ui-monospace,'SF Mono',Menlo,monospace;color:#8E8E93;text-align:center">Picker<br>.segmented</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:96px">
+            <div style="display:flex;gap:6px">
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#C0392B;background:#FBEAE7">2×</div>
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#8E8E93">2×</div>
+            </div>
+            <div style="font:9.5px/1.35 ui-monospace,'SF Mono',Menlo,monospace;color:#8E8E93;text-align:center">custom "2×"<br>on / off</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:96px">
+            <div style="display:flex;gap:6px">
+              <div style="width:28px;height:22px;border-radius:6px;background:#F2F2F4;display:flex;align-items:center;justify-content:center">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1D1D1F" stroke-width="1.2"><rect x="2.5" y="1.5" width="8" height="10" rx="1.6"></rect><path d="M5 4.5h8v10a1.6 1.6 0 0 1-1.6 1.6H6.6A1.6 1.6 0 0 1 5 14.5"></path></svg>
+              </div>
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;position:relative">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#A0A0A6" stroke-width="1.2"><rect x="2.5" y="1.5" width="8" height="10" rx="1.6"></rect><path d="M5 4.5h8v10a1.6 1.6 0 0 1-1.6 1.6H6.6A1.6 1.6 0 0 1 5 14.5"></path><path d="M1.6 14.4 14.4 1.6" stroke="#A0A0A6" stroke-width="1.2"></path></svg>
+              </div>
+            </div>
+            <div style="font:9.5px/1.35 ui-monospace,'SF Mono',Menlo,monospace;color:#8E8E93;text-align:center">doc.on.clipboard<br>+ .slash (off)</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:96px">
+            <div style="display:flex;gap:6px">
+              <div style="width:28px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1D1D1F" stroke-width="1.2" stroke-linecap="round"><path d="M2 6h2.4L8 3v10L4.4 10H2z" fill="#1D1D1F" stroke="none"></path><path d="M10.6 6.2a2.6 2.6 0 0 1 0 3.6M12.8 4.4a5.2 5.2 0 0 1 0 7.2"></path></svg>
+              </div>
+              <div style="width:28px;height:22px;border-radius:6px;background:#F2F2F4;display:flex;align-items:center;justify-content:center">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1D1D1F" stroke-width="1.2" stroke-linecap="round"><path d="M2 6h2.4L8 3v10L4.4 10H2z" fill="#1D1D1F" stroke="none"></path><path d="M11 5.6l3.4 4.8M14.4 5.6L11 10.4"></path></svg>
+              </div>
+            </div>
+            <div style="font:9.5px/1.35 ui-monospace,'SF Mono',Menlo,monospace;color:#8E8E93;text-align:center">speaker.wave.2.fill<br>speaker.slash.fill</div>
+          </div>
+        </div>
+        <div style="height:.5px;background:#E4E4E7"></div>
+        <div style="font-size:13px;font-weight:600;color:#1D1D1F">Agent status · 3 states (custom glyph + label, collapses to the dot at ≤700 pt)</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="height:22px;border-radius:6px;padding:0 8px;display:flex;align-items:center;gap:5px;background:#E9F3EC;box-shadow:inset 0 0 0 .5px #C6E2CE">
+              <div style="width:9px;height:9px;border-radius:2.5px;background:#2E9E4B;box-shadow:0 0 0 2px rgba(46,158,75,.18)"></div>
+              <div style="font-size:11px;color:#1F6B34">Agent</div>
+            </div>
+            <div style="font-size:11px;color:#6E6E73">Connected — clipboard sync, resize-follows-window, absolute pointer</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="height:22px;border-radius:6px;padding:0 8px;display:flex;align-items:center;gap:5px;background:#FDF3DE;box-shadow:inset 0 0 0 .5px #EDDFBB">
+              <div style="width:9px;height:9px;border-radius:2.5px;box-shadow:inset 0 0 0 1.6px #C88A05"></div>
+              <div style="font-size:11px;color:#8A5F02">No agent</div>
+            </div>
+            <div style="font-size:11px;color:#6E6E73">Tooltip: “spice-vdagent isn't running in the guest. Clipboard sync and resize-follows-window are unavailable, and the pointer is captured while you work — press ⌃⌥ to release it.”</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="height:22px;border-radius:6px;padding:0 8px;display:flex;align-items:center;gap:5px;background:#F2F2F4;box-shadow:inset 0 0 0 .5px #E0E0E4">
+              <div style="width:9px;height:9px;border-radius:2.5px;background:#C6C6CB"></div>
+              <div style="font-size:11px;color:#8E8E93">Agent</div>
+            </div>
+            <div style="font-size:11px;color:#6E6E73">Negotiating — agent tokens not yet granted; resolves within ~1 s of MAIN_INIT</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:40px">
+        <div style="background:#FFFFFF;border-radius:12px;padding:22px 24px;box-shadow:0 0 0 .5px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:14px;width:300px">
+          <div style="font-size:13px;font-weight:600;color:#1D1D1F">Connection row · 216 × 40 pt</div>
+          <div style="background:#F0F0F2;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:2px">
+            <div style="border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:1px">
+              <div style="font-size:13px;font-weight:600;color:#1D1D1F">ubuntu-build</div>
+              <div style="font-size:11px;color:#8E8E93">pve.lan:5901 · Yesterday 17:02</div>
+            </div>
+            <div style="border-radius:6px;background:#C0392B;padding:6px 8px;display:flex;flex-direction:column;gap:1px">
+              <div style="font-size:13px;font-weight:600;color:#FFFFFF">win11-desk</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.78)">192.168.1.20:5900 · Today 09:14</div>
+            </div>
+            <div style="border-radius:6px;padding:6px 8px;display:flex;align-items:center;gap:8px">
+              <div style="display:flex;flex-direction:column;gap:1px;flex:1">
+                <div style="font-size:13px;font-weight:600;color:#1D1D1F">opnsense</div>
+                <div style="font-size:11px;color:#8E8E93">10.0.0.4:5900 · Connecting…</div>
+              </div>
+              <div style="width:14px;height:14px;border-radius:50%;border:1.6px solid #D3D3D7;border-top-color:#8E8E93"></div>
+            </div>
+          </div>
+          <div style="font:10px/1.5 ui-monospace,'SF Mono',Menlo,monospace;color:#8E8E93">normal · selected (accent fill, white text, secondary at 78%) · connecting (trailing ProgressView 14pt)</div>
+        </div>
+
+        <div style="background:#1B1B1D;border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:14px;width:300px">
+          <div style="font-size:13px;font-weight:600;color:#F5F5F7">Captured-pointer HUD</div>
+          <div style="display:flex;flex-direction:column;gap:12px;align-items:flex-start">
+            <div style="display:flex;align-items:center;gap:9px;height:36px;padding:0 16px;border-radius:18px;background:rgba(60,60,64,.86);box-shadow:0 10px 30px -8px rgba(0,0,0,.7),inset 0 0 0 .5px rgba(255,255,255,.14)">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="#F5F5F7"><path d="M3.4 1.6 12.6 8.2 8.6 9.1 11 14 9.2 14.7 6.8 9.8 3.4 12.4z"></path></svg>
+              <div style="font-size:12px;color:#FFFFFF">Pointer captured — press <b style="font-weight:600">⌃⌥</b> to release</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:11px;background:rgba(60,60,64,.6);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.12)">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="#E05C4B"><path d="M3.4 1.6 12.6 8.2 8.6 9.1 11 14 9.2 14.7 6.8 9.8 3.4 12.4z"></path></svg>
+              <div style="font-size:10px;color:#E8E8EA">⌃⌥</div>
+            </div>
+          </div>
+          <div style="font:10px/1.5 ui-monospace,'SF Mono',Menlo,monospace;color:#8E8E93">transient (2.0 s, 0.25 s fade) · persistent cue, 60% opacity, top-trailing · both non-interactive</div>
+        </div>
+
+        <div style="background:#FFFFFF;border-radius:12px;padding:22px 24px;box-shadow:0 0 0 .5px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:14px;width:300px">
+          <div style="font-size:13px;font-weight:600;color:#1D1D1F">Sidebar empty-state illustration</div>
+          <div style="display:flex;gap:16px;align-items:center">
+            <div style="width:96px;height:64px;border-radius:8px;background:repeating-linear-gradient(135deg,#E2E2E6 0 6px,#EAEAEE 6px 12px);box-shadow:inset 0 0 0 .5px #D2D2D6"></div>
+            <div style="width:96px;height:64px;border-radius:8px;background:repeating-linear-gradient(135deg,#2E2E31 0 6px,#26262A 6px 12px);box-shadow:inset 0 0 0 .5px #3C3C40"></div>
+          </div>
+          <div style="font:10px/1.5 ui-monospace,'SF Mono',Menlo,monospace;color:#8E8E93">96 × 64 pt asset, light + dark. Placeholder here — supply final art (three stacked VM windows, 1.5pt strokes, .tertiaryLabel).</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div data-end="1"></div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:2400,&quot;height&quot;:1400},&quot;showSpecNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;showDarkArtboards&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const spec = this.props.showSpecNotes ?? true;
+    return {
+      specStyle: spec ? { display: 'flex' } : { display: 'none' },
+      darkStyle: (this.props.showDarkArtboards ?? true) ? { display: 'flex' } : { display: 'none' }
+    };
+  }
+}
+</script>
+</body>
+</html>

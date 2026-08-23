@@ -1,0 +1,343 @@
+SpiceSee — macOS UI
+Native SPICE client · SwiftUI chrome + AppKit/Metal viewports · macOS 14+
+1a
+Artboards are drawn at 1× logical points; every dimension below is in points — export assets at 2× (and 3× for the icon). System font only. One accent:
+Chili Red · #C0392B
+(light) /
+#E05C4B
+(dark), which is the only tint token; everything else is a macOS semantic color, named in the spec notes.
+01 · Connection manager — 760 × 520 pt
+Light · saved host selected, Advanced expanded
+Search
+win11-desk
+192.168.1.20:5900 · Today 09:14
+ubuntu-build
+pve.lan:5901 · Yesterday 17:02
+opnsense
+10.0.0.4:5900 · Connecting…
+truenas-console
+10.0.0.9:5902 · 12 Aug
++
+−
+win11-desk
+SPICE · TLS
+Host:
+192.168.1.20
+Port:
+5900
+TLS:
+5901
+Password:
+••••••••••
+Save password in Keychain
+Advanced
+HiDPI:
+Send backing pixels · guest renders at 2×
+⌘ maps to:
+Super
+Ctrl
+⌥ maps to:
+Alt
+Super
+Release chord:
+⌃
+⌥
+Releases a captured pointer in server mode
+Last connected Today 09:14 · agent was present
+Duplicate
+Connect
+NavigationSplitView · sidebar 232pt (min 200, max 280) · .listStyle(.sidebar) · row: 6/8pt insets, 6pt radius, 13pt semibold + 11pt secondaryLabel
+Titlebar 52pt (.toolbar unified) · form: label column 78pt trailing-aligned, 10pt gap, 12pt row rhythm · TextField 24pt tall, 6pt radius
+Colors: sidebar = .windowBackground w/ vibrancy, detail = .controlBackground, separator = .separator, secondary text = .secondaryLabel
+Connect = .borderedProminent .tint(chiliRed) 28pt, keyboardShortcut(.defaultAction) · Advanced = DisclosureGroup persisted per-connection
+Dark · same window, Advanced collapsed
+Search
+win11-desk
+192.168.1.20:5900 · Today 09:14
+ubuntu-build
+pve.lan:5901 · Yesterday 17:02
+opnsense
+10.0.0.4:5900 · Connecting…
+truenas-console
+10.0.0.9:5902 · 12 Aug
++
+−
+win11-desk
+SPICE · TLS
+Host:
+192.168.1.20
+Port:
+5900
+TLS:
+5901
+Password:
+••••••••••
+Save password in Keychain
+Advanced
+HiDPI off · ⌘→Super · ⌥→Alt · release ⌃⌥
+Last connected Today 09:14 · agent was present
+Duplicate
+Connect
+First launch · empty state
+empty-state illustration
+(3 stacked VM windows)
+No saved connections
++
+−
+SpiceSee
+No Connection Selected
+Add a QEMU or Proxmox host to connect directly — or open a
+.vv
+file downloaded from the Proxmox web console and SpiceSee will connect straight away.
+Add Connection…
+Open .vv File…
+⌘N   ⌘O
+ContentUnavailableView-style layout: 56pt app-icon glyph, 14pt gap, 17pt semibold title, 13pt secondary body ≤340pt wide, centered
+Sidebar empty state replaces the List; "−" is disabled (.tertiaryLabel). Illustration ships as a 96×64pt asset with dark variant.
+02 · Connecting & failure states
+Inline progress · detail pane, 528 × 210 pt crop
+win11-desk
+Connecting…
+Connecting to
+192.168.1.20:5901
+over TLS
+TLS handshake · host-subject verified
+Ticket accepted · main channel linked
+Opening display, inputs, cursor, playback channels…
+Cancel
+Progress is inline in the detail pane — never a modal. ProgressView(.linear) 4pt, tinted accent. Step rows 11pt, checkmark.circle → "checkmark" 11pt.
+Steps mirror SpiceCore bring-up: TLS → ticket (MAIN_INIT) → MAIN_CHANNELS_LIST. A failing secondary channel degrades, it does not fail the connect.
+Failure sheet · TLS host-subject mismatch
+win11-desk
+192.168.1.20:5900
+ubuntu-build
+opnsense
+!
+The server's certificate doesn't match this connection
+SpiceSee expected the certificate to be issued to the subject in your
+.vv
+file. Someone may be intercepting the connection, or the host's certificate was reissued.
+expected
+CN=pve1,O=PVE Cluster Manager CA
+presented
+CN=pve3,O=PVE Cluster Manager CA
+host
+192.168.1.20:5901
+Download a fresh .vv from the console
+Cancel
+Retry
+Sheet 420pt wide, 20/22pt insets, 10pt stack gap. App icon 52pt with warning badge 24pt (exclamationmark.triangle.fill for non-icon contexts).
+Title 13pt bold, message 11pt · technical detail in a 7pt-radius .textBackground box, SF Mono 10.5pt, presented value tinted accent. Retry = defaultAction.
+Connection refused · light
+Nothing is listening on 10.0.0.4:5900
+The host refused the connection. The VM may be powered off, or its SPICE console may not be enabled in Proxmox.
+Edit Connection…
+Retry
+Wrong password · dark
+The password was rejected
+Proxmox SPICE tickets expire a few seconds after they're issued. If this connection came from a .vv file, open a new console from the web UI.
+Password:
+••••••••
+Cancel
+Retry
+05 · VM migrated — reconnect?
+“win11-desk” moved to another host
+The cluster migrated this VM while it was running. Reconnect to keep using the console — the guest keeps running either way.
+New host:
+pve3.lan
+5904
+Reconnect automatically next time
+Cancel
+Reconnect
+Alert-shaped sheets 380pt. Titles are plain-language and name the host; the SPICE error code never reaches this text (it goes to the log).
+Migration dialog is presented on the session window that received MAIN_MIGRATE_SWITCH_HOST, prefilled from the message.
+03 · Session window & 04 · captured-pointer HUD
+Windowed · light · agent connected · 900 × 600 pt
+win11-desk
+Display 1 of 2 · 1920 × 1080
+⌃
+⌥
+⌦
+Fit
+1:1
+2×
+Agent
+VM framebuffer · CAMetalLayer
+guest 1920 × 1080 → scaled to fit (0.469×)
+no chrome, no inset, no overlay
+Unified toolbar 52pt, .toolbar(.unifiedCompact) · items 28×22pt, 6pt radius, 6pt gap, 1pt dividers at 18pt tall · glyphs 15pt, .medium weight
+SF Symbols — fullscreen: arrow.up.left.and.arrow.down.right · clipboard: doc.on.clipboard (off state: doc.on.clipboard + .secondaryLabel) · mute: speaker.slash.fill / speaker.wave.2.fill
+Custom glyphs — Ctrl-Alt-Del: three 10pt keycap chars ⌃⌥⌦ in one 22pt pill · HiDPI: "2×" 11pt semibold (on = accent tint, off = .secondaryLabel) · Scaling: Picker(.segmented) 11pt
+Window title = VM name (falls back to host); subtitle = window's viewport index + guest resolution. Content view has zero padding — the framebuffer is the content.
+Fullscreen · toolbar revealed on hover at top edge · pointer captured
+VM framebuffer · native fullscreen on Mac display 2
+guest 2560 × 1440 → 1:1
+win11-desk
+⌃
+⌥
+⌦
+Fit
+1:1
+2×
+No agent
+Pointer captured — press
+⌃⌥
+to release
+⌃⌥
+Narrow window · 640 pt · toolbar condensed
+opnsense
+⌃
+⌥
+⌦
+VM framebuffer · text console 720 × 400
+agent absent → server-mode mouse
+Press
+⌃⌥
+to release the pointer
+At ≤700pt the scaling picker, HiDPI, clipboard and mute collapse into one ellipsis.circle overflow menu; Ctrl-Alt-Del, fullscreen and the agent chip never collapse.
+Agent chip compresses to the 22pt dot-only form; the tooltip keeps the full explanation.
+HUD: 32–36pt capsule, 11.5–12pt text, 20–44pt from the bottom edge, .thickMaterial + 0.5pt inner stroke. Appears on capture, fades over 0.25s after 2.0s.
+Persistent cue while captured: 22pt capsule top-trailing, 14pt inset below the toolbar edge, 60% opacity, non-interactive (allowsHitTesting false).
+06 · Preferences (⌘,) — 580 × 380 pt  ·  07 · Acknowledgements — 620 × 460 pt
+General · light
+General
+Keyboard
+Updates
+Default scaling:
+Fit window
+1:1 pixels
+HiDPI by default:
+Off sends logical points, so the guest renders at 1×. On sends backing pixels — sharper, but the guest desktop gets very small unless it scales.
+On connect:
+Open one window per guest monitor
+Sync clipboard when the agent is available
+Delete .vv files after connecting
+Per-connection settings in Advanced override these defaults.
+Acknowledgements…
+Keyboard · dark · keycap picker
+General
+Keyboard
+Updates
+Modifier mapping:
+⌘
+Super
+Ctrl
+Alt
+⌥
+Super
+Ctrl
+Alt
+Release chord:
+⌃
+⌥
+⇧
+⌘
+Click keycaps to build the chord — two modifiers minimum
+Send lock keys (⇪, Num, Scroll) to the guest
+Mapping is positional and layout-independent (kVK_* → XT set-1 scancodes). macOS keeps system shortcuts such as ⌘Tab; use Ctrl-Alt-Del in the toolbar for the guest's secure attention sequence.
+Updates · light · Sparkle 2
+Updates
+Check for updates automatically
+Download and install in the background
+Include pre-release builds
+SpiceSee 1.0 (build 142) · last checked today at 08:57
+Check Now
+SwiftUI Settings scene, TabView(.automatic) — toolbar tabs 64pt wide, 17pt symbol + 10pt label. Panes: General 340pt, Keyboard 340pt, Updates 230pt (window resizes per tab).
+Tab symbols: gearshape (General) · keyboard (Keyboard) · arrow.up.circle → square.and.arrow.up on the sheet (Updates). Label column 132–150pt trailing-aligned; 14pt row rhythm.
+Keycap picker: 34×26pt caps, 5pt gap, selected = accent fill / white glyph, unselected = .controlBackground + .separator stroke.
+07 · Acknowledgements · light · 620 × 460 pt
+Acknowledgements
+spice-common codecs
+LGPL-2.1-or-later
+spice-protocol
+BSD-3-Clause
+libopus
+BSD-3-Clause
+Sparkle
+MIT
+QUIC, LZ and GLZ decoders
+From spice-common / spice-gtk, used decode-only. Licensed under the GNU Lesser General Public License, version 2.1 or later.
+You can replace this framework
+These decoders ship as
+CSpiceCodec.framework
+inside the app bundle, and library validation is disabled so you can substitute your own build. Source and the written offer are linked below.
+Get the source…
+Show in Finder
+GNU LESSER GENERAL PUBLIC LICENSE
+Version 2.1, February 1999
+Copyright (C) 1991, 1999 Free Software Foundation, Inc.
+51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+Everyone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.
+[This is the first released version of the Lesser GPL. It also counts as the successor of the GNU Library Public License, version 2, hence the version number 2.1.]
+Preamble
+The licenses for most software are designed to take away your…
+4 components
+Copy License Text
+Split view: 200pt component list (12pt semibold name + 10pt SPDX id), detail = 15pt title, 11pt summary, callout box, then verbatim license in SF Mono 10.5pt / 1.6 line height, selectable.
+The LGPL §6(b) written offer lives in the callout, not buried in the license body — it is a shipping requirement, so it gets a heading.
+08 · App icon & .vv document icon
+App icon — mark study, 176 / 96 / 48 / 32 / 16 pt
+1024 px master
+128
+48
+32
+16
+Concept: a display, seen head-on, with a single chili pepper as the thing on screen — "spice" you can see. Two shapes only, so it survives 16px.
+Legibility ladder: 128 keeps the stand; 48 and below drop it; 16 drops the stem and the bezel highlight, leaving a dark rectangle + red form (the strongest 2-value silhouette).
+Pepper red #D0392A at small sizes / gradient #E4523E→#A82419 at large. Stem #3E7A3A. Screen #191A1D. Plate is a neutral light-grey squircle — no colour behind the pepper, so it stays the only saturated element in the Dock.
+Deliver as .icon (Icon Composer, macOS 26) plus a 1024 PNG set for 14/15; light, dark and tinted variants — dark plate = #2C2C2E→#1C1C1E, pepper unchanged.
+.vv document icon — 128 / 48 / 32 / 16 pt
+VV
+128
+VV
+48
+32
+16
+Standard document page (folded corner) + app-icon badge at 40% of the page width, trailing-bottom, overhanging 6% on both edges — the Apple convention.
+At 16px the page and badge merge: keep the dark screen + red pepper only, no "VV" text (it is illegible below 32px). UTI:
+org.spice-space.vv
+, Editor role Viewer, LSHandlerRank Owner.
+09 · Component sheet
+Toolbar items · 28 × 22 pt hit area, 15 pt glyph
+⌃
+⌥
+⌦
+custom
+Ctrl-Alt-Del
+arrow.up.left.
+and.arrow.down.right
+Fit
+1:1
+Picker
+.segmented
+2×
+2×
+custom "2×"
+on / off
+doc.on.clipboard
++ .slash (off)
+speaker.wave.2.fill
+speaker.slash.fill
+Agent status · 3 states (custom glyph + label, collapses to the dot at ≤700 pt)
+Agent
+Connected — clipboard sync, resize-follows-window, absolute pointer
+No agent
+Tooltip: “spice-vdagent isn't running in the guest. Clipboard sync and resize-follows-window are unavailable, and the pointer is captured while you work — press ⌃⌥ to release it.”
+Agent
+Negotiating — agent tokens not yet granted; resolves within ~1 s of MAIN_INIT
+Connection row · 216 × 40 pt
+ubuntu-build
+pve.lan:5901 · Yesterday 17:02
+win11-desk
+192.168.1.20:5900 · Today 09:14
+opnsense
+10.0.0.4:5900 · Connecting…
+normal · selected (accent fill, white text, secondary at 78%) · connecting (trailing ProgressView 14pt)
+Captured-pointer HUD
+Pointer captured — press
+⌃⌥
+to release
+⌃⌥
+transient (2.0 s, 0.25 s fade) · persistent cue, 60% opacity, top-trailing · both non-interactive
+Sidebar empty-state illustration
+96 × 64 pt asset, light + dark. Placeholder here — supply final art (three stacked VM windows, 1.5pt strokes, .tertiaryLabel).
