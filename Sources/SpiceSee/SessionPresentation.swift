@@ -57,13 +57,27 @@ private struct ConnectFailurePresenter: ViewModifier {
     }
 }
 
+/// Reopens one viewport window per guest monitor. Closing the displays leaves the session
+/// running, so both the Window menu and the manager's Show Displays button land here.
+@MainActor
+func showAllDisplays(_ session: SessionModel, using openWindow: OpenWindowAction) {
+    for viewport in session.viewports { openWindow(id: "session", value: viewport.id) }
+}
+
 private struct SessionWindowOpener: ViewModifier {
     let session: SessionModel
     let settings: AppSettings
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     func body(content: Content) -> some View {
-        content.onChange(of: session.viewports) { _, viewports in
+        content.onChange(of: session.viewports) { previous, viewports in
+            // Disconnecting empties the list; without this the windows would survive with nothing
+            // left to render in them.
+            guard !viewports.isEmpty else {
+                for viewport in previous { dismissWindow(id: "session", value: viewport.id) }
+                return
+            }
             let toOpen = settings.openWindowPerMonitor ? viewports : Array(viewports.prefix(1))
             for viewport in toOpen { openWindow(id: "session", value: viewport.id) }
         }

@@ -104,6 +104,9 @@ private struct SessionToolbar: View {
         // would light up every toolbar when any one of them entered full screen.
         .padding(.horizontal, Metric.Toolbar.contentInsetH)
         .padding(.vertical, Metric.Toolbar.contentInsetV)
+        // macOS draws the item's glass capsule 2pt below the centre of the band it hands us, so
+        // content centred in that band reads high inside the capsule. Measured, not guessed.
+        .offset(y: Metric.Toolbar.capsuleNudgeV)
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { note in
             if isThisWindow(note) { isFullScreen = true }
         }
@@ -265,6 +268,10 @@ private struct WindowConfigurator: NSViewRepresentable {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             window?.toolbarStyle = .unifiedCompact
+            // A viewport is meaningless without a live session. Left restorable, these windows
+            // come back empty on the next launch — and the restore takes the manager down with it,
+            // so the app opens with no windows at all and only a Dock click brings it back.
+            window?.isRestorable = false
         }
     }
 }

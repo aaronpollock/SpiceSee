@@ -8,6 +8,8 @@ struct ConnectionManagerView: View {
     let settings: AppSettings
     let session: SessionModel
 
+    @Environment(\.openWindow) private var openWindow
+
     var body: some View {
         NavigationSplitView {
             sidebar
@@ -31,7 +33,8 @@ struct ConnectionManagerView: View {
                         ConnectionRowView(
                             connection: connection,
                             isSelected: connection.id == store.selection,
-                            isConnecting: isConnecting(connection)
+                            isConnecting: isConnecting(connection),
+                            isConnected: isConnected(connection)
                         )
                         .tag(connection.id)
                         .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
@@ -54,7 +57,7 @@ struct ConnectionManagerView: View {
             Spacer()
         }
         .padding(.horizontal, 6)
-        .frame(height: 30)
+        .frame(height: Metric.Sidebar.bottomBarHeight)
         .overlay(alignment: .top) {
             Rectangle().fill(Color(nsColor: .separatorColor)).frame(height: 0.5)
         }
@@ -83,6 +86,12 @@ struct ConnectionManagerView: View {
         return false
     }
 
+    /// Closing the display windows leaves the session running, so this stays true until the user
+    /// disconnects — it is what the sidebar dot and the detail pane's Disconnect button key off.
+    private func isConnected(_ connection: SavedConnection) -> Bool {
+        session.connection?.id == connection.id && session.phase == .connected
+    }
+
     // MARK: Detail
 
     @ViewBuilder
@@ -107,7 +116,8 @@ struct ConnectionManagerView: View {
                 session: session,
                 settings: settings,
                 onConnect: { password in session.connect(connectionBinding.wrappedValue, password: password) },
-                onDuplicate: { store.duplicate(connectionBinding.wrappedValue) }
+                onDuplicate: { store.duplicate(connectionBinding.wrappedValue) },
+                onShowDisplays: { showAllDisplays(session, using: openWindow) }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .controlBackgroundColor))
@@ -142,6 +152,7 @@ struct ConnectionRowView: View {
     let connection: SavedConnection
     let isSelected: Bool
     let isConnecting: Bool
+    let isConnected: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -158,6 +169,10 @@ struct ConnectionRowView: View {
                 ProgressView()
                     .controlSize(.small)
                     .frame(width: 14, height: 14)
+            } else if isConnected {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: Metric.Sidebar.statusDot, height: Metric.Sidebar.statusDot)
             }
         }
         .padding(.vertical, Metric.Sidebar.rowInsetV)
@@ -168,7 +183,10 @@ struct ConnectionRowView: View {
     }
 
     private var subtitle: String {
-        isConnecting ? "\(connection.host):\(connection.port) · Connecting…" : connection.sidebarSubtitle
+        let endpoint = "\(connection.host):\(connection.port)"
+        if isConnecting { return "\(endpoint) · Connecting…" }
+        if isConnected { return "\(endpoint) · Connected" }
+        return connection.sidebarSubtitle
     }
 
     private var subtitleColor: Color {

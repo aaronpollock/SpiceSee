@@ -6,17 +6,20 @@ struct ConnectionDetailView: View {
     let settings: AppSettings
     var onConnect: (String) -> Void
     var onDuplicate: () -> Void
+    var onShowDisplays: () -> Void
 
     @State private var password = ""
     @AppStorage private var advancedExpanded: Bool
 
     init(connection: Binding<SavedConnection>, session: SessionModel, settings: AppSettings,
-         onConnect: @escaping (String) -> Void, onDuplicate: @escaping () -> Void) {
+         onConnect: @escaping (String) -> Void, onDuplicate: @escaping () -> Void,
+         onShowDisplays: @escaping () -> Void) {
         self._connection = connection
         self.session = session
         self.settings = settings
         self.onConnect = onConnect
         self.onDuplicate = onDuplicate
+        self.onShowDisplays = onShowDisplays
         self._advancedExpanded = AppStorage(wrappedValue: false, "ConnectionDetailView.advancedExpanded.\(connection.wrappedValue.id.uuidString)")
     }
 
@@ -26,10 +29,12 @@ struct ConnectionDetailView: View {
             Divider()
             ScrollView { fields.padding(20) }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .disabled(isConnected)
             footer.padding(.horizontal, 20).padding(.bottom, 20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(nsColor: .controlBackgroundColor))
+        .ignoresSafeArea(.container, edges: .top)
         .onChange(of: connection.id) { password = "" }
     }
 
@@ -43,9 +48,16 @@ struct ConnectionDetailView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
             Spacer()
+            if isConnected { ConnectedBadge() }
         }
         .padding(.horizontal, 16)
         .frame(height: Metric.Window.titlebar)
+    }
+
+    /// True while this is the connection the live session belongs to — including after its
+    /// display windows have been closed, which leaves the session running.
+    private var isConnected: Bool {
+        session.connection?.id == connection.id && session.phase == .connected
     }
 
     private var tagText: String {
@@ -105,14 +117,25 @@ struct ConnectionDetailView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Duplicate", action: onDuplicate)
-                    .buttonStyle(.bordered)
-                    .frame(height: 28)
-                Button("Connect") { onConnect(password) }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color.chiliRed)
-                    .keyboardShortcut(.defaultAction)
-                    .frame(height: 28)
+                if isConnected {
+                    Button("Disconnect", action: session.disconnect)
+                        .buttonStyle(.bordered)
+                        .frame(height: 28)
+                    Button("Show Displays", action: onShowDisplays)
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.chiliRed)
+                        .keyboardShortcut(.defaultAction)
+                        .frame(height: 28)
+                } else {
+                    Button("Duplicate", action: onDuplicate)
+                        .buttonStyle(.bordered)
+                        .frame(height: 28)
+                    Button("Connect") { onConnect(password) }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.chiliRed)
+                        .keyboardShortcut(.defaultAction)
+                        .frame(height: 28)
+                }
             }
     }
 
@@ -138,6 +161,10 @@ struct ConnectionDetailView: View {
     }
 
     private var footerText: String {
+        if isConnected {
+            let count = session.viewports.count
+            return "Connected · \(count) display\(count == 1 ? "" : "s")"
+        }
         guard let lastConnected = connection.lastConnected else { return "Never connected" }
         let formatter = DateFormatter()
         let when: String
@@ -234,6 +261,21 @@ struct DetailEmptyState: View {
             .foregroundColor(.primary)
         + Text(" file downloaded from the Proxmox web console and SpiceSee will connect straight away.")
             .foregroundColor(.secondary)
+    }
+}
+
+/// Marks the connection the live session belongs to. Green, per the status palette — the accent
+/// is never used for state.
+private struct ConnectedBadge: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(Color.green)
+                .frame(width: Metric.Sidebar.statusDot, height: Metric.Sidebar.statusDot)
+            Text("Connected")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -343,7 +385,8 @@ private struct DetailPreviewHost: View {
             session: SessionModel(backend: MockSessionBackend(scenario: .desktop)),
             settings: AppSettings(),
             onConnect: { _ in },
-            onDuplicate: {}
+            onDuplicate: {},
+            onShowDisplays: {}
         )
     }
 }

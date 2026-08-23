@@ -30,18 +30,24 @@ struct SpiceSeeApp: App {
         .defaultSize(Metric.Window.connectionManager)
         .windowStyle(.hiddenTitleBar)
         .commands {
+            // Both reopen the manager first: with every window closed the app is still running,
+            // and neither command has anywhere to show its result otherwise.
             CommandGroup(replacing: .newItem) {
-                Button("Add Connection…") { store.add() }.keyboardShortcut("n")
-                Button("Open .vv File…") { openVVFile() }.keyboardShortcut("o")
+                Button("Add Connection…") {
+                    openWindow(id: "manager")
+                    store.add()
+                }
+                .keyboardShortcut("n")
+                Button("Open .vv File…") {
+                    openWindow(id: "manager")
+                    openVVFile()
+                }
+                .keyboardShortcut("o")
             }
             // Closing a viewport window otherwise left no way to get it back.
             CommandGroup(after: .windowList) {
                 Divider()
-                Button("Show All Displays") {
-                    for viewport in session.viewports {
-                        openWindow(id: "session", value: viewport.id)
-                    }
-                }
+                Button("Show All Displays") { showAllDisplays(session, using: openWindow) }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
                 ForEach(session.viewports) { viewport in
                     displayMenuItem(viewport)

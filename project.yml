@@ -27,7 +27,7 @@ targets:
         CFBundleVersion: "142"
         LSMinimumSystemVersion: "14.0"
         NSPrincipalClass: NSApplication
-        NSHumanReadableCopyright: ""
+        NSHumanReadableCopyright: "© 2026 SCT"
         CFBundleDocumentTypes:
           - CFBundleTypeName: SPICE Connection
             CFBundleTypeRole: Viewer

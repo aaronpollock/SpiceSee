@@ -25,6 +25,11 @@ enum Metric {
         static let rowRadius: CGFloat = 6
         static let rowTitle: CGFloat = 13
         static let rowSubtitle: CGFloat = 11
+        /// Green dot marking the connection the live session belongs to.
+        static let statusDot: CGFloat = 8
+        /// The +/− bar. Taller than the design's 30pt so the 22pt buttons clear the separator
+        /// above them and the window's rounded bottom corner below.
+        static let bottomBarHeight: CGFloat = 38
         /// Secondary text in a selected row sits at 78% so it reads against the accent fill.
         static let selectedSecondaryOpacity: CGFloat = 0.78
     }
@@ -48,6 +53,8 @@ enum Metric {
         /// Breathing room between the toolbar content and the edges of the bar it sits in.
         static let contentInsetH: CGFloat = 4
         static let contentInsetV: CGFloat = 2
+        /// Offset that lands the content on the centre of the system-drawn item capsule.
+        static let capsuleNudgeV: CGFloat = 2
         /// At or below this window width the secondary items collapse into an overflow menu.
         static let collapseWidth: CGFloat = 700
     }
