@@ -91,8 +91,7 @@ struct ConnectionManagerView: View {
                 .font(.system(size: 12, weight: .medium))
                 .frame(width: 24, height: 22)
         }
-        .buttonStyle(.plain)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
+        .buttonStyle(SidebarButtonStyle())
         .foregroundStyle(disabled ? Color(nsColor: .tertiaryLabelColor) : Color(nsColor: .secondaryLabelColor))
         .disabled(disabled)
     }
@@ -165,6 +164,20 @@ struct ConnectionManagerView: View {
 
     private var selectionBinding: Binding<SavedConnection.ID?> {
         Binding(get: { store.selection }, set: { store.selection = $0 })
+    }
+}
+
+/// The +/− buttons. A bare `.plain` button hit-tests only where its label draws, so the 24×22pt
+/// frame around the glyph was dead space — the button fired only on a direct hit on the `+` or `−`
+/// itself. The content shape claims the whole frame, and the fill deepens while pressed so a click
+/// is visibly acknowledged.
+private struct SidebarButtonStyle: ButtonStyle {
+    private let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(shape)
+            .background(shape.fill(Color.primary.opacity(configuration.isPressed ? 0.20 : 0.06)))
     }
 }
 
