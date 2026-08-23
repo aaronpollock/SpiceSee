@@ -2364,6 +2364,12 @@ git -C spice-gtk rev-parse HEAD; git -C $C rev-parse HEAD
 ```
 Write `Sources/CSpiceCodec/VENDORED.md` listing each file, its origin repo, tag `v0.42`, both commit hashes, and the local modifications from Step 2 (this is the LGPL source-publication record).
 
+**Copy these files verbatim — never strip or reflow the header comments.** Every vendored `.c`/`.h`
+carries an upstream copyright line and licence grant, and those notices are the LGPL obligation, not
+decoration. Reformatters, "tidy the imports" passes, and hand-retyping a file all quietly remove
+them. Step 2's shims and the GLZ accessor in Step 5 are the only edits permitted inside `vendor/`,
+and neither touches a header block. Step 7 verifies this held.
+
 - [ ] **Step 2: Shim out glib and pixman**
 
 `shim/config.h`: empty file (the sources `#include <config.h>`).
@@ -2595,7 +2601,34 @@ Add `struct glz_image *glz_decoder_window_last(SpiceGlzDecoderWindow *w);` to `v
 Run: `swift test --filter CodecTests`
 Expected: 4 pass. Build warnings from vendored C are acceptable; errors are not — fix by adding forwarding headers under `shim/`, never by editing `quic.c`/`lz.c`.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Verify the licence notices survived**
+
+The whole LGPL position rests on these notices being intact and on `VENDORED.md` naming the exact
+upstream revision. Run this before committing — it must print nothing and exit 0:
+
+```bash
+cd Sources/CSpiceCodec
+status=0
+for f in $(find vendor -type f \( -name '*.c' -o -name '*.h' \)); do
+  head -40 "$f" | grep -qiE 'copyright|SPDX-License-Identifier|General Public License' \
+    || { echo "STRIPPED NOTICE: $f"; status=1; }
+done
+[ -s LICENSE.LGPL-2.1 ] || { echo "MISSING: LICENSE.LGPL-2.1"; status=1; }
+for f in $(find vendor -type f \( -name '*.c' -o -name '*.h' \)); do
+  grep -q "$(basename $f)" VENDORED.md || { echo "UNDISCLOSED: $f"; status=1; }
+done
+exit $status
+```
+
+Then read `VENDORED.md` once by eye for what the script cannot check: tag `v0.42`, both upstream
+commit hashes from Step 1, and the Step 2/Step 5 modifications described in prose. A file on disk
+but absent from that list is the failure mode that matters — undisclosed LGPL source in a shipped
+binary.
+
+Re-run this check after any later task edits `vendor/` (Task 14 may add accessors) and before
+cutting a release DMG.
+
+- [ ] **Step 8: Commit**
 
 ```bash
 git add -A && git commit -m "feat(codec): vendor QUIC/LZ/GLZ decoders (LGPL-2.1) behind spice_codec.h"
