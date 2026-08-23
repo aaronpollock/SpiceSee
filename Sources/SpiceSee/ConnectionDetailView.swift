@@ -316,59 +316,15 @@ private struct Keycap: View {
 }
 
 /// The app-icon concept, drawn with shapes: a dark screen with a chili pepper on it.
+/// The real app icon, so this never drifts from Assets.xcassets/AppIcon.
 private struct AppIconGlyph: View {
     var size: CGFloat = 56
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let scale = size / 56
-        ZStack {
-            RoundedRectangle(cornerRadius: 13 * scale, style: .continuous)
-                .fill(LinearGradient(colors: plateColors, startPoint: .top, endPoint: .bottom))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 13 * scale, style: .continuous)
-                        .strokeBorder(Color.black.opacity(0.1), lineWidth: 0.5)
-                )
-            RoundedRectangle(cornerRadius: 4 * scale, style: .continuous)
-                .fill(Color(red: 0.118, green: 0.122, blue: 0.125))
-                .frame(width: 34 * scale, height: 24 * scale)
-                .offset(x: -1 * scale, y: 1 * scale)
-            ChiliShape()
-                .fill(Color.chiliRed)
-                .frame(width: 14 * scale, height: 19 * scale)
-                .rotationEffect(.degrees(18))
-                .offset(x: 7 * scale, y: 3 * scale)
-            Capsule()
-                .fill(Color(red: 0.243, green: 0.478, blue: 0.227))
-                .frame(width: 9 * scale, height: 3 * scale)
-                .rotationEffect(.degrees(-28))
-                .offset(x: 11 * scale, y: -6 * scale)
-        }
-        .frame(width: size, height: size)
-    }
-
-    private var plateColors: [Color] {
-        colorScheme == .dark
-            ? [Color(red: 0.173, green: 0.173, blue: 0.180), Color(red: 0.110, green: 0.110, blue: 0.118)]
-            : [Color(red: 0.957, green: 0.957, blue: 0.965), Color(red: 0.886, green: 0.886, blue: 0.902)]
-    }
-}
-
-/// A simple teardrop silhouette standing in for the chili pepper.
-private struct ChiliShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.maxY * 0.55),
-                           control: CGPoint(x: rect.maxX, y: rect.minY * 1.1))
-        path.addQuadCurve(to: CGPoint(x: rect.midX, y: rect.maxY),
-                           control: CGPoint(x: rect.maxX * 0.9, y: rect.maxY))
-        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.maxY * 0.45),
-                           control: CGPoint(x: rect.minX, y: rect.maxY * 0.85))
-        path.addQuadCurve(to: CGPoint(x: rect.midX, y: rect.minY),
-                           control: CGPoint(x: rect.minX, y: rect.minY * 1.1))
-        path.closeSubpath()
-        return path
+        Image(nsImage: NSApp.applicationIconImage)
+            .resizable()
+            .interpolation(.high)
+            .frame(width: size, height: size)
     }
 }
 

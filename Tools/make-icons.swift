@@ -295,8 +295,12 @@ func tierSpec(_ t: Tier) -> MarkTier {
 /// legibility tier from `plateRect`'s own pixel size (so the same routine
 /// can render the standalone app icon or the small corner badge on the
 /// document icon and get correctly-simplified artwork either way).
-func drawMark(_ ctx: CGContext, plateRect: CGRect, dark: Bool, includePlate: Bool) {
-    let tier = tierSpec(Tier.forSize(min(plateRect.width, plateRect.height)))
+func drawMark(_ ctx: CGContext, plateRect: CGRect, dark: Bool, includePlate: Bool, referenceSize: CGFloat? = nil) {
+    // Tier is chosen from the mark's *nominal* size (e.g. the requested
+    // 128pt icon size), not the padded plate rect -- otherwise inset
+    // padding would push a 128pt icon just under the 128 threshold and
+    // silently drop the stand.
+    let tier = tierSpec(Tier.forSize(referenceSize ?? min(plateRect.width, plateRect.height)))
 
     if includePlate {
         let plateRadius = tier.plateCornerFrac * min(plateRect.width, plateRect.height)
@@ -380,7 +384,7 @@ func drawText(_ ctx: CGContext, _ text: String, at point: CGPoint, fontSize: CGF
 func drawAppIcon(_ ctx: CGContext, size: CGFloat, dark: Bool) {
     let pad = size * 0.045
     let plateRect = CGRect(x: pad, y: pad, width: size - 2 * pad, height: size - 2 * pad)
-    drawMark(ctx, plateRect: plateRect, dark: dark, includePlate: true)
+    drawMark(ctx, plateRect: plateRect, dark: dark, includePlate: true, referenceSize: size)
 }
 
 // MARK: - Document icon
@@ -398,7 +402,7 @@ func drawDocumentIcon(_ ctx: CGContext, size: CGFloat, dark: Bool) {
         ctx.addPath(pagePath)
         ctx.setFillColor(hex(dark ? Palette.pageFlatDark : Palette.pageFlatLight))
         ctx.fillPath()
-        drawMark(ctx, plateRect: pageRect, dark: dark, includePlate: false)
+        drawMark(ctx, plateRect: pageRect, dark: dark, includePlate: false, referenceSize: size)
         return
     }
 

@@ -225,20 +225,11 @@ private struct AppIconGlyph: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            RoundedRectangle(cornerRadius: size * 0.23, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
+            // The real app icon, so this never drifts from Assets.xcassets/AppIcon.
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
                 .frame(width: size, height: size)
-                .overlay(
-                    ZStack {
-                        RoundedRectangle(cornerRadius: size * 0.08, style: .continuous)
-                            .fill(Color(nsColor: .labelColor))
-                            .frame(width: size * 0.62, height: size * 0.42)
-                        Capsule()
-                            .fill(Color.chiliRed)
-                            .frame(width: size * 0.25, height: size * 0.35)
-                            .rotationEffect(.degrees(18))
-                    }
-                )
             Image(systemName: "exclamationmark.triangle.fill")
                 .symbolRenderingMode(.multicolor)
                 .font(.system(size: badgeSize * 0.62))
