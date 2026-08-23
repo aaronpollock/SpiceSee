@@ -25,8 +25,7 @@ final class SessionModel {
     var pointerCaptured = false
     var releaseChord: ReleaseChord = .controlOption
 
-    let frames: AsyncStream<FrameUpdate>
-    private let frameContinuation: AsyncStream<FrameUpdate>.Continuation
+    private var frameSubscribers: [UUID: (viewportID: Int, continuation: AsyncStream<FrameUpdate>.Continuation)] = [:]
     private let backend: any SessionBackend
     private var pump: Task<Void, Never>?
 
@@ -35,7 +34,19 @@ final class SessionModel {
 
     init(backend: any SessionBackend) {
         self.backend = backend
-        (frames, frameContinuation) = AsyncStream.makeStream(of: FrameUpdate.self, bufferingPolicy: .unbounded)
+    }
+
+    /// Every viewport window gets its OWN stream. One shared stream would split frames between
+    /// windows — each element is delivered to a single consumer — so a two-monitor guest would
+    /// drop half its updates in each window.
+    func frames(for viewportID: Int) -> AsyncStream<FrameUpdate> {
+        let (stream, continuation) = AsyncStream.makeStream(of: FrameUpdate.self, bufferingPolicy: .unbounded)
+        let key = UUID()
+        frameSubscribers[key] = (viewportID, continuation)
+        continuation.onTermination = { [weak self] _ in
+            Task { @MainActor in self?.frameSubscribers[key] = nil }
+        }
+        return stream
     }
 
     var completedSteps: Set<ConnectStep> {
@@ -71,7 +82,9 @@ final class SessionModel {
             // Without an agent the guest cannot deliver absolute pointer positions, so we capture.
             if state == .absent { pointerCaptured = true }
         case let .frame(update):
-            frameContinuation.yield(update)
+            for (_, subscriber) in frameSubscribers where subscriber.viewportID == update.viewportID {
+                subscriber.continuation.yield(update)
+            }
         case let .migrated(offer):
             migrationOffer = offer
         case let .failed(failure):
