@@ -116,4 +116,17 @@ final class SessionModel {
     func sendCtrlAltDel() { Task { [backend] in await backend.sendCtrlAltDel() } }
 
     func releasePointer() { pointerCaptured = false }
+
+    /// Dismiss a failure sheet, returning the detail pane to its editable form.
+    func dismissFailure() { if case .failed = phase { phase = .idle } }
+
+    /// Accept the migration offer: reconnect to the host the cluster moved the VM to.
+    func acceptMigration(host: String, port: UInt16, password: String?) {
+        guard var connection else { return }
+        connection.host = host
+        connection.port = port
+        connection.tlsPort = nil
+        migrationOffer = nil
+        connect(connection, password: password)
+    }
 }

@@ -1,0 +1,107 @@
+import SwiftUI
+
+// Glue between the screens: which window presents what, and when. The individual screens are
+// self-contained views; this file is the only place that decides how they are surfaced.
+
+extension View {
+    /// Presents `FailureSheet` over the connection manager whenever a connect attempt fails.
+    func connectFailureSheet(session: SessionModel, onEditConnection: @escaping () -> Void,
+                             onFetchVV: @escaping () -> Void) -> some View {
+        modifier(ConnectFailurePresenter(session: session, onEditConnection: onEditConnection, onFetchVV: onFetchVV))
+    }
+
+    /// Opens one viewport window per guest monitor once the session connects.
+    func opensSessionWindows(session: SessionModel, settings: AppSettings) -> some View {
+        modifier(SessionWindowOpener(session: session, settings: settings))
+    }
+
+    /// Presents `MigrationSheet` on the session window, per the design: the dialog belongs to the
+    /// window that received MAIN_MIGRATE_SWITCH_HOST, not to the connection manager.
+    func migrationSheet(session: SessionModel, viewport: ViewportInfo) -> some View {
+        modifier(MigrationPresenter(session: session, viewport: viewport))
+    }
+}
+
+private struct ConnectFailurePresenter: ViewModifier {
+    let session: SessionModel
+    let onEditConnection: () -> Void
+    let onFetchVV: () -> Void
+    @State private var password = ""
+
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: isPresented) {
+            if case let .failed(failure) = session.phase {
+                FailureSheet(
+                    failure: failure,
+                    password: $password,
+                    onCancel: { session.dismissFailure() },
+                    onRetry: {
+                        let entered = password
+                        session.dismissFailure()
+                        session.retry(password: entered.isEmpty ? nil : entered)
+                    },
+                    onSecondary: {
+                        session.dismissFailure()
+                        if case .refused = failure { onEditConnection() } else { onFetchVV() }
+                    }
+                )
+            }
+        }
+    }
+
+    private var isPresented: Binding<Bool> {
+        Binding(
+            get: { if case .failed = session.phase { return true }; return false },
+            set: { if !$0 { session.dismissFailure() } }
+        )
+    }
+}
+
+private struct SessionWindowOpener: ViewModifier {
+    let session: SessionModel
+    let settings: AppSettings
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content.onChange(of: session.viewports) { _, viewports in
+            let toOpen = settings.openWindowPerMonitor ? viewports : Array(viewports.prefix(1))
+            for viewport in toOpen { openWindow(id: "session", value: viewport.id) }
+        }
+    }
+}
+
+private struct MigrationPresenter: ViewModifier {
+    let session: SessionModel
+    let viewport: ViewportInfo
+    @State private var host = ""
+    @State private var port = ""
+    @State private var reconnectAutomatically = false
+
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: isPresented) {
+            if let offer = session.migrationOffer {
+                MigrationSheet(
+                    offer: offer,
+                    host: $host,
+                    port: $port,
+                    reconnectAutomatically: $reconnectAutomatically,
+                    onCancel: { session.migrationOffer = nil },
+                    onReconnect: { session.acceptMigration(host: host, port: UInt16(port) ?? offer.newPort, password: nil) }
+                )
+            }
+        }
+        .onChange(of: session.migrationOffer) { _, offer in
+            guard let offer else { return }
+            host = offer.newHost
+            port = String(offer.newPort)
+        }
+    }
+
+    /// Only one window shows the dialog, otherwise a two-monitor guest raises two of them.
+    private var isPresented: Binding<Bool> {
+        Binding(
+            get: { session.migrationOffer != nil && viewport.index == 0 },
+            set: { if !$0 { session.migrationOffer = nil } }
+        )
+    }
+}

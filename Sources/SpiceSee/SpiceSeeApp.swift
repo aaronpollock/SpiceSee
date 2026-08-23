@@ -9,8 +9,26 @@ struct SpiceSeeApp: App {
     var body: some Scene {
         Window("SpiceSee", id: "manager") {
             ConnectionManagerView(store: store, settings: settings, session: session)
+                .task {
+                    // --mock --autoconnect drives the whole flow without a server, for design review.
+                    if let i = CommandLine.arguments.firstIndex(of: "--open"), i + 1 < CommandLine.arguments.count {
+                        switch CommandLine.arguments[i + 1] {
+                        case "acknowledgements": openWindow(id: "acknowledgements")
+                        case "settings":
+                            try? await Task.sleep(for: .milliseconds(600))
+                            if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
+                                _ = NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+                            }
+                        default: break
+                        }
+                    }
+                    guard CommandLine.arguments.contains("--autoconnect"),
+                          let connection = store.selected else { return }
+                    session.connect(connection, password: nil)
+                }
         }
         .defaultSize(Metric.Window.connectionManager)
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Add Connection…") { store.add() }.keyboardShortcut("n")

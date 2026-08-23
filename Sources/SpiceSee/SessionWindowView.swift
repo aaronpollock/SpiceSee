@@ -36,6 +36,7 @@ struct SessionWindowView: View {
                 }
         }
         .background(WindowConfigurator())
+        .migrationSheet(session: session, viewport: viewport)
         .navigationTitle(session.vmName)
         .navigationSubtitle(viewport.subtitle)
         .onAppear { if session.pointerCaptured { flashHUD() } }

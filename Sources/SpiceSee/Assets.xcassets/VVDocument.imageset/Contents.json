@@ -1,0 +1,9 @@
+{
+  "images" : [
+    { "filename" : "VVDocument.png", "idiom" : "mac", "scale" : "1x" },
+    { "filename" : "VVDocument@2x.png", "idiom" : "mac", "scale" : "2x" },
+    { "filename" : "VVDocument_dark.png", "idiom" : "mac", "scale" : "1x", "appearances" : [ { "appearance" : "luminosity", "value" : "dark" } ] },
+    { "filename" : "VVDocument_dark@2x.png", "idiom" : "mac", "scale" : "2x", "appearances" : [ { "appearance" : "luminosity", "value" : "dark" } ] }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}

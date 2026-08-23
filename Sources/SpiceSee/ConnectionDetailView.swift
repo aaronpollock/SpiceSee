@@ -25,7 +25,9 @@ struct ConnectionDetailView: View {
             header
             Divider()
             form
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(nsColor: .controlBackgroundColor))
         .onChange(of: connection.id) { password = "" }
     }
@@ -89,6 +91,8 @@ struct ConnectionDetailView: View {
                     }
                 }
             }
+
+            Spacer(minLength: Metric.Form.rowRhythm)
 
             HStack(alignment: .center, spacing: Metric.Form.labelGap) {
                 Text(footerText)

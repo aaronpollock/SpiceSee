@@ -13,7 +13,9 @@ struct ConnectionManagerView: View {
             sidebar
         } detail: {
             detail
+                .connectFailureSheet(session: session, onEditConnection: {}, onFetchVV: openVVFile)
         }
+        .opensSessionWindows(session: session, settings: settings)
     }
 
     // MARK: Sidebar
@@ -31,7 +33,7 @@ struct ConnectionManagerView: View {
                             isConnecting: isConnecting(connection)
                         )
                         .tag(connection.id)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                     }

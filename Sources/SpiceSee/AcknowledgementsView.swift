@@ -57,8 +57,11 @@ private let acknowledgementsSourceURL = URL(string: "https://github.com/spicesee
 private let placeholderLicenseText = "PLACEHOLDER — populated by the orchestrator"
 
 private func loadLicenseText(fileName: String) -> String? {
-    guard let url = Bundle.main.url(forResource: fileName, withExtension: "txt", subdirectory: "Licenses"),
-          let text = try? String(contentsOf: url, encoding: .utf8) else {
+    // The build flattens Sources/SpiceSee/Licenses into Resources/, so the subdirectory lookup
+    // misses; fall back to the bundle root rather than shipping without the licence text.
+    let url = Bundle.main.url(forResource: fileName, withExtension: "txt", subdirectory: "Licenses")
+        ?? Bundle.main.url(forResource: fileName, withExtension: "txt")
+    guard let url, let text = try? String(contentsOf: url, encoding: .utf8) else {
         return nil
     }
     if text.trimmingCharacters(in: .whitespacesAndNewlines) == placeholderLicenseText {
