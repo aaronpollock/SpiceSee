@@ -32,6 +32,10 @@ struct SessionWindowView: View {
                     ToolbarItem(placement: .primaryAction) {
                         SessionToolbar(session: session,
                                        collapsed: proxy.size.width <= Metric.Toolbar.collapseWidth)
+                            // Centre in whatever height the toolbar gives us. In full screen the
+                            // revealed overlay bar is taller than the windowed band, and a fixed
+                            // 22pt row sat high in it with the extra space falling below.
+                            .frame(maxHeight: .infinity, alignment: .center)
                     }
                 }
         }
@@ -73,7 +77,7 @@ private struct SessionToolbar: View {
     @State private var hostWindow: NSWindow?
 
     var body: some View {
-        HStack(spacing: Metric.Toolbar.itemGap) {
+        HStack(alignment: .center, spacing: Metric.Toolbar.itemGap) {
             ctrlAltDel
             divider
             ToolbarGlyphButton(help: isFullScreen ? "Leave Full Screen" : "Full Screen") {
@@ -281,19 +285,9 @@ struct AgentChip: View {
                     .fixedSize()
             }
         }
-        .fixedSize()
-        .padding(.horizontal, collapsed ? 0 : 8)
+        .padding(.horizontal, collapsed ? 0 : 6)
         .frame(width: collapsed ? Metric.HUD.cueHeight : nil, height: Metric.Toolbar.itemSize.height)
-        .background {
-            RoundedRectangle(cornerRadius: Metric.Toolbar.itemRadius, style: .continuous)
-                .fill(fill)
-                .overlay {
-                    RoundedRectangle(cornerRadius: Metric.Toolbar.itemRadius, style: .continuous)
-                        .strokeBorder(stroke, lineWidth: 0.5)
-                }
-        }
         .fixedSize()
-        .frame(height: 28)
         .help(state.tooltip)
     }
 
@@ -335,13 +329,7 @@ struct AgentChip: View {
         return Color(nsColor: base.blended(withFraction: 0.4, of: .black) ?? base)
     }
 
-    private var fill: Color {
-        base.map { Color(nsColor: $0).opacity(0.14) } ?? Color.secondary.opacity(0.12)
-    }
 
-    private var stroke: Color {
-        base.map { Color(nsColor: $0).opacity(0.3) } ?? Color.secondary.opacity(0.25)
-    }
 }
 
 // MARK: - Captured pointer
