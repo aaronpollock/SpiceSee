@@ -2,3 +2,4 @@
 *.xcodeproj
 DerivedData/
 .DS_Store
+.claude/worktrees/
