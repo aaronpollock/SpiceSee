@@ -76,8 +76,7 @@ private struct SessionToolbar: View {
         HStack(spacing: Metric.Toolbar.itemGap) {
             ctrlAltDel
             divider
-            ToolbarGlyphButton(help: isFullScreen ? "Leave Full Screen" : "Full Screen",
-                               tint: isFullScreen ? Color.chiliRed : nil) {
+            ToolbarGlyphButton(help: isFullScreen ? "Leave Full Screen" : "Full Screen") {
                 NSApplication.shared.keyWindow?.toggleFullScreen(nil)
             } glyph: {
                 ToolbarGlyph(isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
@@ -147,8 +146,7 @@ private struct SessionToolbar: View {
     }
 
     private var hiDPI: some View {
-        ToolbarGlyphButton(help: "Send backing pixels to the guest (HiDPI)",
-                           tint: session.hiDPI ? Color.chiliRed : nil) {
+        ToolbarGlyphButton(help: "Send backing pixels to the guest (HiDPI)") {
             session.hiDPI.toggle()
         } glyph: {
             Text("2×")
@@ -158,8 +156,7 @@ private struct SessionToolbar: View {
     }
 
     private var clipboard: some View {
-        ToolbarGlyphButton(help: session.clipboardSync ? "Clipboard sync is on" : "Clipboard sync is off",
-                           tint: session.clipboardSync ? Color.green : Color.red) {
+        ToolbarGlyphButton(help: session.clipboardSync ? "Clipboard sync is on" : "Clipboard sync is off") {
             session.clipboardSync.toggle()
         } glyph: {
             ToolbarGlyph("doc.on.clipboard")
@@ -230,8 +227,6 @@ private struct WindowReader: NSViewRepresentable {
 
 private struct ToolbarGlyphButton<Glyph: View>: View {
     let help: String
-    /// Non-nil means the control is ON: it stays filled instead of only highlighting on hover.
-    var tint: Color?
     let action: () -> Void
     @ViewBuilder let glyph: Glyph
 
@@ -239,44 +234,19 @@ private struct ToolbarGlyphButton<Glyph: View>: View {
         Button(action: action) {
             glyph.frame(width: Metric.Toolbar.itemSize.width)
         }
-        .buttonStyle(ToolbarButtonStyle(tint: tint))
+        .buttonStyle(ToolbarButtonStyle())
         .help(help)
     }
 }
 
-/// Rest = no background, hover = subtle fill, pressed = stronger fill. When `tint` is set the
-/// control reads as ON. Every toolbar control uses this, so their backgrounds share one geometry.
+/// Hover and pressed states are macOS's own: a toolbar item's native highlight is taller than the
+/// design's 22pt control, so any background we drew ourselves sat inside it and the highlight
+/// appeared to overhang. On/off state is carried by colour instead.
 private struct ToolbarButtonStyle: ButtonStyle {
-    var tint: Color?
-
     func makeBody(configuration: Configuration) -> some View {
-        Chrome(tint: tint, pressed: configuration.isPressed) { configuration.label }
-    }
-
-    private struct Chrome<Content: View>: View {
-        let tint: Color?
-        let pressed: Bool
-        @ViewBuilder let content: Content
-        @State private var hovering = false
-
-        private var shape: RoundedRectangle {
-            RoundedRectangle(cornerRadius: Metric.Toolbar.itemRadius, style: .continuous)
-        }
-
-        var body: some View {
-            content
-                .frame(height: Metric.Toolbar.itemSize.height)
-                .background(shape.fill(fill))
-                .overlay { if tint != nil { shape.strokeBorder((tint ?? .clear).opacity(0.35), lineWidth: 0.5) } }
-                .contentShape(shape)
-                .onHover { hovering = $0 }
-        }
-
-        private var fill: Color {
-            if pressed { return (tint ?? .primary).opacity(0.28) }
-            if let tint { return tint.opacity(hovering ? 0.26 : 0.16) }
-            return hovering ? Color.primary.opacity(0.10) : .clear
-        }
+        configuration.label
+            .frame(height: Metric.Toolbar.itemSize.height)
+            .opacity(configuration.isPressed ? 0.55 : 1)
     }
 }
 
@@ -323,6 +293,7 @@ struct AgentChip: View {
                 }
         }
         .fixedSize()
+        .frame(height: 28)
         .help(state.tooltip)
     }
 

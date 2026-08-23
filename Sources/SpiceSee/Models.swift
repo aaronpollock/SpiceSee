@@ -144,6 +144,8 @@ struct ViewportInfo: Identifiable, Hashable {
     var height: Int
     /// "Display 1 of 2 · 1920 × 1080"
     var subtitle: String { "Display \(index + 1) of \(total) · \(width) × \(height)" }
+    /// Window-menu entry, so a display closed by mistake can be brought back.
+    var menuTitle: String { "Display \(index + 1) — \(width) × \(height)" }
 }
 
 /// A VM whose console moved mid-session (MAIN_MIGRATE_SWITCH_HOST).

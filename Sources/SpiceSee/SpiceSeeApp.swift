@@ -34,6 +34,19 @@ struct SpiceSeeApp: App {
                 Button("Add Connection…") { store.add() }.keyboardShortcut("n")
                 Button("Open .vv File…") { openVVFile() }.keyboardShortcut("o")
             }
+            // Closing a viewport window otherwise left no way to get it back.
+            CommandGroup(after: .windowList) {
+                Divider()
+                Button("Show All Displays") {
+                    for viewport in session.viewports {
+                        openWindow(id: "session", value: viewport.id)
+                    }
+                }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+                ForEach(session.viewports) { viewport in
+                    displayMenuItem(viewport)
+                }
+            }
             CommandGroup(replacing: .appInfo) {
                 Button("About SpiceSee") { NSApp.orderFrontStandardAboutPanel(nil) }
                 Button("Acknowledgements…") { openWindow(id: "acknowledgements") }
@@ -60,6 +73,17 @@ struct SpiceSeeApp: App {
     }
 
     @Environment(\.openWindow) private var openWindow
+
+    /// ⌘1…⌘9 for the first nine displays; beyond that the item still works, just without a shortcut.
+    @ViewBuilder
+    private func displayMenuItem(_ viewport: ViewportInfo) -> some View {
+        let button = Button(viewport.menuTitle) { openWindow(id: "session", value: viewport.id) }
+        if viewport.index < 9 {
+            button.keyboardShortcut(KeyEquivalent(Character(String(viewport.index + 1))), modifiers: .command)
+        } else {
+            button
+        }
+    }
 
     private func openVVFile() {
         let panel = NSOpenPanel()
