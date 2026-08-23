@@ -102,6 +102,8 @@ private struct SessionToolbar: View {
         .background(WindowReader { hostWindow = $0 })
         // Scoped to this window: a multi-monitor session has several, and an unscoped notification
         // would light up every toolbar when any one of them entered full screen.
+        .padding(.horizontal, Metric.Toolbar.contentInsetH)
+        .padding(.vertical, Metric.Toolbar.contentInsetV)
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { note in
             if isThisWindow(note) { isFullScreen = true }
         }

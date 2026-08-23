@@ -45,6 +45,9 @@ enum Metric {
         static let itemGap: CGFloat = 6
         static let dividerHeight: CGFloat = 18
         static let glyph: CGFloat = 15
+        /// Breathing room between the toolbar content and the edges of the bar it sits in.
+        static let contentInsetH: CGFloat = 4
+        static let contentInsetV: CGFloat = 2
         /// At or below this window width the secondary items collapse into an overflow menu.
         static let collapseWidth: CGFloat = 700
     }
