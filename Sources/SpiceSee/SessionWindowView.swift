@@ -69,15 +69,19 @@ struct SessionWindowView: View {
 private struct SessionToolbar: View {
     @Bindable var session: SessionModel
     let collapsed: Bool
+    @State private var isFullScreen = false
+    @State private var hostWindow: NSWindow?
 
     var body: some View {
         HStack(spacing: Metric.Toolbar.itemGap) {
             ctrlAltDel
             divider
-            ToolbarGlyphButton(help: "Full Screen") {
+            ToolbarGlyphButton(help: isFullScreen ? "Leave Full Screen" : "Full Screen",
+                               tint: isFullScreen ? Color.chiliRed : nil) {
                 NSApplication.shared.keyWindow?.toggleFullScreen(nil)
             } glyph: {
-                ToolbarGlyph("arrow.up.left.and.arrow.down.right")
+                ToolbarGlyph(isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    .foregroundStyle(isFullScreen ? Color.chiliRed : Color.primary)
             }
 
             if collapsed {
@@ -92,6 +96,22 @@ private struct SessionToolbar: View {
             divider
             AgentChip(state: session.agent, collapsed: collapsed)
         }
+        .background(WindowReader { hostWindow = $0 })
+        // Scoped to this window: a multi-monitor session has several, and an unscoped notification
+        // would light up every toolbar when any one of them entered full screen.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { note in
+            if isThisWindow(note) { isFullScreen = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { note in
+            if isThisWindow(note) { isFullScreen = false }
+        }
+    }
+
+    private func isThisWindow(_ note: Notification) -> Bool {
+        // If the host window could not be resolved, accept the event rather than never showing the
+        // state at all — a single-window session is the common case and is still correct.
+        guard let hostWindow else { return true }
+        return (note.object as? NSWindow) === hostWindow
     }
 
     private var divider: some View {
@@ -100,20 +120,16 @@ private struct SessionToolbar: View {
             .frame(width: 1, height: Metric.Toolbar.dividerHeight)
     }
 
-    /// Three keycap characters in one pill, the way the guest sees the chord.
+    /// Spelled out rather than ⌃⌥⌦ — the glyphs read as a shortcut to press, not a button to click.
     private var ctrlAltDel: some View {
         Button { session.sendCtrlAltDel() } label: {
-            HStack(spacing: 3) {
-                ForEach(["⌃", "⌥", "⌦"], id: \.self) { Text($0) }
-            }
-            .font(.system(size: 10))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 8)
-            .frame(height: Metric.Toolbar.itemSize.height)
-            .background(keycap)
-            .contentShape(RoundedRectangle(cornerRadius: Metric.Toolbar.itemRadius, style: .continuous))
+            Text("Ctrl-Alt-Del")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.primary)
+                .fixedSize()
+                .padding(.horizontal, 8)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ToolbarButtonStyle())
         .help("Send Ctrl-Alt-Del to the guest")
     }
 
@@ -131,33 +147,28 @@ private struct SessionToolbar: View {
     }
 
     private var hiDPI: some View {
-        ToolbarGlyphButton(help: "Send backing pixels to the guest (HiDPI)") {
+        ToolbarGlyphButton(help: "Send backing pixels to the guest (HiDPI)",
+                           tint: session.hiDPI ? Color.chiliRed : nil) {
             session.hiDPI.toggle()
         } glyph: {
             Text("2×")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(session.hiDPI ? Color.chiliRed : Color.secondary)
-                .frame(width: Metric.Toolbar.itemSize.width, height: Metric.Toolbar.itemSize.height)
-                .background {
-                    if session.hiDPI {
-                        RoundedRectangle(cornerRadius: Metric.Toolbar.itemRadius, style: .continuous)
-                            .fill(Color.chiliRed.opacity(0.16))
-                    }
-                }
         }
     }
 
     private var clipboard: some View {
-        ToolbarGlyphButton(help: session.clipboardSync ? "Clipboard sync is on" : "Clipboard sync is off") {
+        ToolbarGlyphButton(help: session.clipboardSync ? "Clipboard sync is on" : "Clipboard sync is off",
+                           tint: session.clipboardSync ? Color.green : Color.red) {
             session.clipboardSync.toggle()
         } glyph: {
             ToolbarGlyph("doc.on.clipboard")
-                .foregroundStyle(session.clipboardSync ? Color.primary : Color.secondary)
+                .foregroundStyle(session.clipboardSync ? Color.green : Color.red)
                 .overlay {
                     // SF Symbols has no `doc.on.clipboard.slash`, so the off state draws the slash.
                     if !session.clipboardSync {
                         Capsule()
-                            .fill(Color.secondary)
+                            .fill(Color.red)
                             .frame(width: Metric.Toolbar.glyph * 1.2, height: 1.2)
                             .rotationEffect(.degrees(-45))
                     }
@@ -192,14 +203,6 @@ private struct SessionToolbar: View {
         .help("More session controls")
     }
 
-    private var keycap: some View {
-        RoundedRectangle(cornerRadius: Metric.Toolbar.itemRadius, style: .continuous)
-            .fill(.quaternary)
-            .overlay {
-                RoundedRectangle(cornerRadius: Metric.Toolbar.itemRadius, style: .continuous)
-                    .strokeBorder(.separator, lineWidth: 0.5)
-            }
-    }
 }
 
 private struct ToolbarGlyph: View {
@@ -212,19 +215,68 @@ private struct ToolbarGlyph: View {
     }
 }
 
+/// Hands back the NSWindow hosting this SwiftUI content.
+private struct WindowReader: NSViewRepresentable {
+    let onResolve: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { onResolve(view.window) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
 private struct ToolbarGlyphButton<Glyph: View>: View {
     let help: String
+    /// Non-nil means the control is ON: it stays filled instead of only highlighting on hover.
+    var tint: Color?
     let action: () -> Void
     @ViewBuilder let glyph: Glyph
 
     var body: some View {
         Button(action: action) {
-            glyph
-                .frame(width: Metric.Toolbar.itemSize.width, height: Metric.Toolbar.itemSize.height)
-                .contentShape(RoundedRectangle(cornerRadius: Metric.Toolbar.itemRadius, style: .continuous))
+            glyph.frame(width: Metric.Toolbar.itemSize.width)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ToolbarButtonStyle(tint: tint))
         .help(help)
+    }
+}
+
+/// Rest = no background, hover = subtle fill, pressed = stronger fill. When `tint` is set the
+/// control reads as ON. Every toolbar control uses this, so their backgrounds share one geometry.
+private struct ToolbarButtonStyle: ButtonStyle {
+    var tint: Color?
+
+    func makeBody(configuration: Configuration) -> some View {
+        Chrome(tint: tint, pressed: configuration.isPressed) { configuration.label }
+    }
+
+    private struct Chrome<Content: View>: View {
+        let tint: Color?
+        let pressed: Bool
+        @ViewBuilder let content: Content
+        @State private var hovering = false
+
+        private var shape: RoundedRectangle {
+            RoundedRectangle(cornerRadius: Metric.Toolbar.itemRadius, style: .continuous)
+        }
+
+        var body: some View {
+            content
+                .frame(height: Metric.Toolbar.itemSize.height)
+                .background(shape.fill(fill))
+                .overlay { if tint != nil { shape.strokeBorder((tint ?? .clear).opacity(0.35), lineWidth: 0.5) } }
+                .contentShape(shape)
+                .onHover { hovering = $0 }
+        }
+
+        private var fill: Color {
+            if pressed { return (tint ?? .primary).opacity(0.28) }
+            if let tint { return tint.opacity(hovering ? 0.26 : 0.16) }
+            return hovering ? Color.primary.opacity(0.10) : .clear
+        }
     }
 }
 
@@ -259,6 +311,7 @@ struct AgentChip: View {
                     .fixedSize()
             }
         }
+        .fixedSize()
         .padding(.horizontal, collapsed ? 0 : 8)
         .frame(width: collapsed ? Metric.HUD.cueHeight : nil, height: Metric.Toolbar.itemSize.height)
         .background {
@@ -269,6 +322,7 @@ struct AgentChip: View {
                         .strokeBorder(stroke, lineWidth: 0.5)
                 }
         }
+        .fixedSize()
         .help(state.tooltip)
     }
 

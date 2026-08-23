@@ -105,3 +105,43 @@ private struct MigrationPresenter: ViewModifier {
         )
     }
 }
+
+/// Sizes and bounds the hosting window on first appearance.
+///
+/// SwiftUI sizes a `Window` whose content is vertically flexible to the screen's whole visible
+/// height, which is how the connection manager ended up 1041pt tall — taller than the design's 520
+/// and, once Advanced expanded, pushed off the top of the screen. `.defaultSize` does not survive
+/// that. Clamping the content size here is deterministic, and the max keeps it on-screen.
+struct WindowSizer: NSViewRepresentable {
+    let size: CGSize
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { apply(to: view.window) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private func apply(to window: NSWindow?) {
+        guard let window, !context(window) else { return }
+        let visible = (window.screen ?? NSScreen.main)?.visibleFrame.size ?? size
+        window.contentMinSize = CGSize(width: min(620, size.width), height: min(380, size.height))
+        window.contentMaxSize = CGSize(width: .greatestFiniteMagnitude, height: visible.height)
+        window.setContentSize(CGSize(width: min(size.width, visible.width),
+                                     height: min(size.height, visible.height)))
+        window.center()
+        sized.insert(ObjectIdentifier(window))
+    }
+
+    /// Only the first appearance sizes the window; later ones would fight the user's own resizing.
+    private func context(_ window: NSWindow) -> Bool { sized.contains(ObjectIdentifier(window)) }
+}
+
+@MainActor private var sized: Set<ObjectIdentifier> = []
+
+extension View {
+    func sizesWindow(to size: CGSize) -> some View {
+        background(WindowSizer(size: size))
+    }
+}

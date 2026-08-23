@@ -52,6 +52,7 @@ struct SpiceSeeApp: App {
             AcknowledgementsView()
         }
         .defaultSize(Metric.Window.acknowledgements)
+        .windowResizability(.contentMinSize)
 
         Settings {
             SettingsView(settings: settings)

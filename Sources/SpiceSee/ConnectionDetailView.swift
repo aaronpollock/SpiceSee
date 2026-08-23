@@ -24,8 +24,9 @@ struct ConnectionDetailView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            form
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            ScrollView { fields.padding(20) }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            footer.padding(.horizontal, 20).padding(.bottom, 20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(nsColor: .controlBackgroundColor))
@@ -35,9 +36,11 @@ struct ConnectionDetailView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Text(connection.name)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(tagText)
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
             Spacer()
         }
@@ -49,7 +52,7 @@ struct ConnectionDetailView: View {
         connection.tlsPort != nil ? "SPICE · TLS" : "SPICE"
     }
 
-    private var form: some View {
+    private var fields: some View {
         VStack(alignment: .leading, spacing: Metric.Form.rowRhythm) {
             HStack(spacing: Metric.Form.labelGap) {
                 FormLabel("Host:")
@@ -60,8 +63,9 @@ struct ConnectionDetailView: View {
                 FormTextField(text: portBinding)
                     .frame(width: 84)
                 FormLabel("TLS:", width: 52)
-                FormTextField(text: tlsPortBinding)
+                FormTextField(text: tlsPortBinding, placeholder: "port")
                     .frame(width: 84)
+                    .help(tlsHelp)
             }
             HStack(spacing: Metric.Form.labelGap) {
                 FormLabel("Password:")
@@ -92,8 +96,10 @@ struct ConnectionDetailView: View {
                 }
             }
 
-            Spacer(minLength: Metric.Form.rowRhythm)
+        }
+    }
 
+    private var footer: some View {
             HStack(alignment: .center, spacing: Metric.Form.labelGap) {
                 Text(footerText)
                     .font(.system(size: 11))
@@ -108,10 +114,9 @@ struct ConnectionDetailView: View {
                     .keyboardShortcut(.defaultAction)
                     .frame(height: 28)
             }
-            .padding(.top, 4)
-        }
-        .padding(20)
     }
+
+    private let tlsHelp = "Encrypted SPICE port. Proxmox .vv files supply this — leave it empty to connect without TLS."
 
     private var portBinding: Binding<String> {
         Binding(
@@ -253,13 +258,14 @@ private struct FormLabel: View {
 private struct FormTextField: View {
     @Binding var text: String
     var isSecure = false
+    var placeholder = ""
 
     var body: some View {
         Group {
             if isSecure {
-                SecureField("", text: $text)
+                SecureField(placeholder, text: $text)
             } else {
-                TextField("", text: $text)
+                TextField(placeholder, text: $text)
             }
         }
         .textFieldStyle(.plain)

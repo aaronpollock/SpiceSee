@@ -134,6 +134,8 @@ struct AcknowledgementsView: View {
             .padding(.horizontal, 8)
             .background(isSelected ? Color.chiliRed : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            // Without this only the text is clickable; the whitespace beside it must select too.
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
     }

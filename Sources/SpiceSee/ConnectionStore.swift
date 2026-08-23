@@ -15,7 +15,11 @@ final class ConnectionStore {
         return dir.appendingPathComponent("connections.json")
     }()
 
+    /// Preview/mock stores never touch disk — otherwise sample hosts leak into the real store.
+    private let isEphemeral: Bool
+
     init(connections: [SavedConnection]? = nil) {
+        isEphemeral = connections != nil
         if let connections { self.connections = connections; return }
         if let data = try? Data(contentsOf: url),
            let decoded = try? JSONDecoder().decode([SavedConnection].self, from: data) {
@@ -63,7 +67,7 @@ final class ConnectionStore {
     }
 
     private func save() {
-        guard let data = try? JSONEncoder().encode(connections) else { return }
+        guard !isEphemeral, let data = try? JSONEncoder().encode(connections) else { return }
         try? data.write(to: url, options: .atomic)
     }
 

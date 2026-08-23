@@ -15,6 +15,7 @@ struct ConnectionManagerView: View {
             detail
                 .connectFailureSheet(session: session, onEditConnection: {}, onFetchVV: openVVFile)
         }
+        .sizesWindow(to: Metric.Window.connectionManager)
         .opensSessionWindows(session: session, settings: settings)
     }
 
