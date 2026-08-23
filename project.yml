@@ -1,0 +1,55 @@
+name: SpiceSee
+options:
+  bundleIdPrefix: com.spicesee
+  deploymentTarget:
+    macOS: "14.0"
+packages:
+  SpiceSee:
+    path: .
+targets:
+  SpiceSee:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/SpiceSee
+    dependencies:
+      - package: SpiceSee
+        product: SpiceKit
+    info:
+      path: Sources/SpiceSee/Info.plist
+      properties:
+        CFBundleName: SpiceSee
+        CFBundleDisplayName: SpiceSee
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "142"
+        LSMinimumSystemVersion: "14.0"
+        NSPrincipalClass: NSApplication
+        NSHumanReadableCopyright: ""
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: SPICE Connection
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [org.spice-space.vv]
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: org.spice-space.vv
+            UTTypeDescription: SPICE Connection
+            UTTypeConformsTo: [public.data, public.text]
+            UTTypeTagSpecification:
+              public.filename-extension: [vv]
+    entitlements:
+      path: Sources/SpiceSee/SpiceSee.entitlements
+      properties:
+        com.apple.security.cs.disable-library-validation: true
+        com.apple.security.network.client: true
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        ARCHS: "arm64 x86_64"
+        ONLY_ACTIVE_ARCH: "NO"
+        ENABLE_HARDENED_RUNTIME: "YES"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        PRODUCT_BUNDLE_IDENTIFIER: com.spicesee.app
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ChiliRed
+        MARKETING_VERSION: "1.0"
