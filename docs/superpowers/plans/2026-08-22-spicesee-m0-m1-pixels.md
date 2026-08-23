@@ -3814,3 +3814,68 @@ git add -A && git commit -m "feat(app): connect view and Metal-presented session
 - **Spec coverage (M0–M1):** §2 layout (T1), security-boundary reader (T2), link/ticket/caps (T3, T7, T9), MAIN_INIT/CHANNELS_LIST/PING (T4, T10, T11), TLS/`.vv`/migration → M3 plan, §4 tier 1 + cache + GLZ window + codec routing (T13, T14), Metal present on dirty rects (T18), §7 replay + per-op goldens + spicerec (T12, T14, T15), libFuzzer → add to M4 plan once `SpiceWire` is complete, §8 bundle/entitlement/embedding (T17), signing/notarization → M7.
 - **Known deviations:** surfaces are copied per dirty rect into `[UInt8]` for the Metal upload instead of shared zero-copy (spec §4) — keeps the no-`@unchecked Sendable` rule; revisit with a custom serial executor + `IOSurface` in M4 if profiling demands. Non-PUT ROPs / masks / scaled copies draw as PUT with an `.unsupported` event in M1; M4 replaces them with tier 2/3.
 - **Type consistency check:** `ChannelDescriptor(type:id:)`, `Transport` = `ByteSource & ByteSink`, `ClientMessage.frame(type:payload:mini:serial:)`, `DisplayMessage(type:payload:)`, `Canvas.apply(_:)` / `snapshot(surfaceID:)` / `primarySurfaceID`, `SurfaceUpdate.isPrimary`, `SessionInfo.connectionID` are used with the same spelling in every task.
+
+---
+
+## Amendment — 2026-08-22: UI built ahead of the engine
+
+The finalized Claude Design project (`docs/design/SpiceSee UI.dc.html`, text extract at
+`docs/design/design-text.txt`) arrived before execution started, so the app layer was built first,
+from the design, rather than from Tasks 17–18's placeholders.
+
+**Tasks 17 and 18 above are superseded.** What shipped instead:
+
+- `project.yml` / xcodegen app target — as Task 17 specified, plus the `.vv` document type and UTI
+  (`org.spice-space.vv`), the `ChiliRed` accent colorset, and `Sources/SpiceSee/Licenses` as bundled
+  resources. `CSpiceCodec.framework` embedding is NOT yet wired — it lands with Task 13, which is
+  when the framework first exists.
+- The full UI from the design: connection manager, inline connect progress, the three failure sheets,
+  migration sheet, session window with the responsive toolbar and captured-pointer HUD, preferences,
+  acknowledgements, and the app/document icons.
+
+**The one architectural deviation.** Task 18 had `SessionModel` talk to `SpiceKit.SpiceSession`
+directly. `SpiceKit` does not exist until Task 16, so the UI is written against a seam:
+
+```swift
+protocol SessionBackend: Sendable {
+    func connect(host: String, port: UInt16, tlsPort: UInt16?, password: String?) -> AsyncStream<BackendEvent>
+    func disconnect() async
+    func sendCtrlAltDel() async
+}
+```
+
+`MockSessionBackend` implements it today (`--mock`, `--scenario <name>`), which is what makes every
+screen reviewable before a single byte of SPICE has been parsed. This is one protocol and one mock,
+not a speculative abstraction layer: without it the UI could not be run or verified at all.
+
+**Therefore add, after Task 16:**
+
+### Task 16b: SpiceKitBackend — replace the mock
+
+**Files:**
+- Create: `Sources/SpiceSee/SpiceKitBackend.swift`
+- Modify: `Sources/SpiceSee/SpiceSeeApp.swift` (select the real backend unless `--mock`)
+- Test: `Tests/SpiceKitTests/SpiceKitBackendTests.swift`
+
+**Interfaces:**
+- Consumes: `SpiceSession.connect(_:)`, `SessionEvent`, `SurfaceUpdate`, `SurfaceDescriptor`, `SpiceError`.
+- Produces: `struct SpiceKitBackend: SessionBackend`.
+
+The mapping is mechanical, and each line is pinned by an existing UI state:
+
+| `SessionEvent` | `BackendEvent` |
+|---|---|
+| `.connected(SessionInfo)` | `.connected(viewports:)` — one `ViewportInfo` per display channel in `info.channels` |
+| `.canvas(.surfaceCreated(d))` where `d.isPrimary` | update that viewport's `width`/`height` |
+| `.canvas(.updated(u))` | `.frame(FrameUpdate(...))` — `u.rect` → `x/y/width/height`, `u.pixels` verbatim (both are tightly packed BGRA) |
+| `.channelFailed(desc, err)` | `.failed(...)` for the main channel; a failed *secondary* channel degrades the session and must NOT produce `.failed` (spec §3) |
+| `.disconnected` | `.disconnected` |
+
+`SpiceError` → `ConnectFailure` mapping, since the design's failure copy is keyed to these:
+`.link(.permissionDenied)` and `.auth` → `.passwordRejected`; `.connect` → `.refused(endpoint:)`;
+`.tls` → `.hostSubjectMismatch(expected:presented:host:)` (M3, when the verify block can report both
+subjects); everything else → `.other(title:message:)`. The raw `SpiceError` goes to `os.Logger`, never
+into the sheet text — the design is explicit that the SPICE error code never reaches the user.
+
+No view changes when this lands. If a view needs editing to accommodate the real backend, the seam is
+wrong — fix the adapter, not the view.

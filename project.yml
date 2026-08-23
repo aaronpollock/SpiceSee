@@ -12,6 +12,9 @@ targets:
     platform: macOS
     sources:
       - path: Sources/SpiceSee
+        excludes: [Licenses]
+      - path: Sources/SpiceSee/Licenses
+        buildPhase: resources
     dependencies:
       - package: SpiceSee
         product: SpiceKit
