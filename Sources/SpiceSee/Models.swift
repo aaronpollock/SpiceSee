@@ -95,7 +95,7 @@ enum AgentState: Equatable {
 enum ConnectStep: Int, CaseIterable, Identifiable {
     case tls, ticket, channels
     var id: Int { rawValue }
-    func label(host: String) -> String {
+    var label: String {
         switch self {
         case .tls: "TLS handshake · host-subject verified"
         case .ticket: "Ticket accepted · main channel linked"
