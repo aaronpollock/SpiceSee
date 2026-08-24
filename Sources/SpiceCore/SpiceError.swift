@@ -3,6 +3,7 @@ import SpiceWire
 public struct SpiceError: Error, Sendable {
     public enum Kind: Sendable {
         case connect, tls, link(LinkError), auth, protocolError(WireError), closed, unsupported(String)
+        case vvFile(String)
     }
     public var kind: Kind
     public var channel: ChannelDescriptor?

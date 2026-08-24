@@ -1,0 +1,13 @@
+[virt-viewer]
+type=spice
+host=192.168.1.10
+port=0
+tls-port=61000
+password=Zm9vYmFyLXRpY2tldA==
+host-subject=OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=pve1.example.com
+ca=-----BEGIN CERTIFICATE-----\nMIIB<<placeholder>>\n-----END CERTIFICATE-----\n
+delete-this-file=1
+title=VM 100 - win11 (Press %s to release the cursor)
+toggle-fullscreen=shift+f11
+release-cursor=shift+f12
+secure-attention=ctrl+alt+end
