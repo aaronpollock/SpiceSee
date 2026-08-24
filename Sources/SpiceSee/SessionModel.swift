@@ -138,8 +138,6 @@ final class SessionModel {
         Task { [backend] in await backend.sendCtrlAltDel() }
     }
 
-    func releasePointer() { pointerCaptured = false }
-
     /// Dismiss a failure sheet, returning the detail pane to its editable form.
     func dismissFailure() { if case .failed = phase { phase = .idle } }
 
