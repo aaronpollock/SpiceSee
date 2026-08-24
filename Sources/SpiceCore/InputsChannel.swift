@@ -1,0 +1,110 @@
+import os
+import SpiceWire
+
+/// The inputs channel: every key and pointer message the guest receives goes through here, in the
+/// order it was called. The caller (SpiceSession's single input pump) serialises calls; this actor
+/// owns the state the wire needs — held keys, buttons_state, motion flow control, guest lock keys.
+public actor InputsChannel {
+    public static let descriptor = ChannelDescriptor(type: .inputs, id: 0)
+    private let reader: ChannelReader
+    private let loop: Task<Void, Never>
+    private var pump: Task<Void, Never>?
+    private let log = Logger(subsystem: "com.spicesee", category: "inputs")
+
+    public private(set) var heldKeys: Set<XTScancode> = []
+    public private(set) var guestLockKeys: LockKeys = []
+    private var buttons = MouseButtonState()
+    private var throttle = MotionThrottle()
+
+    public static func clientCaps() -> CapabilitySet { CapabilitySet(bits: [InputsCap.keyScancode]) }
+
+    public static func open(transport: any Transport, connectionID: UInt32, password: String?) async throws -> InputsChannel {
+        let link = try await LinkHandshake.perform(on: transport, connectionID: connectionID, channel: descriptor,
+                                                   channelCaps: clientCaps(), password: password)
+        let reader = ChannelReader(source: transport, sink: transport, miniHeader: link.miniHeader, channel: descriptor)
+        let loop = Task { await reader.run() }
+        let channel = InputsChannel(reader: reader, loop: loop)
+        await channel.startPump()
+        return channel
+    }
+
+    private init(reader: ChannelReader, loop: Task<Void, Never>) { self.reader = reader; self.loop = loop }
+
+    private func startPump() {
+        let messages = reader.messages
+        pump = Task { [weak self] in
+            for await raw in messages {
+                guard let self else { return }
+                do { await self.handle(try InputsMessage(type: raw.type, payload: raw.payload)) }
+                catch { self.log.error("inputs: drop type \(raw.type): \(String(describing: error))") }
+            }
+        }
+    }
+
+    private func handle(_ m: InputsMessage) async {
+        switch m {
+        case let .`init`(k), let .keyModifiers(k): guestLockKeys = k
+        case .mouseMotionAck:
+            if let p = throttle.acked() { try? await send(p) }
+        case .other: break
+        }
+    }
+
+    /// Feeds a server message as if it had arrived on the wire (tests only).
+    func handleForTesting(_ m: InputsMessage) async { await handle(m) }
+
+    // MARK: Keyboard
+
+    public func keyDown(_ s: XTScancode) async throws {
+        heldKeys.insert(s)
+        try await reader.send(type: InputsClientMsg.keyDown.rawValue, payload: ClientMessage.keyDown(s))
+    }
+    public func keyUp(_ s: XTScancode) async throws {
+        heldKeys.remove(s)
+        try await reader.send(type: InputsClientMsg.keyUp.rawValue, payload: ClientMessage.keyUp(s))
+    }
+    /// On focus loss: the guest must not be left with a stuck modifier.
+    public func releaseAllKeys() async throws {
+        for s in heldKeys.sorted(by: { ($0.extended ? 256 : 0) + Int($0.code) < ($1.extended ? 256 : 0) + Int($1.code) }) {
+            try await reader.send(type: InputsClientMsg.keyUp.rawValue, payload: ClientMessage.keyUp(s))
+        }
+        heldKeys = []
+    }
+    public func setLockKeys(_ k: LockKeys) async throws {
+        try await reader.send(type: InputsClientMsg.keyModifiers.rawValue, payload: ClientMessage.keyModifiers(k))
+    }
+    /// Caps lock is the only lock state macOS exposes; num and scroll keep what the guest reported.
+    public func syncCapsLock(_ on: Bool) async throws {
+        var k = guestLockKeys
+        if on { k.insert(.capsLock) } else { k.remove(.capsLock) }
+        try await setLockKeys(k)
+    }
+
+    // MARK: Pointer
+
+    public func mouseMotion(dx: Int32, dy: Int32) async throws {
+        if let p = throttle.offer(.motion(dx: dx, dy: dy)) { try await send(p) }
+    }
+    public func mousePosition(x: UInt32, y: UInt32, displayID: UInt8) async throws {
+        if let p = throttle.offer(.position(x: x, y: y, displayID: displayID)) { try await send(p) }
+    }
+    public func buttonDown(_ b: MouseButton) async throws {
+        buttons.insert(b)
+        try await reader.send(type: InputsClientMsg.mousePress.rawValue, payload: ClientMessage.mousePress(b, buttons: buttons))
+    }
+    public func buttonUp(_ b: MouseButton) async throws {
+        buttons.remove(b)
+        try await reader.send(type: InputsClientMsg.mouseRelease.rawValue, payload: ClientMessage.mouseRelease(b, buttons: buttons))
+    }
+
+    private func send(_ p: MotionThrottle.Pending) async throws {
+        switch p {
+        case let .motion(dx, dy):
+            try await reader.send(type: InputsClientMsg.mouseMotion.rawValue, payload: ClientMessage.mouseMotion(dx: dx, dy: dy, buttons: buttons))
+        case let .position(x, y, id):
+            try await reader.send(type: InputsClientMsg.mousePosition.rawValue, payload: ClientMessage.mousePosition(x: x, y: y, buttons: buttons, displayID: id))
+        }
+    }
+
+    public func close() { pump?.cancel(); loop.cancel() }
+}
