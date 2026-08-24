@@ -854,7 +854,7 @@ git add -A && git commit -m "feat(wire): data headers, common and main channel m
       static func at(pointer: UInt32, base: SpiceReader) throws -> SpiceImage? }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -916,12 +916,12 @@ private func bitmapMessage() -> [UInt8] {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter ImageTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Geometry.swift`:
 ```swift
@@ -1104,12 +1104,12 @@ public struct SpiceImage: Sendable, Equatable {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter ImageTests`
 Expected: 6 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(wire): geometry, clip, brush, qmask and image descriptors"
