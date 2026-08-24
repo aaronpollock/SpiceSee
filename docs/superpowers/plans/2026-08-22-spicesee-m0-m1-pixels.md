@@ -1145,7 +1145,7 @@ git add -A && git commit -m "feat(wire): geometry, clip, brush, qmask and image 
   extension ClientMessage { static func displayInit(cacheID: UInt8 = 1, cacheSize: Int64, glzDictionaryID: UInt8 = 1, glzWindowSize: Int32) -> [UInt8] }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -1206,12 +1206,12 @@ private func base(surface: UInt32 = 0) -> SpiceWriter {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter DisplayMessageTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `DisplayMessages.swift`:
 ```swift
@@ -1364,12 +1364,12 @@ extension ClientMessage {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter DisplayMessageTests`
 Expected: 5 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(wire): display channel messages for tier-1 drawing"

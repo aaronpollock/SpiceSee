@@ -8,3 +8,11 @@ public enum ClientMessage {
     public static func attachChannels() -> [UInt8] { [] }
     public static func mouseModeRequest(_ mode: UInt32) -> [UInt8] { var w = SpiceWriter(); w.u32(mode); return w.bytes }
 }
+
+extension ClientMessage {
+    public static func displayInit(cacheID: UInt8 = 1, cacheSize: Int64, glzDictionaryID: UInt8 = 1, glzWindowSize: Int32) -> [UInt8] {
+        var w = SpiceWriter()
+        w.u8(cacheID); w.u64(UInt64(bitPattern: cacheSize)); w.u8(glzDictionaryID); w.i32(glzWindowSize)
+        return w.bytes
+    }
+}
