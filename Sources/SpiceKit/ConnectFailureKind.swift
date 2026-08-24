@@ -7,14 +7,14 @@ import SpiceWire
 public enum ConnectFailureKind: Sendable, Equatable {
     case passwordRejected
     case refused
-    case hostSubjectMismatch
+    case hostSubjectMismatch(expected: String, presented: String)
     case other
 
     public static func of(_ error: SpiceError) -> ConnectFailureKind {
         switch error.kind {
         case .auth, .link(.permissionDenied): .passwordRejected
         case .connect: .refused
-        case .tls: .hostSubjectMismatch
+        case let .tls(.subjectMismatch(expected, presented)): .hostSubjectMismatch(expected: expected, presented: presented)
         default: .other
         }
     }

@@ -179,7 +179,8 @@ final class SpiceKitBackend: SessionBackend {
         switch ConnectFailureKind.of(error) {
         case .passwordRejected: .passwordRejected
         case .refused: .refused(endpoint: endpoint)
-        case .hostSubjectMismatch: .hostSubjectMismatch(expected: "", presented: "", host: endpoint)
+        case let .hostSubjectMismatch(expected, presented):
+            .hostSubjectMismatch(expected: expected, presented: presented, host: endpoint)
         case .other: .other(title: "The connection failed",
                             message: "SpiceSee could not keep a session open with \(endpoint).")
         }

@@ -61,8 +61,18 @@ private func updates(from canvas: Canvas) async -> [SurfaceUpdate] {
     #expect(ConnectFailureKind.of(SpiceError(.link(.permissionDenied))) == .passwordRejected)
     #expect(ConnectFailureKind.of(SpiceError(.auth)) == .passwordRejected)
     #expect(ConnectFailureKind.of(SpiceError(.connect)) == .refused)
-    #expect(ConnectFailureKind.of(SpiceError(.tls)) == .hostSubjectMismatch)
+    #expect(ConnectFailureKind.of(SpiceError(.tls(.subjectMismatch(expected: "a", presented: "b"))))
+            == .hostSubjectMismatch(expected: "a", presented: "b"))
     #expect(ConnectFailureKind.of(SpiceError(.closed)) == .other)
     #expect(ConnectFailureKind.of(SpiceError(.protocolError(.badOffset(3)))) == .other)
     #expect(ConnectFailureKind.of(SpiceError(.link(.channelNotAvailable))) == .other)
+}
+
+@Test func tlsFailuresCarryBothSubjects() {
+    let mismatch = SpiceError(.tls(.subjectMismatch(expected: "CN=pve1", presented: "CN=pve3")))
+    #expect(ConnectFailureKind.of(mismatch) == .hostSubjectMismatch(expected: "CN=pve1", presented: "CN=pve3"))
+    // Everything else about TLS is a plain failure — the sheet has no detail box for it.
+    #expect(ConnectFailureKind.of(SpiceError(.tls(.untrusted("not trusted")))) == .other)
+    #expect(ConnectFailureKind.of(SpiceError(.tls(.badCertificate("bad")))) == .other)
+    #expect(ConnectFailureKind.of(SpiceError(.tls(.handshake("reset")))) == .other)
 }
