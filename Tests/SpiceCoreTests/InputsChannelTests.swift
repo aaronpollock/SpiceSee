@@ -69,6 +69,18 @@ private func waitForLockKeys(_ ch: InputsChannel) async throws {
     #expect(after.count == 9 && after.last?.1 == ClientMessage.mouseMotion(dx: 2, dy: 2, buttons: []))
 }
 
+@Test func keysUseScancodeMessageWhenServerAdvertisesIt() async throws {
+    let t = InMemoryTransport(input: try fakeLink(channelCaps: 1 << InputsCap.keyScancode,
+                                                  body: frame(InputsServerMsg.`init`.rawValue, [0, 0])))
+    let ch = try await InputsChannel.open(transport: t, connectionID: 1, password: nil)
+    let s = XTScancode(0x53, extended: true)
+    try await ch.keyDown(s); try await ch.keyUp(s)
+    let frames = try await sentFrames(t)
+    #expect(frames.filter { $0.0 == InputsClientMsg.keyDown.rawValue || $0.0 == InputsClientMsg.keyUp.rawValue }.isEmpty)
+    let scancodes = frames.filter { $0.0 == InputsClientMsg.keyScancode.rawValue }.map(\.1)
+    #expect(scancodes == [[0xE0, 0x53], [0xE0, 0xD3]])
+}
+
 @Test func capsLockSyncPreservesGuestNumAndScroll() async throws {
     let (ch, t) = try await openInputs(frame(InputsServerMsg.`init`.rawValue, [3, 0]))   // guest: scroll + num
     try await waitForLockKeys(ch)

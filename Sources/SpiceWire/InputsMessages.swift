@@ -1,6 +1,6 @@
 public enum InputsServerMsg: UInt16, Sendable { case `init` = 101, keyModifiers = 102, mouseMotionAck = 111 }
 public enum InputsClientMsg: UInt16, Sendable {
-    case keyDown = 101, keyUp = 102, keyModifiers = 103
+    case keyDown = 101, keyUp = 102, keyModifiers = 103, keyScancode = 104
     case mouseMotion = 111, mousePosition = 112, mousePress = 113, mouseRelease = 114
 }
 public enum InputsCap { public static let keyScancode: UInt32 = 0 }
@@ -46,6 +46,13 @@ public struct XTScancode: Sendable, Hashable {
         let byte = UInt32(code) | (pressed ? 0 : 0x80)
         return extended ? 0xE0 | byte << 8 : byte
     }
+
+    /// The raw scancode byte(s) `SPICE_MSGC_INPUTS_KEY_SCANCODE` carries — the same E0-then-code
+    /// order `wireCode` packs into a u32, but as the literal bytes `kbd_push_scan` consumes.
+    public func rawBytes(pressed: Bool) -> [UInt8] {
+        let byte = UInt8(code) | (pressed ? 0 : 0x80)
+        return extended ? [0xE0, byte] : [byte]
+    }
 }
 
 public enum InputsMessage: Sendable, Equatable {
@@ -64,6 +71,7 @@ public enum InputsMessage: Sendable, Equatable {
 extension ClientMessage {
     public static func keyDown(_ s: XTScancode) -> [UInt8] { var w = SpiceWriter(); w.u32(s.wireCode(pressed: true)); return w.bytes }
     public static func keyUp(_ s: XTScancode) -> [UInt8] { var w = SpiceWriter(); w.u32(s.wireCode(pressed: false)); return w.bytes }
+    public static func keyScancode(_ s: XTScancode, pressed: Bool) -> [UInt8] { s.rawBytes(pressed: pressed) }
     public static func keyModifiers(_ k: LockKeys) -> [UInt8] { var w = SpiceWriter(); w.u16(k.rawValue); return w.bytes }
     public static func mouseMotion(dx: Int32, dy: Int32, buttons: MouseButtonState) -> [UInt8] {
         var w = SpiceWriter(); w.i32(dx); w.i32(dy); w.u16(buttons.rawValue); return w.bytes

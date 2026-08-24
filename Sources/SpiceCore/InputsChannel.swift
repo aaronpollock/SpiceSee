@@ -15,6 +15,10 @@ public actor InputsChannel {
     public private(set) var guestLockKeys: LockKeys = []
     private var buttons = MouseButtonState()
     private var throttle = MotionThrottle()
+    /// Set once, from the server's link-reply caps: whether keys go out as the combined
+    /// KEY_SCANCODE byte stream (what a real client sends when this is negotiated) or as the
+    /// legacy KEY_DOWN/KEY_UP pair.
+    private let serverSendsScancodes: Bool
 
     public static func clientCaps() -> CapabilitySet { CapabilitySet(bits: [InputsCap.keyScancode]) }
 
@@ -23,12 +27,15 @@ public actor InputsChannel {
                                                    channelCaps: clientCaps(), password: password)
         let reader = ChannelReader(source: transport, sink: transport, miniHeader: link.miniHeader, channel: descriptor)
         let loop = Task { await reader.run() }
-        let channel = InputsChannel(reader: reader, loop: loop)
+        let channel = InputsChannel(reader: reader, loop: loop,
+                                     serverSendsScancodes: link.serverChannelCaps.contains(InputsCap.keyScancode))
         await channel.startPump()
         return channel
     }
 
-    private init(reader: ChannelReader, loop: Task<Void, Never>) { self.reader = reader; self.loop = loop }
+    private init(reader: ChannelReader, loop: Task<Void, Never>, serverSendsScancodes: Bool) {
+        self.reader = reader; self.loop = loop; self.serverSendsScancodes = serverSendsScancodes
+    }
 
     private func startPump() {
         let messages = reader.messages
@@ -57,18 +64,27 @@ public actor InputsChannel {
 
     public func keyDown(_ s: XTScancode) async throws {
         heldKeys.insert(s)
-        try await reader.send(type: InputsClientMsg.keyDown.rawValue, payload: ClientMessage.keyDown(s))
+        try await sendKey(s, pressed: true)
     }
     public func keyUp(_ s: XTScancode) async throws {
         heldKeys.remove(s)
-        try await reader.send(type: InputsClientMsg.keyUp.rawValue, payload: ClientMessage.keyUp(s))
+        try await sendKey(s, pressed: false)
     }
     /// On focus loss: the guest must not be left with a stuck modifier.
     public func releaseAllKeys() async throws {
         for s in heldKeys.sorted(by: { ($0.extended ? 256 : 0) + Int($0.code) < ($1.extended ? 256 : 0) + Int($1.code) }) {
-            try await reader.send(type: InputsClientMsg.keyUp.rawValue, payload: ClientMessage.keyUp(s))
+            try await sendKey(s, pressed: false)
         }
         heldKeys = []
+    }
+    private func sendKey(_ s: XTScancode, pressed: Bool) async throws {
+        if serverSendsScancodes {
+            try await reader.send(type: InputsClientMsg.keyScancode.rawValue, payload: ClientMessage.keyScancode(s, pressed: pressed))
+        } else {
+            let type = pressed ? InputsClientMsg.keyDown : InputsClientMsg.keyUp
+            let payload = pressed ? ClientMessage.keyDown(s) : ClientMessage.keyUp(s)
+            try await reader.send(type: type.rawValue, payload: payload)
+        }
     }
     public func setLockKeys(_ k: LockKeys) async throws {
         try await reader.send(type: InputsClientMsg.keyModifiers.rawValue, payload: ClientMessage.keyModifiers(k))
