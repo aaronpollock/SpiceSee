@@ -42,6 +42,31 @@ private func keypair() throws -> (SecKey, [UInt8]) {
     #expect(r.remaining == 0)
 }
 
+/// spice-server decides whether a 4-byte auth mechanism precedes the ticket by testing
+/// PROTOCOL_AUTH_SELECTION in *the client's* link message. Sending the mechanism without
+/// advertising the capability shifts the ticket by four bytes and the server's RSA decrypt fails.
+@Test func advertisesAuthSelectionWheneverMechanismIsSent() async throws {
+    let (_, spki) = try keypair()
+    let t = InMemoryTransport(input: serverBytes(commonCaps: [CommonCap.protocolAuthSelection, CommonCap.authSpice, CommonCap.miniHeader], pubkey: spki))
+    _ = try await LinkHandshake.perform(on: t, connectionID: 0, channel: .init(type: .main, id: 0), channelCaps: CapabilitySet(), password: "pw")
+    let written = await t.written
+
+    var r = SpiceReader(written)
+    _ = try r.bytes(16)                                   // link header
+    _ = try r.u32()                                       // connection id
+    _ = try r.u8(); _ = try r.u8()                        // channel type, id
+    let commonWords = try r.u32()
+    _ = try r.u32()                                       // num channel caps
+    _ = try r.u32()                                       // caps offset
+    #expect(commonWords == 1)
+    let caps = try r.u32()
+    #expect(caps & (1 << CommonCap.protocolAuthSelection) != 0)
+    #expect(caps & (1 << CommonCap.authSpice) != 0)
+    #expect(caps & (1 << CommonCap.miniHeader) != 0)
+    // and the mechanism itself still follows the link mess
+    #expect(try r.u32() == CommonCap.authSpice)
+}
+
 @Test func handshakeWithoutAuthSelectionSendsTicketOnly() async throws {
     let (_, spki) = try keypair()
     let t = InMemoryTransport(input: serverBytes(commonCaps: [CommonCap.authSpice], pubkey: spki))

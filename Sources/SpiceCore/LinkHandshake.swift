@@ -7,8 +7,10 @@ public struct LinkResult: Sendable {
 }
 
 public enum LinkHandshake {
+    /// AUTH_SELECTION must be advertised because we send the auth mechanism: spice-server keys that
+    /// read off the client's capabilities, and without it our mechanism word is eaten as ticket bytes.
     public static func clientCommonCaps() -> CapabilitySet {
-        CapabilitySet(bits: [CommonCap.authSpice, CommonCap.miniHeader])
+        CapabilitySet(bits: [CommonCap.protocolAuthSelection, CommonCap.authSpice, CommonCap.miniHeader])
     }
 
     public static func perform(on t: any Transport, connectionID: UInt32, channel: ChannelDescriptor,

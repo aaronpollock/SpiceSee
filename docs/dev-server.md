@@ -29,13 +29,19 @@ link message, so the first real evidence is `spicesee-cli connect`.
 swift run spicesee-cli connect 192.168.50.6 5930
 ```
 
-**Not yet met — the server denies the ticket.** 2026-08-23:
+**Met, 2026-08-23:**
 
 ```
-error: SpiceError(kind: link(permissionDenied), channel: main/0)
+MAIN_INIT session=241582735 mouse=1 agent=0 tokens=10 mmtime=227448441
+channels: record/0 playback/0 smartcard/0 usbredir/2 usbredir/1 usbredir/0 display/0 cursor/0 webdav/0 inputs/0
 ```
 
-The handshake itself is correct on our side. Recorded through `spicerec` and decoded by hand:
+`agent=0` because the Windows installer has no vdagent.
+
+### The bug this first flushed out
+
+The first attempt failed with `link(permissionDenied)`, and stayed failing after the server was
+reconfigured with `disable-ticketing=on`. Recorded through `spicerec` and decoded by hand:
 
 | Direction | Bytes | Meaning |
 |---|---|---|
@@ -49,16 +55,27 @@ The handshake itself is correct on our side. Recorded through `spicerec` and dec
 | s2c | common caps `0x0b`, channel caps `0x0f` | AUTH_SELECTION + AUTH_SPICE + MINI_HEADER |
 | s2c | `07000000` | **link result = permissionDenied**, after the ticket |
 
-So the server accepted the link message, returned its key, and rejected only the ticket. That is the
-signature of `spice-server` with ticketing *enabled* and no password set — it refuses every client
-with permission denied rather than allowing an empty ticket. The fix is on the server: quickemu must
-pass `disable-ticketing=on`, or set a password to hand to `spicesee-cli connect <host> <port> <pw>`.
+The server accepted the link message, returned its key, and rejected only the ticket — and kept doing
+so with ticketing disabled. That was the clue: in `reds_handle_ticket` the RSA decrypt happens
+*before* the `ticketing_enabled` check, so `disable-ticketing=on` cannot rescue a ticket the server
+fails to decrypt.
 
-Check the running guest with:
+The ticket was fine (see `ticketDecryptsWithOpenSSL`); the *framing* was not. In
+`reds_handle_read_link_done`:
 
-```sh
-ps aux | grep -o '[-]spice [^ ]*' | tr ',' '\n'
+```c
+auth_selection = test_capability(caps, num_caps, SPICE_COMMON_CAP_PROTOCOL_AUTH_SELECTION);
+// `caps` is from link_mess — the CLIENT's capabilities, not the server's
+if (auth_selection) { read 4-byte auth_mechanism, then the ticket }
+else                { read the 128-byte ticket directly }
 ```
+
+We sent the 4-byte auth mechanism because the *server* advertised the capability (`0x0b`), but
+advertised only `AUTH_SPICE | MINI_HEADER` ourselves (`0x0a`). The server therefore read our
+mechanism word as the first four bytes of the ticket and the decrypt failed. Fix:
+`LinkHandshake.clientCommonCaps()` now advertises `PROTOCOL_AUTH_SELECTION` as spice-gtk does.
+Not advertising it would also break against SASL-enabled servers, which reject clients that skip
+auth selection.
 
 ## Why this guest is a good fixture
 
