@@ -24,7 +24,7 @@ private func openInputs(_ body: [UInt8] = frame(InputsServerMsg.`init`.rawValue,
 /// guestLockKeys reflects it; poll instead of a fixed sleep so this isn't flaky under load.
 private func waitForLockKeys(_ ch: InputsChannel) async throws {
     for _ in 0 ..< 400 {
-        if await ch.guestLockKeys != [] { return }
+        if await ch.guestLockKeys != nil { return }
         try await Task.sleep(for: .milliseconds(5))
     }
 }
@@ -87,4 +87,15 @@ private func waitForLockKeys(_ ch: InputsChannel) async throws {
     try await ch.syncCapsLock(true)
     let f = try await sentFrames(t).filter { $0.0 == InputsClientMsg.keyModifiers.rawValue }
     #expect(f.last?.1 == ClientMessage.keyModifiers([.scrollLock, .numLock, .capsLock]))
+}
+
+@Test func capsLockSyncWaitsForGuestLockState() async throws {
+    // No INPUTS_INIT: the guest's lock state is unknown, and KEY_MODIFIERS carries the whole state,
+    // so a sync sent now would switch the guest's num lock off.
+    let (ch, t) = try await openInputs([])
+    try await ch.syncCapsLock(true)
+    #expect(try await sentFrames(t).filter { $0.0 == InputsClientMsg.keyModifiers.rawValue }.isEmpty)
+    await ch.handleForTesting(.`init`([.numLock]))
+    let f = try await sentFrames(t).filter { $0.0 == InputsClientMsg.keyModifiers.rawValue }
+    #expect(f.count == 1 && f.first?.1 == ClientMessage.keyModifiers([.numLock, .capsLock]))
 }

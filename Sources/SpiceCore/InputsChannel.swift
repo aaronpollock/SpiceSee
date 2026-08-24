@@ -12,7 +12,9 @@ public actor InputsChannel {
     private let log = Logger(subsystem: "com.spicesee", category: "inputs")
 
     public private(set) var heldKeys: Set<XTScancode> = []
-    public private(set) var guestLockKeys: LockKeys = []
+    /// nil until the guest reports its lock state in INPUTS_INIT or KEY_MODIFIERS.
+    public private(set) var guestLockKeys: LockKeys?
+    private var pendingCapsLock: Bool?
     private var buttons = MouseButtonState()
     private var throttle = MotionThrottle()
     /// Set once, from the server's link-reply caps: whether keys go out as the combined
@@ -50,7 +52,12 @@ public actor InputsChannel {
 
     private func handle(_ m: InputsMessage) async {
         switch m {
-        case let .`init`(k), let .keyModifiers(k): guestLockKeys = k
+        case let .`init`(k), let .keyModifiers(k):
+            guestLockKeys = k
+            if let on = pendingCapsLock {
+                pendingCapsLock = nil
+                try? await setLockKeys(merging(on, into: k))
+            }
         case .mouseMotionAck:
             if let p = throttle.acked() { try? await send(p) }
         case .other: break
@@ -90,10 +97,17 @@ public actor InputsChannel {
         try await reader.send(type: InputsClientMsg.keyModifiers.rawValue, payload: ClientMessage.keyModifiers(k))
     }
     /// Caps lock is the only lock state macOS exposes; num and scroll keep what the guest reported.
+    /// Before the guest has reported, sending would clear its num and scroll lock — spice-server takes
+    /// KEY_MODIFIERS as the whole state — so the request is held and applied when INIT arrives.
     public func syncCapsLock(_ on: Bool) async throws {
-        var k = guestLockKeys
-        if on { k.insert(.capsLock) } else { k.remove(.capsLock) }
-        try await setLockKeys(k)
+        guard let k = guestLockKeys else { pendingCapsLock = on; return }
+        try await setLockKeys(merging(on, into: k))
+    }
+
+    private func merging(_ capsLock: Bool, into keys: LockKeys) -> LockKeys {
+        var k = keys
+        if capsLock { k.insert(.capsLock) } else { k.remove(.capsLock) }
+        return k
     }
 
     // MARK: Pointer

@@ -76,9 +76,9 @@ private func waitForFrames(_ t: InMemoryTransport, type: UInt16, count: Int) asy
     let all = try await waitForFrames(inputs, type: InputsClientMsg.mousePosition.rawValue, count: 1)
     #expect(all.last == ClientMessage.mousePosition(x: 10, y: 20, buttons: [], displayID: 0))
 
-    // The lock-key payload races INPUTS_INIT — num/scroll preservation is pinned by InputsChannelTests,
-    // so here only the caps bit and the frame's position in the order are asserted.
-    let expected: [(type: UInt16, payload: [UInt8]?)] = [
+    // The caps-lock sync waits for INPUTS_INIT before it can merge num/scroll, so its frame is not
+    // ordered with the rest; everything else must keep the order it was sent in.
+    let expected: [(type: UInt16, payload: [UInt8])] = [
         (InputsClientMsg.keyDown.rawValue, ClientMessage.keyDown(a)),
         (InputsClientMsg.keyUp.rawValue, ClientMessage.keyUp(a)),
         (InputsClientMsg.mousePress.rawValue, ClientMessage.mousePress(.left, buttons: [.left])),
@@ -86,14 +86,15 @@ private func waitForFrames(_ t: InMemoryTransport, type: UInt16, count: Int) asy
         (InputsClientMsg.mouseRelease.rawValue, ClientMessage.mouseRelease(.left, buttons: [])),
         (InputsClientMsg.mousePress.rawValue, ClientMessage.mousePress(.down, buttons: [])),
         (InputsClientMsg.mouseRelease.rawValue, ClientMessage.mouseRelease(.down, buttons: [])),
-        (InputsClientMsg.keyModifiers.rawValue, nil),
         (InputsClientMsg.mousePosition.rawValue, ClientMessage.mousePosition(x: 10, y: 20, buttons: [], displayID: 0)),
     ]
-    let frames = try await clientFrames(inputs).filter { $0.type > 100 }
+    let frames = try await clientFrames(inputs).filter { $0.type > 100 && $0.type != InputsClientMsg.keyModifiers.rawValue }
     #expect(frames.map(\.type) == expected.map(\.type))
-    for (got, want) in zip(frames, expected) where want.payload != nil { #expect(got.payload == want.payload) }
-    var mods = SpiceReader(try #require(frames.first { $0.type == InputsClientMsg.keyModifiers.rawValue }).payload)
-    #expect(LockKeys(rawValue: try mods.u16()).contains(.capsLock))
+    for (got, want) in zip(frames, expected) { #expect(got.payload == want.payload) }
+
+    // INIT said [2, 0] — num lock — so the deferred sync must add caps to it and send exactly once.
+    let mods = try await waitForFrames(inputs, type: InputsClientMsg.keyModifiers.rawValue, count: 1)
+    #expect(mods == [ClientMessage.keyModifiers([.numLock, .capsLock])])
     await session.disconnect()
 }
 
