@@ -229,9 +229,6 @@ struct DetailEmptyState: View {
                     .keyboardShortcut("o", modifiers: .command)
             }
             .padding(.top, 2)
-            Text("⌘N   ⌘O")
-                .font(.mono(10.5))
-                .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
         }
         .padding(.horizontal, 64)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
