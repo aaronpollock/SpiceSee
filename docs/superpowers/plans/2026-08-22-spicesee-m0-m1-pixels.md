@@ -92,7 +92,7 @@ Tests/
 **Interfaces:**
 - Produces: module names `SpiceWire`, `SpiceCore`, `SpiceCanvas`, `SpiceKit`, `CSpiceCodec`, executables `spicerec`, `spicesee-cli`.
 
-- [ ] **Step 1: Write Package.swift**
+- [x] **Step 1: Write Package.swift**
 
 ```swift
 // swift-tools-version: 6.0
@@ -127,7 +127,7 @@ let package = Package(
 )
 ```
 
-- [ ] **Step 2: Create placeholders so every target compiles**
+- [x] **Step 2: Create placeholders so every target compiles**
 
 ```bash
 mkdir -p Sources/{CSpiceCodec/include,CSpiceCodec/shim,CSpiceCodec/vendor,SpiceWire,SpiceCore,SpiceCanvas,SpiceKit,spicerec,spicesee-cli}
@@ -151,7 +151,7 @@ echo 'print("spicesee-cli")' > Sources/spicesee-cli/main.swift
 printf '.build/\n*.xcodeproj\nDerivedData/\n.DS_Store\n' > .gitignore
 ```
 
-- [ ] **Step 3: Write smoke test**
+- [x] **Step 3: Write smoke test**
 
 `Tests/SpiceWireTests/SmokeTests.swift`:
 ```swift
@@ -161,12 +161,12 @@ import Testing
 @Test func packageBuilds() { #expect(true) }
 ```
 
-- [ ] **Step 4: Build and test**
+- [x] **Step 4: Build and test**
 
 Run: `swift build && swift test`
 Expected: `Build complete`, `Test run with 1 test passed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "build: SPM scaffold with module layout"
@@ -212,7 +212,7 @@ git add -A && git commit -m "build: SPM scaffold with module layout"
   }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -254,12 +254,12 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter SpiceWireTests`
 Expected: compile error `cannot find 'SpiceReader'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `WireError.swift`:
 ```swift
@@ -335,12 +335,12 @@ public struct SpiceWriter: Sendable {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter SpiceWireTests`
 Expected: 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git rm -q Sources/SpiceWire/SpiceWire.swift
