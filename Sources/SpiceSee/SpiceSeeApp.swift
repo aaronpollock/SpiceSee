@@ -4,7 +4,9 @@ import SwiftUI
 struct SpiceSeeApp: App {
     @State private var store = ConnectionStore.isRunningMock ? .preview : ConnectionStore()
     @State private var settings = AppSettings()
-    @State private var session = SessionModel(backend: MockSessionBackend(scenario: MockSessionBackend.launchScenario))
+    @State private var session = SessionModel(backend: ConnectionStore.isRunningMock
+        ? MockSessionBackend(scenario: MockSessionBackend.launchScenario)
+        : SpiceKitBackend())
 
     var body: some Scene {
         Window("SpiceSee", id: "manager") {
