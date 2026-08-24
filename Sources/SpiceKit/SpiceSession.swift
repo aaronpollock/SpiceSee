@@ -110,15 +110,23 @@ public actor SpiceSession {
             }
         }
 
+        // Nothing will ever drain the queue without a pump, so finish the continuation instead of
+        // letting `send` grow an unbounded buffer: a `yield` on a finished stream is a no-op drop.
         if let inputs {
             let stream = inputStream
             tasks.append(Task { [weak self] in
                 for await e in stream {
                     guard let self else { return }
                     do { try await self.dispatch(e, to: inputs) }
-                    catch { self.log.error("inputs send failed: \(String(describing: error))"); return }
+                    catch {
+                        self.log.error("inputs send failed: \(String(describing: error))")
+                        self.inputCont.finish()
+                        return
+                    }
                 }
             })
+        } else {
+            inputCont.finish()
         }
 
         await negotiateMouseMode(supported: info.mainInit.supportedMouseModes)

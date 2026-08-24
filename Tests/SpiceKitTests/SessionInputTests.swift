@@ -5,10 +5,10 @@ import SpiceCore
 @testable import SpiceKit
 
 /// A main channel whose MAIN_INIT advertises `supported` mouse modes and is `current`ly in one of them.
-private func mainBytes(supported: UInt32, current: UInt32) throws -> [UInt8] {
+private func mainBytes(supported: UInt32, current: UInt32, trailing: [UInt8] = []) throws -> [UInt8] {
     var mi = SpiceWriter(); [1, 1, supported, current, 0, 10, 0, 0].forEach { mi.u32($0) }
     var cl = SpiceWriter(); cl.u32(3); cl.u8(2); cl.u8(0); cl.u8(3); cl.u8(0); cl.u8(4); cl.u8(0)   // display/0 inputs/0 cursor/0
-    return try fakeLink(body: frame(MainServerMsg.`init`.rawValue, mi.bytes) + frame(MainServerMsg.channelsList.rawValue, cl.bytes))
+    return try fakeLink(body: frame(MainServerMsg.`init`.rawValue, mi.bytes) + frame(MainServerMsg.channelsList.rawValue, cl.bytes) + trailing)
 }
 
 /// `fakeLink`'s reply never advertises PROTOCOL_AUTH_SELECTION, so the handshake writes the link
@@ -113,4 +113,30 @@ private func waitForFrames(_ t: InMemoryTransport, type: UInt16, count: Int) asy
         if case .disconnected = e { break }
     }
     #expect(moved.count == 1 && moved.first?.0 == 4 && moved.first?.1 == 5 && moved.first?.2 == 0)
+}
+
+@Test func reactsToMouseModeWithoutRelooping() async throws {
+    var mm = SpiceWriter(); mm.u32(3); mm.u32(SpiceMouseMode.client)
+    var tok = SpiceWriter(); tok.u32(10)
+    let main = InMemoryTransport(input: try mainBytes(
+        supported: 3, current: SpiceMouseMode.server,
+        trailing: frame(MainServerMsg.mouseMode.rawValue, mm.bytes)
+            + frame(MainServerMsg.agentConnectedTokens.rawValue, tok.bytes)))
+    let session = try await SpiceSession.connect(password: nil) { desc in
+        desc.type == .main ? main : InMemoryTransport(input: try fakeLink(body: []))
+    }
+    var modes: [PointerMode] = []
+    var agent: [Bool] = []
+    for await e in session.events {
+        if case let .pointerMode(m) = e { modes.append(m) }
+        if case let .agent(connected) = e { agent.append(connected) }
+        if case .disconnected = e { break }
+    }
+    #expect(modes == [.server, .client])
+    #expect(agent == [true])
+    // Every write the session makes precedes `.disconnected`, so this needs no poll: once the guest
+    // reports client mode the request must not be repeated.
+    let req = try await clientFrames(main).filter { $0.type == MainClientMsg.mouseModeRequest.rawValue }
+    #expect(req.count == 1)
+    #expect(await session.pointerMode == .client)
 }
