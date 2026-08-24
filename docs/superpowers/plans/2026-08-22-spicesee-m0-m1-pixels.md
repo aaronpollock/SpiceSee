@@ -1392,7 +1392,7 @@ git add -A && git commit -m "feat(wire): display channel messages for tier-1 dra
   public enum Ticket { static func encrypt(password: String, publicKey der: [UInt8]) throws -> [UInt8] }
   ```
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```swift
 import Testing
@@ -1421,12 +1421,12 @@ import Security
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter TicketTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `SpiceError.swift`:
 ```swift
@@ -1490,12 +1490,12 @@ public enum Ticket {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter TicketTests`
 Expected: 2 pass. If `unwrapSPKI` rejects a real server key later (Task 12), dump the 162 bytes with `xxd` and adjust the layout check — the format above is what `spice-server` produces via `i2d_RSA_PUBKEY` for 1024-bit keys.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git rm -q Sources/SpiceCore/SpiceCore.swift

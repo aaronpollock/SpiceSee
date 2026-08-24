@@ -13,6 +13,7 @@ let package = Package(
         .target(name: "SpiceCanvas", dependencies: ["SpiceWire"]),
         .target(name: "SpiceKit", dependencies: ["SpiceCore", "SpiceCanvas"]),
         .testTarget(name: "SpiceWireTests", dependencies: ["SpiceWire"]),
+        .testTarget(name: "SpiceCoreTests", dependencies: ["SpiceCore"]),
     ],
     swiftLanguageModes: [.v6]
 )
