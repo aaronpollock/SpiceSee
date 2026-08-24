@@ -368,7 +368,7 @@ git add -A && git commit -m "feat(wire): bounds-checked SpiceReader and SpiceWri
   public enum Link { static let magic: UInt32 = 0x51444552; static let major: UInt32 = 2; static let minor: UInt32 = 2; static let ticketPubkeyBytes = 162; static let ticketBytes = 128; static let maxPasswordLength = 60 }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -419,12 +419,12 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter LinkTests`
 Expected: compile errors for missing types.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Constants.swift`:
 ```swift
@@ -546,12 +546,12 @@ public struct SpiceLinkReply: Sendable, Equatable {
 
 > Note on the final `skip`: the body is `r`'s remaining bytes from its current offset; after parsing, advance `r` by the total consumed (`caps.offset` is absolute within the shared storage, so the expression reduces to `caps.offset - r.offset`). If that reads confusingly, replace with `try r.skip(caps.offset - r.offset)` — same value.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter LinkTests`
 Expected: 3 pass. (If `linkReplyParses` fails on `remaining`, fix the skip expression per the note.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(wire): channel types, capability sets, link handshake messages"
