@@ -591,7 +591,7 @@ git add -A && git commit -m "feat(wire): channel types, capability sets, link ha
       static func frame(type: UInt16, payload: [UInt8], mini: Bool, serial: UInt64) -> [UInt8] }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -644,12 +644,12 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter MainMessageTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `DataHeader.swift`:
 ```swift
@@ -813,12 +813,12 @@ public enum ClientMessage {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter MainMessageTests`
 Expected: 6 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(wire): data headers, common and main channel messages"
