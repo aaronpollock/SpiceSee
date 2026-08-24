@@ -6,7 +6,7 @@ public enum Ticket {
     /// rsaEncryption OID + NULL, followed by BIT STRING wrapping the PKCS#1 key.
     private static let rsaAlgID: [UInt8] = [0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00]
 
-    static func wrapSPKI(pkcs1: [UInt8]) -> [UInt8] {
+    public static func wrapSPKI(pkcs1: [UInt8]) -> [UInt8] {
         let bitString: [UInt8] = [0x03, 0x81, UInt8(pkcs1.count + 1), 0x00] + pkcs1
         let inner = rsaAlgID + bitString
         return [0x30, 0x81, UInt8(inner.count)] + inner
