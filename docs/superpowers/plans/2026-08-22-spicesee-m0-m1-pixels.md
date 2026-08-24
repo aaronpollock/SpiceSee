@@ -2665,7 +2665,7 @@ git add -A && git commit -m "feat(codec): vendor QUIC/LZ/GLZ decoders (LGPL-2.1)
   public enum PNG { public static func encode(_ image: DecodedImage) throws -> Data; public static func decode(_ data: Data) throws -> DecodedImage }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `Tests/SpiceCanvasTests/CanvasTests.swift`:
 ```swift
@@ -2822,12 +2822,12 @@ private func img(_ type: ImageType, w: UInt32, h: UInt32, body: (inout SpiceWrit
 ```
 (Import `CSpiceCodec` in that test file for `sc_quic_encode_rgb32`.)
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter CanvasTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `DecodedImage.swift`:
 ```swift
@@ -3258,12 +3258,12 @@ public enum PNG {
 ```
 > `byteOrder32Little` + `alphaInfo` on an 8-bit context means memory order B,G,R,A — matching our buffers. The PNG round-trip test pins this; if channels come out swapped, the fix is the `bitmapInfo`, not the buffer.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter "CanvasTests|ImageDecoderTests"`
 Expected: 11 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git rm -q Sources/SpiceCanvas/SpiceCanvas.swift
