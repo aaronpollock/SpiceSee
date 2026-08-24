@@ -28,6 +28,8 @@ let package = Package(
         .testTarget(name: "SpiceWireTests", dependencies: ["SpiceWire"]),
         .testTarget(name: "SpiceCoreTests", dependencies: ["SpiceCore"]),
         .testTarget(name: "SpiceCanvasTests", dependencies: ["SpiceCanvas", "CSpiceCodec"]),
+        .testTarget(name: "SpiceKitTests", dependencies: ["SpiceKit", "SpiceCore", "SpiceCanvas"],
+                    resources: [.copy("Fixtures")]),
     ],
     swiftLanguageModes: [.v6]
 )

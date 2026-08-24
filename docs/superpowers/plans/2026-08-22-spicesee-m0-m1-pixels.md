@@ -3289,7 +3289,7 @@ git add -A && git commit -m "feat(canvas): surfaces, image cache, codec routing 
   }
   ```
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```swift
 import Foundation
@@ -3322,12 +3322,12 @@ import SpiceCanvas
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter ReplayTests`
 Expected: compile error `DisplayChannel` not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```swift
 import os
@@ -3375,12 +3375,12 @@ public actor DisplayChannel {
 
 > In replay, the recording's link reply was produced for the *reference client's* link mess; our handshake only reads the reply, so caps mismatch is harmless except MINI_HEADER: `LinkResult.miniHeader` is derived from the server's caps, and the server sent mini headers only if the reference client also advertised it. If the fixture's `c2s.bin` shows the reference client lacked MINI_HEADER, add `static func open(..., forceFullHeader: Bool = false)` and pass `true` from the test.
 
-- [ ] **Step 4: Run, review the golden, run again**
+- [x] **Step 4: Run, review the golden, run again**
 
 Run: `swift test --filter ReplayTests` — first run writes `alpine-display.golden.png`. Open it (`open Tests/SpiceKitTests/Fixtures/alpine-display.golden.png`): it must show the Alpine boot/login text legibly. If it is black, garbled, or partially drawn, that is a real bug in Task 13/14 — fix there, delete the golden, re-run. Only commit a golden you have looked at.
 Run again: `swift test --filter ReplayTests` → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(core): display channel; replay golden test from Alpine recording"
