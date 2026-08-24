@@ -1658,7 +1658,7 @@ git add -A && git commit -m "feat(core): ByteSource/ByteSink with in-memory and 
                                  channelCaps: CapabilitySet, password: String?) async throws -> LinkResult }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -1733,12 +1733,12 @@ extension SpiceReader {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter LinkHandshakeTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `LinkHandshake.swift`:
 ```swift
@@ -1787,12 +1787,12 @@ public enum LinkHandshake {
 
 > Servers with `disable-ticketing` still expect the 128-byte ticket; the empty password encrypts to a valid blob. Do not special-case it.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter LinkHandshakeTests`
 Expected: 3 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(core): link handshake with auth selection and ticket"
