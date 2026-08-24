@@ -4,3 +4,6 @@ DerivedData/
 .DS_Store
 .claude/worktrees/
 recordings/
+
+# subagent-driven-development scratch (ledgers, briefs, review packages)
+.superpowers/
