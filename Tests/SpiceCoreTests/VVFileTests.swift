@@ -71,3 +71,22 @@ private func fixture(_ name: String) throws -> String {
     #expect(badCA.caPEM == "not a certificate")   // parsing defers validation to Certificates
     #expect(throws: SpiceError.self) { try VVFile.parse("[virt-viewer]\nhost=\nport=1") }
 }
+
+@Test func parseFromDiskRejectsOversizedAndNonUTF8Files() throws {
+    let dir = FileManager.default.temporaryDirectory
+    let oversized = dir.appendingPathComponent(UUID().uuidString + ".vv")
+    try Data(repeating: 0x41, count: VVFile.maxFileBytes + 1).write(to: oversized)
+    defer { try? FileManager.default.removeItem(at: oversized) }
+    #expect(throws: SpiceError.self) { try VVFile.parse(contentsOf: oversized) }
+
+    let notUTF8 = dir.appendingPathComponent(UUID().uuidString + ".vv")
+    try Data([0xFF, 0xFE, 0xFF]).write(to: notUTF8)
+    defer { try? FileManager.default.removeItem(at: notUTF8) }
+    #expect(throws: SpiceError.self) { try VVFile.parse(contentsOf: notUTF8) }
+
+    let text = try fixture("plain.vv")
+    let valid = dir.appendingPathComponent(UUID().uuidString + ".vv")
+    try text.write(to: valid, atomically: true, encoding: .utf8)
+    defer { try? FileManager.default.removeItem(at: valid) }
+    #expect(try VVFile.parse(contentsOf: valid) == VVFile.parse(text))
+}

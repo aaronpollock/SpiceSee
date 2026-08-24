@@ -29,8 +29,17 @@ public struct VVFile: Sendable, Equatable {
     static let maxFileBytes = 256 << 10
 
     public static func parse(contentsOf url: URL) throws -> VVFile {
-        let data = try Data(contentsOf: url)
-        guard data.count <= maxFileBytes else { throw SpiceError(.vvFile("file is larger than 256 KB")) }
+        let data: Data
+        if let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+            guard size <= maxFileBytes else { throw SpiceError(.vvFile("file is larger than 256 KB")) }
+            data = try Data(contentsOf: url)
+        } else {
+            // Size unavailable from the filesystem: read a bounded prefix instead of trusting the file.
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            data = try handle.read(upToCount: maxFileBytes + 1) ?? Data()
+            guard data.count <= maxFileBytes else { throw SpiceError(.vvFile("file is larger than 256 KB")) }
+        }
         guard let text = String(data: data, encoding: .utf8) else {
             throw SpiceError(.vvFile("file is not UTF-8"))
         }
