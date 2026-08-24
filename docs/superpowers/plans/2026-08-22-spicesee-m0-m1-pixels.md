@@ -2351,7 +2351,7 @@ git add -A && git commit -m "feat: M0 spike — dev server script, spicerec prox
   int      sc_glz_decode(sc_glz *, const uint8_t *data, size_t len, const uint8_t **out, int *width, int *height, int *stride);
   ```
 
-- [ ] **Step 1: Fetch pinned sources**
+- [x] **Step 1: Fetch pinned sources**
 
 ```bash
 cd "$(mktemp -d)" && git clone --depth 1 --branch v0.42 --recurse-submodules https://gitlab.freedesktop.org/spice/spice-gtk.git
@@ -2374,7 +2374,7 @@ decoration. Reformatters, "tidy the imports" passes, and hand-retyping a file al
 them. Step 2's shims and the GLZ accessor in Step 5 are the only edits permitted inside `vendor/`,
 and neither touches a header block. Step 7 verifies this held.
 
-- [ ] **Step 2: Shim out glib and pixman**
+- [x] **Step 2: Shim out glib and pixman**
 
 `shim/config.h`: empty file (the sources `#include <config.h>`).
 
@@ -2433,7 +2433,7 @@ Then edit `vendor/decode-glz.c` (record every change in `VENDORED.md`):
 
 `vendor/common/quic.c` and `lz.c` should need no edits beyond the shim; if `#include "common/xyz.h"` spellings appear, add the forwarding headers under `shim/common/` rather than editing the vendored files.
 
-- [ ] **Step 3: Write the failing test**
+- [x] **Step 3: Write the failing test**
 
 `Tests/SpiceCanvasTests/CodecTests.swift`:
 ```swift
@@ -2498,12 +2498,12 @@ private func gradient(_ w: Int, _ h: Int) -> [UInt8] {
 }
 ```
 
-- [ ] **Step 4: Run to verify failure**
+- [x] **Step 4: Run to verify failure**
 
 Run: `swift test --filter CodecTests`
 Expected: link errors for `sc_quic_*`.
 
-- [ ] **Step 5: Implement the bridge**
+- [x] **Step 5: Implement the bridge**
 
 `codec_bridge.c` (QUIC and LZ parts; the usr-context pattern is the same for both):
 ```c
@@ -2600,12 +2600,12 @@ int sc_glz_decode(sc_glz *g, const uint8_t *data, size_t len, const uint8_t **ou
 ```
 Add `struct glz_image *glz_decoder_window_last(SpiceGlzDecoderWindow *w);` to `vendor/decode.h` and make `struct glz_image` visible there.
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `swift test --filter CodecTests`
 Expected: 4 pass. Build warnings from vendored C are acceptable; errors are not — fix by adding forwarding headers under `shim/`, never by editing `quic.c`/`lz.c`.
 
-- [ ] **Step 7: Verify the licence notices survived**
+- [x] **Step 7: Verify the licence notices survived**
 
 The whole LGPL position rests on these notices being intact and on `VENDORED.md` naming the exact
 upstream revision. Run this before committing — it must print nothing and exit 0:
@@ -2632,7 +2632,7 @@ binary.
 Re-run this check after any later task edits `vendor/` (Task 14 may add accessors) and before
 cutting a release DMG.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A && git commit -m "feat(codec): vendor QUIC/LZ/GLZ decoders (LGPL-2.1) behind spice_codec.h"

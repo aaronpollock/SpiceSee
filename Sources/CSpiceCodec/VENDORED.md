@@ -40,7 +40,13 @@ separately at the version spice-gtk requires.
 | `lz_decompress_tmpl.c` | LGPL-2.1-or-later |
 | `macros.h` | LGPL-2.1-or-later |
 | `verify.h` | LGPL-2.1-or-later |
+| `mem.c` | LGPL-2.1-or-later |
+| `mem.h` | LGPL-2.1-or-later |
 | `draw.h` | BSD-3-Clause, © 2009 Red Hat |
+
+`mem.c`/`mem.h` are vendored rather than shimmed: `draw.h` needs `SpiceChunks` from `mem.h`, and
+`mem.c` is glib-free, so using upstream's real allocator keeps hand-written stand-ins out of the
+decode path.
 
 The plan also listed `quic_rgb_tmpl.c` and `bitops.h`. Neither exists at this revision — the RGB
 templates were folded into `quic_tmpl.c` upstream — so neither is vendored.
@@ -68,4 +74,37 @@ templates were folded into `quic_tmpl.c` upstream — so neither is vendored.
 
 ## Local modifications
 
-None yet — recorded here as they are made.
+Only two vendored files are edited; `quic.c`, `lz.c`, `mem.c` and every template file are byte-for-byte
+upstream. Each edit is marked in the source with a `SPICESEE MODIFICATION` comment, and the commit
+that introduced them sits directly on top of the commit that vendored the pristine copies, so
+`git diff` shows the change set exactly.
+
+Everything else upstream expects — glib, pixman, spice-gtk's coroutines, spice-common's logging — is
+satisfied by non-upstream headers under `shim/`, which contain no vendored code.
+
+### `vendor/decode-glz.c`
+
+1. **`struct glz_image` no longer holds a pixman surface.** `glz_image_new()` allocated a
+   `pixman_image_t` through `alloc_lz_image_surface()`; we have no pixman, and the decoder only ever
+   needs a flat BGRA buffer, so it now allocates `gross_pixels * 4` bytes directly and records the
+   row stride. `glz_image_destroy()` frees that buffer instead of unreffing the surface. Upstream
+   walked `img->data` back to the allocation start for bottom-up images; ours starts there already.
+2. **Added `struct glz_image *last` to `SpiceGlzDecoderWindow`**, set in `glz_decoder_window_add()`,
+   cleared in `glz_decoder_window_clear()` and in `glz_decoder_window_release()` when the image it
+   points at is destroyed. Upstream returns the decoded image through the pixman surface handed in
+   via `usr_data`; we pass none, so the bridge reads it from here.
+3. **Added `glz_decoder_window_last()` and five `sc_glz_image_*` accessors.** `struct glz_image`
+   stays private to the file; `codec_bridge.c` reads it through these.
+
+### `vendor/decode.h`
+
+Declares the accessors added above. No other change.
+
+## Known limitation
+
+If a GLZ stream fails validation *after* `glz_image_new()` has allocated — a corrupt back-reference
+rather than a corrupt header — the unwind skips `glz_decoder_window_add()` and that one buffer is
+leaked, because the window never takes ownership. It is bounded by the image size and cannot be
+reached today (nothing routes GLZ until task 14 wires `ImageDecoder`), but it is a resource-exhaustion
+vector against a hostile server and should be closed when task 14 exercises this path — most likely
+by having `decode()` record the in-flight image so the window can free it.

@@ -38,9 +38,14 @@ struct glz_image_hdr {
     uint32_t                win_head_dist;
 };
 
+/* SPICESEE MODIFICATION: upstream backs each image with a pixman surface from
+   alloc_lz_image_surface(). We have no pixman, and the decoder only ever needs a flat BGRA buffer,
+   so the surface is replaced with a plain allocation. Upstream then walks img->data back to the
+   allocation start for bottom-up images; ours starts there already. `stride` is recorded so the
+   bridge can hand it to callers. See VENDORED.md. */
 struct glz_image {
     struct glz_image_hdr    hdr;
-    pixman_image_t          *surface;
+    int                     stride;
     uint8_t                 *data;
 };
 
@@ -49,18 +54,15 @@ static struct glz_image *glz_image_new(struct glz_image_hdr *hdr,
 {
     struct glz_image *img;
 
+    (void)opaque;
     g_return_val_if_fail(type == LZ_IMAGE_TYPE_RGB32 || type == LZ_IMAGE_TYPE_RGBA, NULL);
 
     img = g_new0(struct glz_image, 1);
     img->hdr = *hdr;
-    img->surface = alloc_lz_image_surface
-        (opaque, type == LZ_IMAGE_TYPE_RGBA ? PIXMAN_LE_a8r8g8b8 : PIXMAN_LE_x8r8g8b8,
-         img->hdr.width, img->hdr.height, img->hdr.gross_pixels, img->hdr.top_down);
-    pixman_image_ref(img->surface);
-    img->data = (uint8_t *)pixman_image_get_data(img->surface);
-    if (!img->hdr.top_down) {
-        img->data = img->data - img->hdr.width * (img->hdr.height - 1) * 4;
-    }
+    /* gross_pixels covers the padded rows PLT sources decode into, so it bounds the output. */
+    img->stride = img->hdr.height ? (int)(img->hdr.gross_pixels / img->hdr.height) * 4
+                                  : (int)img->hdr.width * 4;
+    img->data = g_malloc0((size_t)img->hdr.gross_pixels * 4);
     return img;
 }
 
@@ -69,7 +71,7 @@ static void glz_image_destroy(struct glz_image *img)
     if (img == NULL)
         return;
 
-    pixman_image_unref(img->surface);
+    g_free(img->data);
     g_free(img);
 }
 
@@ -84,7 +86,24 @@ struct SpiceGlzDecoderWindow {
     uint32_t                nimages;
     uint64_t                oldest;
     uint64_t                tail_gap;
+    struct glz_image        *last;   /* SPICESEE MODIFICATION: see glz_decoder_window_last() */
 };
+
+/* SPICESEE MODIFICATION: upstream hands the decoded image back through the pixman surface it was
+   given in usr_data. We pass no surface, so the most recently decoded image is recorded here and
+   read by codec_bridge.c. See VENDORED.md. */
+struct glz_image *glz_decoder_window_last(SpiceGlzDecoderWindow *w)
+{
+    return w ? w->last : NULL;
+}
+
+/* SPICESEE MODIFICATION: struct glz_image stays private to this file; the bridge reads it through
+   these. See VENDORED.md. */
+const uint8_t *sc_glz_image_data(const struct glz_image *img) { return img ? img->data : NULL; }
+int sc_glz_image_width(const struct glz_image *img) { return img ? (int)img->hdr.width : 0; }
+int sc_glz_image_height(const struct glz_image *img) { return img ? (int)img->hdr.height : 0; }
+int sc_glz_image_stride(const struct glz_image *img) { return img ? img->stride : 0; }
+int sc_glz_image_top_down(const struct glz_image *img) { return img ? (int)img->hdr.top_down : 1; }
 
 static void glz_decoder_window_resize(SpiceGlzDecoderWindow *w)
 {
@@ -124,6 +143,7 @@ static void glz_decoder_window_add(SpiceGlzDecoderWindow *w,
     }
 
     w->images[slot] = img;
+    w->last = img;   /* SPICESEE MODIFICATION */
 
     /* close the gap */
     while (w->tail_gap <= img->hdr.id && w->images[w->tail_gap % w->nimages] != NULL)
@@ -172,6 +192,9 @@ static void glz_decoder_window_release(SpiceGlzDecoderWindow *w,
 
     while (w->oldest < oldest) {
         slot = w->oldest % w->nimages;
+        if (w->last == w->images[slot]) {
+            w->last = NULL;   /* SPICESEE MODIFICATION: do not leave `last` dangling */
+        }
         g_clear_pointer(&w->images[slot], glz_image_destroy);
         w->oldest++;
     }
@@ -402,6 +425,7 @@ void glz_decoder_window_clear(SpiceGlzDecoderWindow *w)
         }
     }
 
+    w->last = NULL;   /* SPICESEE MODIFICATION: the images it pointed at are gone */
     w->nimages = 16;
     g_free(w->images);
     w->images = g_new0(struct glz_image*, w->nimages);
