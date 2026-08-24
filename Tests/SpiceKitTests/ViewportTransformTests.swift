@@ -25,3 +25,10 @@ import Testing
     let empty = ViewportTransform(viewSize: .init(width: 400, height: 400), surfaceSize: .zero, scaling: .fit)
     #expect(empty.guestPoint(fromView: .init(x: 5, y: 5)) == .init(x: 0, y: 0))
 }
+
+@Test func oneToOneOnRetinaMapsAGuestPixelToADevicePixel() {
+    let t = ViewportTransform(viewSize: .init(width: 400, height: 400), surfaceSize: .init(width: 800, height: 200),
+                              scaling: .oneToOne, backingScale: 2)
+    #expect(t.scale == 0.5 && t.origin == .init(x: 0, y: 150))
+    #expect(t.guestPoint(fromView: .init(x: 100, y: 150)) == .init(x: 200, y: 0))
+}

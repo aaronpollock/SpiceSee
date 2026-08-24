@@ -14,14 +14,19 @@ public struct ViewportTransform: Sendable, Equatable {
     public let origin: CGPoint
     public let surfaceSize: CGSize
 
-    public init(viewSize: CGSize, surfaceSize: CGSize, scaling: ViewportScaling) {
+    /// `backingScale` is the view's device-pixel ratio: `.oneToOne` means one guest pixel per *device*
+    /// pixel, so on a 2x display it draws at half a point per pixel.
+    public init(viewSize: CGSize, surfaceSize: CGSize, scaling: ViewportScaling, backingScale: CGFloat = 1) {
         self.surfaceSize = surfaceSize
+        let pixel = scaling == .fit ? 1 : 1 / backingScale
         guard viewSize.width > 0, viewSize.height > 0, surfaceSize.width > 0, surfaceSize.height > 0 else {
-            scale = 1; origin = .zero; return
+            scale = pixel; origin = .zero; return
         }
-        scale = scaling == .fit ? min(viewSize.width / surfaceSize.width, viewSize.height / surfaceSize.height) : 1
-        origin = CGPoint(x: (viewSize.width - surfaceSize.width * scale) / 2,
-                         y: (viewSize.height - surfaceSize.height * scale) / 2)
+        scale = scaling == .fit ? min(viewSize.width / surfaceSize.width, viewSize.height / surfaceSize.height) : pixel
+        // Snap the centred origin to the device grid: a half-device-pixel offset would soften nearest
+        // sampling, and rounding here keeps the mouse mapping, the overlay and the present in step.
+        let x = (viewSize.width - surfaceSize.width * scale) / 2, y = (viewSize.height - surfaceSize.height * scale) / 2
+        origin = CGPoint(x: (x * backingScale).rounded() / backingScale, y: (y * backingScale).rounded() / backingScale)
     }
 
     /// Guest pixel under a view point, clamped to the surface so dragging past the edge keeps working.

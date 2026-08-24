@@ -89,8 +89,10 @@ final class GuestSurfaceView: NSView {
     var transform: ViewportTransform? {
         guard let texture else { return nil }
         return ViewportTransform(viewSize: bounds.size, surfaceSize: CGSize(width: texture.width, height: texture.height),
-                                 scaling: scaling == .fit ? .fit : .oneToOne)
+                                 scaling: scaling == .fit ? .fit : .oneToOne, backingScale: backingScale)
     }
+
+    private var backingScale: CGFloat { window?.backingScaleFactor ?? metalLayer?.contentsScale ?? 1 }
 
     override init(frame frameRect: NSRect) {
         queue = device?.makeCommandQueue()
@@ -139,7 +141,7 @@ final class GuestSurfaceView: NSView {
 
     private func resizeDrawable() {
         guard let metalLayer else { return }
-        let scale = window?.backingScaleFactor ?? metalLayer.contentsScale
+        let scale = backingScale
         metalLayer.contentsScale = scale
         let size = CGSize(width: max(1, (bounds.width * scale).rounded()),
                           height: max(1, (bounds.height * scale).rounded()))
