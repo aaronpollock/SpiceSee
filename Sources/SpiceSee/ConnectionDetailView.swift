@@ -233,6 +233,9 @@ struct DetailEmptyState: View {
         .padding(.horizontal, 64)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
+        // Centre on the whole pane, not on the pane minus the titlebar inset, which sat the block
+        // low by half the titlebar's height.
+        .ignoresSafeArea(.container, edges: .top)
     }
 
     private var bodyText: Text {
