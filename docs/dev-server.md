@@ -77,6 +77,38 @@ mechanism word as the first four bytes of the ticket and the decrypt failed. Fix
 Not advertising it would also break against SASL-enabled servers, which reject clients that skip
 auth selection.
 
+## Recorded fixtures
+
+`Tests/SpiceKitTests/Fixtures/win-*.bin`, captured 2026-08-23. The Ubuntu box is headless, so the
+reference client ran under a virtual framebuffer:
+
+```sh
+# here
+swift run spicerec 5901 192.168.50.6 5930 recordings/win-installer
+# on the Ubuntu box
+timeout 25 xvfb-run -a -s "-screen 0 1280x1024x24" remote-viewer spice://192.168.50.38:5901
+```
+
+Nine channels were opened. `conn-7` is `display/0`, `conn-1` is `main/0`; the raw capture is
+gitignored and only these three files are kept.
+
+| Fixture | From | Contents |
+|---|---|---|
+| `win-display.s2c.bin` | conn-7 s2c, 18.6 KB | `SURFACE_CREATE`, `DRAW_COPY`, `MONITORS_CONFIG`, `MARK`, `INVAL_ALL_PALETTES`, `SET_ACK`, 4×`PING` |
+| `win-display.c2s.bin` | conn-7 c2s, 276 B | the reference client's link mess, so its negotiated caps stay checkable |
+| `win-main.s2c.bin` | conn-1 s2c, 250 KB | `MAIN_INIT`, `NAME`, `UUID`, `CHANNELS_LIST`, `MOUSE_MODE`, `NOTIFY`, pings |
+
+Two things task 15 needs from this:
+
+- **Mini headers are in use.** `remote-viewer` advertised common caps `0xd` — AUTH_SELECTION,
+  AUTH_SASL, MINI_HEADER — so the replay must pass `miniHeader: true`. Display channel caps `0x2fbf`.
+- **No `STREAM_CREATE` anywhere.** The installer screen came over as a single `DRAW_COPY` on a
+  freshly created surface, which is exactly the tier-1 path M1 implements.
+
+`win-main.s2c.bin` is large because 250 KB of it is one `PING`: spice-server's bandwidth net test
+(`NET_TEST_BYTES`, 250 KB + a 12-byte ping header = 256012). Our `ChannelReader` already handles it —
+`Ping` reads only the leading id and timestamp, and the `PONG` echoes 12 bytes.
+
 ## Why this guest is a good fixture
 
 The Windows installer runs on basic VGA with no QXL driver loaded, and nothing on screen animates.

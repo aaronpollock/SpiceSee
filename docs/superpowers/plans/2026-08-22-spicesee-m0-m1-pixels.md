@@ -2286,7 +2286,7 @@ swift run spicesee-cli connect 127.0.0.1 5900
 ```
 Expected: `MAIN_INIT session=... mouse=...` and `channels: display/0 inputs/0 cursor/0 playback/0 record/0`. Paste the actual output into `docs/dev-server.md`.
 
-- [ ] **Step 5: Record a fixture for later tasks**
+- [x] **Step 5: Record a fixture for later tasks**
 
 ```bash
 mkdir -p recordings/alpine-boot
@@ -2301,7 +2301,7 @@ Note which `conn-N` is the display channel (its `c2s.bin` begins with the link m
 
 > Recording a reference client (not our own) means the fixture exercises caps we also advertise (MINI_HEADER) — check the display `c2s.bin` caps words and, if the reference client lacked MINI_HEADER, the replay test in Task 15 must pass `miniHeader: false`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && git commit -m "feat: M0 spike — dev server script, spicerec proxy, spicesee-cli connect"
