@@ -21,4 +21,7 @@ import Testing
     let t = ViewportTransform(viewSize: .zero, surfaceSize: .init(width: 10, height: 10), scaling: .fit)
     #expect(t.scale == 1)
     #expect(t.guestPoint(fromView: .zero) == .init(x: 0, y: 0))
+
+    let empty = ViewportTransform(viewSize: .init(width: 400, height: 400), surfaceSize: .zero, scaling: .fit)
+    #expect(empty.guestPoint(fromView: .init(x: 5, y: 5)) == .init(x: 0, y: 0))
 }

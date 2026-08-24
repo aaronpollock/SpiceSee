@@ -27,7 +27,7 @@ public struct ViewportTransform: Sendable, Equatable {
     /// Guest pixel under a view point, clamped to the surface so dragging past the edge keeps working.
     public func guestPoint(fromView p: CGPoint) -> GuestPoint {
         let gx = ((p.x - origin.x) / scale).rounded(.down), gy = ((p.y - origin.y) / scale).rounded(.down)
-        return GuestPoint(x: Int(min(max(gx, 0), surfaceSize.width - 1)), y: Int(min(max(gy, 0), surfaceSize.height - 1)))
+        return GuestPoint(x: Int(min(max(gx, 0), max(surfaceSize.width - 1, 0))), y: Int(min(max(gy, 0), max(surfaceSize.height - 1, 0))))
     }
 
     public func viewRect(forGuest r: CGRect) -> CGRect {
