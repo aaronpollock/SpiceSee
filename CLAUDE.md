@@ -19,7 +19,7 @@ SpiceSee is a native macOS SPICE client (remote console for Proxmox VE and plain
 
 This trips people up: **`swift build` does not compile the app.**
 
-- `Package.swift` builds the engine libraries only — `SpiceWire`, `SpiceCore`, `SpiceCanvas`, `SpiceKit`.
+- `Package.swift` builds the engine only — `CSpiceCodec`, `SpiceWire`, `SpiceCore`, `SpiceCanvas`, `SpiceKit`, plus the `spicesee-cli` and `spicerec` executables. Nothing there imports SwiftUI, which is what keeps the whole stack testable headless.
 - The app target lives in `Sources/SpiceSee/` and is **not** a member of the SPM package. It is built by an Xcode project generated from `project.yml` by [xcodegen](https://github.com/yonaskolb/XcodeGen). `SpiceSee.xcodeproj` is generated output and is gitignored — never edit it, edit `project.yml`.
 
 ```bash
@@ -39,9 +39,29 @@ swift Tools/make-icons.swift
 
 Swift 6 language mode with strict concurrency, macOS 14 deployment target, universal (arm64 + x86_64). No locks, no `@unchecked Sendable`.
 
+## Running against a real SPICE server
+
+The dev server is a quickemu Windows guest on the LAN, not a local process — endpoint, ticket state
+and the bug it flushed out are in `docs/dev-server.md`. `scripts/dev-server.sh` reports reachability.
+
+```bash
+swift run spicesee-cli connect 192.168.50.6 5930            # prints MAIN_INIT and the channel list
+swift run spicesee-cli dump 192.168.50.6 5930 5 /tmp/f.png  # captures the guest for 5s, writes a PNG
+swift run spicerec 5901 192.168.50.6 5930 recordings/x      # recording TCP proxy, one file per channel
+```
+
+`spicerec` is how fixtures are made: proxy a *reference* client (`remote-viewer` under `xvfb-run`,
+since the guest host is headless) and keep the per-channel captures. `Tests/SpiceKitTests/Fixtures/`
+holds the display and main recordings plus `win-display.golden.png`; `ReplayTests` renders the
+recording headless and compares pixel-for-pixel, so a regression anywhere in the stack fails there
+first. **Only commit a golden you have actually looked at.**
+
+`scripts/check-vendored-notices.sh` must exit 0 before any release — it enforces the LGPL record in
+`Sources/CSpiceCodec/VENDORED.md`. Re-run it after touching anything under `vendor/`.
+
 ## Running the app without a SPICE server
 
-There is no engine yet (see below), so the app ships a mock harness. All flags are gated behind `--mock`:
+`MockSessionBackend` still drives every screen for design review. All flags are gated behind `--mock`:
 
 ```bash
 open -n /path/to/SpiceSee.app --args --mock --scenario desktop --autoconnect
@@ -63,9 +83,11 @@ SpiceKit     facade: SpiceSession, the only type the app sees
 SpiceSee     SwiftUI + AppKit app
 ```
 
-**The engine is unstarted.** All four library targets currently hold a one-line placeholder. The whole UI was built first, against the finalized design. `docs/superpowers/plans/2026-08-22-spicesee-m0-m1-pixels.md` is the task-by-task plan for building the engine (tasks 1–16), and `docs/superpowers/specs/2026-08-22-spicesee-design.md` is the design spec it argues from. Read both before touching the engine.
+**M0–M1 are done: a real guest renders in the app.** `docs/superpowers/plans/2026-08-22-spicesee-m0-m1-pixels.md` (tasks 1–16b, all ticked) built the stack; `docs/superpowers/specs/2026-08-22-spicesee-design.md` is the design spec it argues from. What exists now: the link handshake with ticket auth, main and display channels, the vendored QUIC/LZ/GLZ codecs, tier-1 draws, and `SpiceSession`. What does not: **input (M2)** — no mouse, no keyboard, no Ctrl-Alt-Del; TLS and `.vv` (M3); streams/video, tiers 2–3 (M4); agent and clipboard (M5); audio (M6). Later plans are written one at a time, after the previous milestone ships.
 
-**`SessionBackend` is the seam.** Because `SpiceKit.SpiceSession` does not exist yet, the UI talks to a protocol (`Sources/SpiceSee/SessionBackend.swift`) with `MockSessionBackend` behind it. Task 16b in the plan specifies `SpiceKitBackend`, the adapter that replaces the mock — including the `SpiceError` → `ConnectFailure` mapping the failure-sheet copy depends on. **If a view needs editing to accommodate the real backend, the seam is wrong — fix the adapter, not the view.**
+Because input is M2, the session window shows the guest but cannot drive it. The captured-pointer HUD appears whenever the agent is absent (`SessionModel` sets `pointerCaptured` on `.agent(.absent)`) even though nothing is actually captured yet — M2 makes that honest by implementing capture.
+
+**`SessionBackend` is the seam.** The UI talks to a protocol (`Sources/SpiceSee/SessionBackend.swift`), never to SPICE. `SpiceKitBackend` is the real implementation and `MockSessionBackend` still backs `--mock` for design review, so every screen stays reviewable without a server. Landing the real engine required **no view changes** — keep it that way: **if a view needs editing to accommodate the engine, the seam is wrong — fix the adapter, not the view.** Error classification lives in `SpiceKit.ConnectFailureKind` (tested); the failure wording stays in the app, and the raw `SpiceError` goes to the log, never to the sheet.
 
 **`SpiceWire` is the security boundary.** Every reader accessor throws; a hostile or malformed server message must produce a caught error, never a trap. No `!` unwraps or unchecked subscripts on wire data.
 

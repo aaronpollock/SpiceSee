@@ -22,9 +22,9 @@ enum BackendEvent: Sendable {
 
 /// The seam between the UI and the SPICE engine.
 ///
-/// `SpiceKit` does not exist yet — it is built by the M0–M1 plan — so the UI is written against this
-/// protocol and verified today with `MockSessionBackend`. `SpiceKitBackend` replaces the mock once
-/// `SpiceSession` lands; no view changes when it does.
+/// `SpiceKitBackend` drives this with the real engine; `MockSessionBackend` still backs `--mock`, so
+/// every screen stays reviewable without a server. Landing the engine needed no view changes — if one
+/// ever seems to, the seam is wrong and the fix belongs in the adapter.
 protocol SessionBackend: Sendable {
     func connect(host: String, port: UInt16, tlsPort: UInt16?, password: String?) -> AsyncStream<BackendEvent>
     func disconnect() async
