@@ -105,7 +105,7 @@ Tests/
 - Consumes: `SpiceReader`, `SpiceWriter`, `WireError`, `ClientMessage` (`Sources/SpiceWire/ClientMessages.swift`).
 - Produces: `InputsServerMsg`, `InputsClientMsg`, `InputsCap.keyScancode`, `SpiceMouseMode.server/.client: UInt32`, `MouseButton` (`.left .middle .right .up .down`, `.mask`), `LockKeys` (OptionSet: `.scrollLock .numLock .capsLock`), `XTScancode(code:extended:)` + `wireCode(pressed:)`, `InputsMessage` (`.init(LockKeys)`, `.keyModifiers(LockKeys)`, `.mouseMotionAck`, `.other(type:)`), and `ClientMessage.keyDown(_:) / keyUp(_:) / keyModifiers(_:) / mouseMotion(dx:dy:buttons:) / mousePosition(x:y:buttons:displayID:) / mousePress(_:buttons:) / mouseRelease(_:buttons:)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```swift
 // Tests/SpiceWireTests/InputsMessageTests.swift
@@ -149,12 +149,12 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `swift test --filter InputsMessageTests`
 Expected: compile error — `XTScancode`, `InputsMessage`, `MouseButtonState` do not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```swift
 // Sources/SpiceWire/InputsMessages.swift
@@ -244,12 +244,12 @@ extension MouseButtonState: ExpressibleByArrayLiteral {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `swift test --filter InputsMessageTests`
 Expected: 4 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceWire/InputsMessages.swift Tests/SpiceWireTests/InputsMessageTests.swift
@@ -267,7 +267,7 @@ git commit -m "feat(wire): inputs channel messages and scancode packing"
 **Interfaces:**
 - Produces: `CursorServerMsg`, `CursorFlags.none/.cacheMe/.fromCache: UInt16`, `CursorType`, `SpicePoint16(x:y:)`, `CursorHeader(unique:type:width:height:hotX:hotY:)`, `SpiceCursor(flags:header:data:)`, `CursorMessage` (`.init(position:visible:cursor:)`, `.reset`, `.set(position:visible:cursor:)`, `.move(SpicePoint16)`, `.hide`, `.trail(length:frequency:)`, `.invalOne(UInt64)`, `.invalAll`, `.other(type:)`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```swift
 // Tests/SpiceWireTests/CursorMessageTests.swift
@@ -327,12 +327,12 @@ private func header(unique: UInt64 = 7, type: UInt8 = 0, w: UInt16 = 2, h: UInt1
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `swift test --filter CursorMessageTests`
 Expected: compile error — `CursorMessage` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```swift
 // Sources/SpiceWire/CursorMessages.swift
@@ -418,12 +418,12 @@ public enum CursorMessage: Sendable, Equatable {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `swift test --filter CursorMessageTests`
 Expected: 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceWire/CursorMessages.swift Tests/SpiceWireTests/CursorMessageTests.swift
@@ -444,7 +444,7 @@ The one thing Tasks 1–2 cannot prove is that our bytes match what spice-server
 - Consumes: `spicerec`, `SpiceLinkReply.parseHeader`, `DataHeader(mini:)`, `ClientMessage.*` from Task 1, `CursorMessage` from Task 2.
 - Produces: the three fixtures, referenced by Tasks 5, 8 and 9.
 
-- [ ] **Step 1: Check the dev server and the Ubuntu box**
+- [x] **Step 1: Check the dev server and the Ubuntu box**
 
 ```bash
 scripts/dev-server.sh                      # TCP reachability of 192.168.50.6:5930
@@ -453,7 +453,7 @@ ssh nuc2 'which remote-viewer xvfb-run xdotool'
 
 If `xdotool` is missing: `ssh nuc2 'sudo apt-get install -y xdotool'`. If `ssh nuc2` is not set up, hand the two remote commands below to the user verbatim and wait — do not skip this task; the whole point is a foreign implementation's bytes.
 
-- [ ] **Step 2: Record**
+- [x] **Step 2: Record**
 
 Terminal 1, here (leave running until the remote session exits):
 
@@ -485,7 +485,7 @@ EOF
 ssh nuc2 "sed -i 's/MACIP/$(ipconfig getifaddr en0)/' /tmp/drive.sh && timeout 40 xvfb-run -a -s '-screen 0 1280x1024x24' sh /tmp/drive.sh"
 ```
 
-- [ ] **Step 3: Identify the channels and keep the fixtures**
+- [x] **Step 3: Identify the channels and keep the fixtures**
 
 Each connection's first c2s bytes are the link mess; byte 20 is the channel type (3 = inputs, 4 = cursor):
 
@@ -495,7 +495,7 @@ for f in recordings/win-input/conn-*.c2s.bin; do printf '%s type=%d\n' "$f" "$(x
 
 Copy the inputs pair and the cursor s2c into `Tests/SpiceKitTests/Fixtures/win-inputs.s2c.bin`, `win-inputs.c2s.bin`, `win-cursor.s2c.bin`. `recordings/` is gitignored; only these three are committed.
 
-- [ ] **Step 4: Decode the c2s inputs capture by hand**
+- [x] **Step 4: Decode the c2s inputs capture by hand**
 
 ```bash
 python3 - <<'EOF'
@@ -511,7 +511,7 @@ EOF
 
 Expected (common messages 1–3 interleaved): `103` KEY_MODIFIERS at start; then `111` motion `0a000000 05000000 0000`; `113`/`114` with `01 0100`/`01 0000`; `113`/`114` with `03 0400`/`03 0000`; `101 1e000000` / `102 9e000000` for "a"; `101 e0530000` / `102 e0d30000` for Delete — the E0 prefix is the **first** byte on the wire (little-endian `0x000053E0`); `101 e04b0000` / `102 e0cb0000` for Left; `113 04 0000` / `114 04 0000` for wheel up. If the reference client puts E0 anywhere else, stop and fix `XTScancode.wireCode` (Task 1) before building on it. Also confirm the link mess channel caps word for inputs has bit 0 (KEY_SCANCODE) set.
 
-- [ ] **Step 5: Pin the encodings against the recording**
+- [x] **Step 5: Pin the encodings against the recording**
 
 ```swift
 // Tests/SpiceKitTests/ReferenceClientTests.swift
@@ -567,12 +567,12 @@ private func referenceInputFrames() throws -> [(type: UInt16, payload: [UInt8])]
 
 If xdotool's motion arrived split across several `MOUSE_MOTION` frames (X may deliver 10,5 as two events), relax the motion expectation to "the dx sum of consecutive motion frames after the grab is 10 and the dy sum is 5", computed with `SpiceReader` — but keep the exact-bytes checks for keys and buttons.
 
-- [ ] **Step 6: Run**
+- [x] **Step 6: Run**
 
 Run: `swift test --filter ReferenceClientTests`
 Expected: 2 tests pass. If the scancode test fails, the fix is in `XTScancode.wireCode` (Task 1), not in the test.
 
-- [ ] **Step 7: Document and commit**
+- [x] **Step 7: Document and commit**
 
 Add three rows to the fixtures table in `docs/dev-server.md` (name, source connection, contents — list the message types seen in Step 4 and the cursor s2c: expect `CURSOR_INIT` with flags NONE from a VGA guest, plus pings), and the xdotool recipe under "Recorded fixtures".
 
@@ -595,7 +595,7 @@ git commit -m "test(kit): pin inputs encoders against a remote-viewer recording;
 - Consumes: `LinkHandshake.perform`, `ChannelReader`, `InMemoryTransport`, Task 1 types.
 - Produces: `MotionThrottle` (`offer(_:) -> Pending?`, `acked() -> Pending?`), `actor InputsChannel` with `static func open(transport:connectionID:password:)`, `keyDown(_:)`, `keyUp(_:)`, `releaseAllKeys()`, `setLockKeys(_:)`, `syncCapsLock(_ on: Bool)`, `mouseMotion(dx:dy:)`, `mousePosition(x:y:displayID:)`, `buttonDown(_:)`, `buttonUp(_:)`, `guestLockKeys: LockKeys`, `heldKeys: Set<XTScancode>`, `close()`.
 
-- [ ] **Step 1: Write the failing throttle tests**
+- [x] **Step 1: Write the failing throttle tests**
 
 ```swift
 // Tests/SpiceCoreTests/MotionThrottleTests.swift
@@ -629,12 +629,12 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `swift test --filter MotionThrottleTests`
 Expected: compile error.
 
-- [ ] **Step 3: Implement MotionThrottle**
+- [x] **Step 3: Implement MotionThrottle**
 
 ```swift
 // Sources/SpiceCore/MotionThrottle.swift
@@ -678,12 +678,12 @@ struct MotionThrottle: Sendable, Equatable {
 }
 ```
 
-- [ ] **Step 4: Run the throttle tests**
+- [x] **Step 4: Run the throttle tests**
 
 Run: `swift test --filter MotionThrottleTests`
 Expected: 3 pass.
 
-- [ ] **Step 5: Add the link-preamble helper**
+- [x] **Step 5: Add the link-preamble helper**
 
 `MainChannelTests` builds a fake link reply inline; the new channel tests need the same bytes. Add to `Tests/SpiceCoreTests/TestSupport.swift` (leave `MainChannelTests` untouched):
 
@@ -718,7 +718,7 @@ func frame(_ type: UInt16, _ payload: [UInt8]) -> [UInt8] {
 
 Note the reply now has one channel-caps word (`w.u32(1); w.u32(1); w.u32(178)` = 1 common, 1 channel, offset 178) — `SpiceLinkReply` reads `nChannel` words, so this is consistent.
 
-- [ ] **Step 6: Write the failing InputsChannel tests**
+- [x] **Step 6: Write the failing InputsChannel tests**
 
 ```swift
 // Tests/SpiceCoreTests/InputsChannelTests.swift
@@ -793,12 +793,12 @@ private func openInputs(_ body: [UInt8] = frame(InputsServerMsg.`init`.rawValue,
 }
 ```
 
-- [ ] **Step 7: Run to verify they fail**
+- [x] **Step 7: Run to verify they fail**
 
 Run: `swift test --filter InputsChannelTests`
 Expected: compile error — `InputsChannel` does not exist.
 
-- [ ] **Step 8: Implement InputsChannel**
+- [x] **Step 8: Implement InputsChannel**
 
 ```swift
 // Sources/SpiceCore/InputsChannel.swift
@@ -914,12 +914,12 @@ public actor InputsChannel {
 }
 ```
 
-- [ ] **Step 9: Run all core tests**
+- [x] **Step 9: Run all core tests**
 
 Run: `swift test --filter SpiceCoreTests`
 Expected: all pass, including the 5 new `InputsChannelTests` and the untouched `MainChannelTests`.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add Sources/SpiceCore/MotionThrottle.swift Sources/SpiceCore/InputsChannel.swift Tests/SpiceCoreTests/TestSupport.swift \
@@ -939,7 +939,7 @@ git commit -m "feat(core): InputsChannel actor with motion flow control"
 - Consumes: `LinkHandshake`, `ChannelReader`, `CursorMessage` (Task 2), `fakeLink`/`frame` (Task 4).
 - Produces: `actor CursorChannel` with `static func open(transport:connectionID:id:password:)`, `nonisolated let messages: AsyncStream<CursorMessage>`, `close()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```swift
 // Tests/SpiceCoreTests/CursorChannelTests.swift
@@ -974,12 +974,12 @@ import SpiceWire
 
 The second test needs the fixture in `SpiceCoreTests`: add `resources: [.copy("Fixtures")]` to the `SpiceCoreTests` target in `Package.swift` and a symlink `Tests/SpiceCoreTests/Fixtures/win-cursor.s2c.bin -> ../../SpiceKitTests/Fixtures/win-cursor.s2c.bin` (SPM copies through symlinks). If SPM refuses the symlink on this toolchain, copy the file — it is small — and say so in the commit.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `swift test --filter CursorChannelTests`
 Expected: compile error.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```swift
 // Sources/SpiceCore/CursorChannel.swift
@@ -1020,12 +1020,12 @@ public actor CursorChannel {
 }
 ```
 
-- [ ] **Step 4: Run**
+- [x] **Step 4: Run**
 
 Run: `swift test --filter CursorChannelTests`
 Expected: 2 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceCore/CursorChannel.swift Tests/SpiceCoreTests/CursorChannelTests.swift Package.swift Tests/SpiceCoreTests/Fixtures
@@ -1043,7 +1043,7 @@ git commit -m "feat(core): CursorChannel actor"
 - Consumes: `CursorHeader`, `SpiceCursor`, `CursorMessage`, `CursorFlags`, `CursorType` (Task 2), `CanvasError`.
 - Produces: `CursorShape(width:height:hotX:hotY:pixels:)` (BGRA, straight alpha, tightly packed), `CursorDecoder.decode(_:data:) throws -> CursorShape`, `CursorChange` (`.shape(CursorShape?)` — nil means hidden; `.moved(x:y:)`), `struct CursorTracker` with `mutating func apply(_: CursorMessage) -> [CursorChange]`.
 
-- [ ] **Step 1: Write the failing decoder tests**
+- [x] **Step 1: Write the failing decoder tests**
 
 ```swift
 // Tests/SpiceCanvasTests/CursorDecoderTests.swift
@@ -1098,12 +1098,12 @@ private func hdr(_ type: CursorType, w: UInt16, h: UInt16) -> CursorHeader {
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `swift test --filter CursorDecoderTests`
 Expected: compile error.
 
-- [ ] **Step 3: Implement the decoder**
+- [x] **Step 3: Implement the decoder**
 
 ```swift
 // Sources/SpiceCanvas/CursorShape.swift
@@ -1184,12 +1184,12 @@ public enum CursorDecoder {
 }
 ```
 
-- [ ] **Step 4: Run the decoder tests**
+- [x] **Step 4: Run the decoder tests**
 
 Run: `swift test --filter CursorDecoderTests`
 Expected: 5 pass.
 
-- [ ] **Step 5: Write the failing tracker tests**
+- [x] **Step 5: Write the failing tracker tests**
 
 ```swift
 // Tests/SpiceCanvasTests/CursorTrackerTests.swift
@@ -1232,7 +1232,7 @@ private let shape = CursorShape(width: 1, height: 1, hotX: 0, hotY: 0, pixels: s
 }
 ```
 
-- [ ] **Step 6: Implement the tracker**
+- [x] **Step 6: Implement the tracker**
 
 ```swift
 // Sources/SpiceCanvas/CursorTracker.swift
@@ -1291,12 +1291,12 @@ public struct CursorTracker: Sendable {
 
 `os.Logger` is `Sendable`; a `static let` on a `Sendable` struct is fine under strict concurrency.
 
-- [ ] **Step 7: Run**
+- [x] **Step 7: Run**
 
 Run: `swift test --filter SpiceCanvasTests`
 Expected: all pass, including 3 `CursorTrackerTests`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add Sources/SpiceCanvas/CursorShape.swift Sources/SpiceCanvas/CursorTracker.swift \
@@ -1318,7 +1318,7 @@ Three pure pieces of `SpiceKit`, each tested. `KeyMap` is the spec's static tabl
 - Consumes: `XTScancode` (Task 1).
 - Produces: `ModifierTarget` (`.super .ctrl .alt`), `KeyMap.scancode(keyCode:commandMapsTo:optionMapsTo:) -> XTScancode?`, `KeyMap.capsLockKeyCode: UInt16 = 0x39`, `KeyMap.isModifierKeyCode(_:)`, `XTScancode.leftControl/.leftAlt/.delete`; `WheelAccumulator` (`mutating func add(precise: Bool, delta: Double) -> Int`); `ViewportTransform(viewSize:surfaceSize:scaling:)` with `.fit/.oneToOne`, `scale`, `origin`, `guestPoint(fromView:)`, `viewRect(forGuest:)`.
 
-- [ ] **Step 1: Write the failing KeyMap tests**
+- [x] **Step 1: Write the failing KeyMap tests**
 
 ```swift
 // Tests/SpiceKitTests/KeyMapTests.swift
@@ -1373,12 +1373,12 @@ import SpiceWire
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `swift test --filter KeyMapTests`
 Expected: compile error.
 
-- [ ] **Step 3: Implement KeyMap**
+- [x] **Step 3: Implement KeyMap**
 
 ```swift
 // Sources/SpiceKit/KeyMap.swift
@@ -1470,12 +1470,12 @@ public enum KeyMap {
 }
 ```
 
-- [ ] **Step 4: Run the KeyMap tests**
+- [x] **Step 4: Run the KeyMap tests**
 
 Run: `swift test --filter KeyMapTests`
 Expected: 5 pass. If `tableHasNoDuplicateTargets` fails, the message names the colliding key codes — fix the table entry, do not weaken the test.
 
-- [ ] **Step 5: Write the failing WheelAccumulator tests**
+- [x] **Step 5: Write the failing WheelAccumulator tests**
 
 ```swift
 // Tests/SpiceKitTests/WheelAccumulatorTests.swift
@@ -1499,7 +1499,7 @@ import Testing
 }
 ```
 
-- [ ] **Step 6: Implement WheelAccumulator**
+- [x] **Step 6: Implement WheelAccumulator**
 
 ```swift
 // Sources/SpiceKit/WheelAccumulator.swift
@@ -1525,7 +1525,7 @@ public struct WheelAccumulator: Sendable {
 }
 ```
 
-- [ ] **Step 7: Write the failing ViewportTransform tests**
+- [x] **Step 7: Write the failing ViewportTransform tests**
 
 ```swift
 // Tests/SpiceKitTests/ViewportTransformTests.swift
@@ -1555,7 +1555,7 @@ import Testing
 }
 ```
 
-- [ ] **Step 8: Implement ViewportTransform**
+- [x] **Step 8: Implement ViewportTransform**
 
 ```swift
 // Sources/SpiceKit/ViewportTransform.swift
@@ -1597,12 +1597,12 @@ public struct ViewportTransform: Sendable, Equatable {
 }
 ```
 
-- [ ] **Step 9: Run all three**
+- [x] **Step 9: Run all three**
 
 Run: `swift test --filter "KeyMapTests|WheelAccumulatorTests|ViewportTransformTests"`
 Expected: 10 pass.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add Sources/SpiceKit/KeyMap.swift Sources/SpiceKit/WheelAccumulator.swift Sources/SpiceKit/ViewportTransform.swift Tests/SpiceKitTests/KeyMapTests.swift Tests/SpiceKitTests/WheelAccumulatorTests.swift Tests/SpiceKitTests/ViewportTransformTests.swift
@@ -1621,7 +1621,7 @@ git commit -m "feat(kit): kVK→XT key map, wheel accumulator, viewport transfor
 - Consumes: `InputsChannel` (Task 4), `CursorChannel` (Task 5), `CursorTracker`/`CursorChange` (Task 6), `MainChannel.requestMouseMode(_:)`, `MainMessage.mouseMode/.agentConnected/.agentDisconnected`, `SpiceMouseMode`.
 - Produces: `PointerMode` (`.server .client`), `GuestInput`, `SessionEvent.pointerMode(PointerMode)`, `.cursor(CursorChange, displayID: UInt8)`, `.agent(connected: Bool)`, `SpiceSession.send(_ input: GuestInput)` (nonisolated, ordered, never blocks), `SpiceSession.pointerMode`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```swift
 // Tests/SpiceKitTests/SessionInputTests.swift
@@ -1751,12 +1751,12 @@ Also update `Tests/SpiceKitTests/SpiceSessionTests.swift`'s transport factory so
 
 (`win-inputs.s2c.bin` was recorded from a `remote-viewer` link with common caps `0xd`; our link reads the *server's* reply from the file, which is what `fakeLink` also mimics, so the recording replays under `miniHeader: true` exactly as the display fixture does.)
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `swift test --filter SessionInputTests`
 Expected: compile error — `GuestInput`, `PointerMode`, `send` missing.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace `Sources/SpiceKit/SpiceSession.swift` with:
 
@@ -1952,12 +1952,12 @@ public actor SpiceSession {
 
 `.agentConnectedTokens` is how a current spice-server announces the agent (it carries the token count); treating it like `.agentConnected` is deliberate.
 
-- [ ] **Step 4: Run the kit tests**
+- [x] **Step 4: Run the kit tests**
 
 Run: `swift test --filter SpiceKitTests`
 Expected: all pass — the four new tests, `sessionBringsUpMainAndDisplayFromRecordings` with four channels, the replay golden unchanged. If `doesNotRequestClientModeWhenUnsupported` hangs, the drain task is waiting on a channel whose transport threw before `open` — confirm the `catch` runs before the pumps are appended (it does in the code above) and that `main`'s recording ends (EOF ends `ChannelReader.run`).
 
-- [ ] **Step 5: Live check with the CLI**
+- [x] **Step 5: Live check with the CLI**
 
 `spicesee-cli dump` still works unchanged, and now brings up inputs and cursor too:
 
@@ -1967,7 +1967,7 @@ swift run spicesee-cli dump 192.168.50.6 5930 3 /tmp/m2.png
 
 Expected: `connected: 10 channels`, a PNG of the installer, no `channelFailed` logged (`log stream --predicate 'subsystem == "com.spicesee"' --level info` in another terminal).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/SpiceKit/SpiceSession.swift Sources/SpiceCore/Ticket.swift Tests/SpiceKitTests/TestSupport.swift \
@@ -1987,7 +1987,7 @@ No views change in this task. It extends the protocol, teaches both backends the
 - Consumes: `SpiceSession.send`, `GuestInput`, `PointerMode`, `CursorChange`, `CursorShape`, `KeyMap`, `ModifierTarget` (Tasks 6–8); app `GuestModifier`, `AgentState`.
 - Produces (app side, `SessionBackend.swift`): `PointerMode` (`.client .server`), `PointerButton` (`.left .middle .right`), `KeyboardMapping(commandMapsTo:optionMapsTo:)`, `InputEvent`, `CursorImage`, `CursorChange` (`.shape(CursorImage?)`, `.moved(x:y:)`), `ViewportEvent` (`.frame(FrameUpdate)`, `.cursor(CursorChange)`), `BackendEvent.pointerMode(PointerMode)`, `BackendEvent.cursor(viewportID: Int, CursorChange)`, `SessionBackend.sendInput(_:)` (synchronous). `SessionModel`: `pointerMode`, `keyboardMapping`, `sendLockKeys`, `sendInput(_:)`, `setPointerCaptured(_:)`, `viewportEvents(for:)`.
 
-- [ ] **Step 1: Extend the seam**
+- [x] **Step 1: Extend the seam**
 
 In `Sources/SpiceSee/SessionBackend.swift`, add below `FrameUpdate`:
 
@@ -2044,7 +2044,7 @@ Extend `BackendEvent` with `case pointerMode(PointerMode)` and `case cursor(view
     func sendInput(_ event: InputEvent)
 ```
 
-- [ ] **Step 2: Teach SessionModel**
+- [x] **Step 2: Teach SessionModel**
 
 In `Sources/SpiceSee/SessionModel.swift`:
 
@@ -2134,7 +2134,7 @@ In `SpiceSeeApp.swift`, inside the manager `Window` content, after `.task { … 
                 .onChange(of: settings.sendLockKeys, initial: true) { _, on in session.sendLockKeys = on }
 ```
 
-- [ ] **Step 3: The real adapter**
+- [x] **Step 3: The real adapter**
 
 In `Sources/SpiceSee/SpiceKitBackend.swift`:
 
@@ -2214,7 +2214,7 @@ And the translations plus a real Ctrl-Alt-Del:
 
 The app's `CursorChange` and `SpiceCanvas.CursorChange` share a name; qualify the engine one as above and the app one as `SpiceSee.CursorChange`… the app module is `SpiceSee`, so inside the adapter the unqualified name resolves to the app's; only the parameter type needs `SpiceCanvas.` — as written.
 
-- [ ] **Step 4: The mock**
+- [x] **Step 4: The mock**
 
 `MockSessionBackend`: after `.agent(...)` yield `.pointerMode(scenario == .noAgent ? .server : .client)`; when the agent connects (non-`noAgent`) yield `.pointerMode(.client)` next to `.agent(.connected)`. Add `func sendInput(_ event: InputEvent) {}`. For design review of Task 12, also yield one cursor after `.connected`:
 
@@ -2242,7 +2242,7 @@ with
     }()
 ```
 
-- [ ] **Step 5: Build the app and run every scenario**
+- [x] **Step 5: Build the app and run every scenario**
 
 ```bash
 xcodegen generate
@@ -2252,7 +2252,7 @@ swift test 2>&1 | tail -1
 
 Expected: `BUILD SUCCEEDED`; the SPM suite unchanged. Then launch `--mock --scenario noAgent --autoconnect` and `--scenario desktop --autoconnect` (see CLAUDE.md for the `open -n … --args` form and the window-scoped screenshot recipe). `noAgent`: the HUD must **not** appear on connect any more (nothing has captured yet — Task 11 makes the click do it). `desktop`: agent chip green, no cue. Screenshot both with `screencapture -l<id>`, look at them.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/SpiceSee
@@ -2270,7 +2270,7 @@ git commit -m "feat(app): input, pointer-mode and cursor events cross the Sessio
 - Consumes: `SessionModel.sendInput/keyboardMapping/sendLockKeys/pointerMode/releaseChord/setPointerCaptured`, `InputEvent`, `KeyMap.capsLockKeyCode` is *not* visible here (app has no SpiceKit import in views) — the caps-lock key code `0x39` is repeated as a private constant with a comment pointing at `KeyMap`.
 - Produces: `final class GuestInputView: NSView` with `var onInput: (InputEvent) -> Void`, `var keyboardMapping`, `var sendLockKeys`, `var pointerMode`, `var releaseChord`, `var onCaptureChange: (Bool) -> Void`, `var transform: () -> ViewportGeometry?` (Task 11), `func releaseCapture()`.
 
-- [ ] **Step 1: Write the view (keyboard half)**
+- [x] **Step 1: Write the view (keyboard half)**
 
 ```swift
 // Sources/SpiceSee/GuestInputView.swift
@@ -2388,7 +2388,7 @@ final class GuestInputView: NSView {
 
 `NSNotificationCenter` closures are not `@MainActor`; `MainActor.assumeIsolated` is correct because `queue: .main` delivers there. `deinit` must remove both observers.
 
-- [ ] **Step 2: Host it from MetalSurfaceView**
+- [x] **Step 2: Host it from MetalSurfaceView**
 
 In `MetalSurfaceView.makeNSView`, after creating the surface view:
 
@@ -2415,7 +2415,7 @@ with `GuestSurfaceView` gaining `var inputView: GuestInputView?` and `MetalSurfa
 
 and `updateNSView` calling `nsView.inputView.map(configure)` (it runs whenever an observed property the body read changes; reading `session.pointerMode` etc. inside `configure` during `makeNSView`/`updateNSView` registers them). Because `configure` reads observable properties, wrap the reads in `updateNSView` so SwiftUI tracks them — the simplest is to read them into locals in `updateNSView` and pass them in.
 
-- [ ] **Step 3: Build and verify live**
+- [x] **Step 3: Build and verify live**
 
 ```bash
 xcodegen generate && xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -configuration Debug -destination 'platform=macOS' build 2>&1 | tail -2
@@ -2430,7 +2430,7 @@ Connect to `192.168.50.6:5930` (the user's saved connection — see the memory n
 
 Report exactly which of these you observed. Hover/focus-ring appearance is visible in a `screencapture -l<id>`; if the guest did not visibly react, say so.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/SpiceSee/GuestInputView.swift Sources/SpiceSee/MetalSurfaceView.swift
@@ -2449,7 +2449,7 @@ git commit -m "feat(app): keyboard input to the guest; lock-key sync; release on
 - Consumes: `ViewportTransform` (Task 7) — **through the adapter boundary?** No: `ViewportTransform` is pure geometry in `SpiceKit`, and `MetalSurfaceView.swift` already imports Metal/QuartzCore; importing `SpiceKit` there for a geometry helper is allowed (the rule is that views do not see *SPICE* types — this is not one). `WheelAccumulator` likewise.
 - Produces: `GuestSurfaceView.transform: ViewportTransform?` (nil until the first frame), used by Task 12 for the overlay.
 
-- [ ] **Step 1: Replace `clipExtent` with the shared transform**
+- [x] **Step 1: Replace `clipExtent` with the shared transform**
 
 In `GuestSurfaceView`:
 
@@ -2480,7 +2480,7 @@ and in `render()` derive the clip-space extent from it instead of `clipExtent`:
 
 Change the vertex shader to take `float4 placement` (centre.xy, extent.zw): `out.position = float4(placement.xy + corners[id] * placement.zw, 0, 1);` and `setVertexBytes(&extent, length: MemoryLayout<SIMD4<Float>>.size, index: 0)`. Delete `clipExtent`. Run the app in `--mock`: fit and 1:1 must look exactly as before (compare a `screencapture -l<id>` against one taken before the change — the pixels must match).
 
-- [ ] **Step 2: The pointer half of GuestInputView**
+- [x] **Step 2: The pointer half of GuestInputView**
 
 Add to `GuestInputView`:
 
@@ -2583,11 +2583,11 @@ Replace the Task 10 stub `func releaseCapture() {}` and `private(set) var pointe
 
 Wire `viewportID` and `transform` in `MetalSurfaceView.configure`: `input.viewportID = viewport.id`, `input.transform = { [weak view] in view?.transform }`.
 
-- [ ] **Step 3: Make the HUD honest**
+- [x] **Step 3: Make the HUD honest**
 
 `SessionWindowView` already flashes the HUD on `pointerCaptured` becoming true and shows the cue while true — with `setPointerCaptured` driven by the view, nothing there changes. Confirm with `--mock --scenario noAgent --autoconnect`: the HUD appears only after the first click, the cue stays, ⌃⌥ dismisses both and the pointer reappears. Screenshot the captured state.
 
-- [ ] **Step 4: Live verification**
+- [x] **Step 4: Live verification**
 
 Against the dev server (server mode, no agent):
 
@@ -2600,7 +2600,7 @@ Against the dev server (server mode, no agent):
 
 Client mode cannot be verified on this guest (no agent, no tablet). State that plainly in the report; the `--mock --scenario desktop` path shows the absolute pointer code runs (log the `pointerPosition` events at `.debug`, look for them).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceSee/GuestInputView.swift Sources/SpiceSee/MetalSurfaceView.swift
@@ -2618,7 +2618,7 @@ git commit -m "feat(app): mouse in both modes; server-mode capture with release 
 - Consumes: `ViewportEvent.cursor(CursorChange)`, `CursorImage`, `GuestSurfaceView.transform`.
 - Produces: `GuestSurfaceView.apply(_ change: CursorChange)`, `GuestInputView.hostCursor: NSCursor?`.
 
-- [ ] **Step 1: Turn a CursorImage into an NSCursor**
+- [x] **Step 1: Turn a CursorImage into an NSCursor**
 
 ```swift
 extension CursorImage {
@@ -2642,7 +2642,7 @@ extension CursorImage {
 
 Put this in `GuestInputView.swift`; it is presentation glue for that view.
 
-- [ ] **Step 2: Client mode — the host pointer wears the guest's shape**
+- [x] **Step 2: Client mode — the host pointer wears the guest's shape**
 
 In `GuestInputView`:
 
@@ -2664,7 +2664,7 @@ In `GuestInputView`:
 
 (`.cursorUpdate` is already in the tracking-area options from Task 11.)
 
-- [ ] **Step 3: Server mode — composite the shape at the reported position**
+- [x] **Step 3: Server mode — composite the shape at the reported position**
 
 In `GuestSurfaceView`:
 
@@ -2733,13 +2733,13 @@ In `render()`, after the surface quad and before `endEncoding`:
 
 `MetalSurfaceView.Coordinator.pump` forwards `.cursor(change)` to `view.apply(change)`; `configure` sets `view.showsCursorOverlay = session.pointerMode == .server`.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 `--mock --scenario noAgent --autoconnect`: the mock's arrow appears at (300, 260) in guest pixels over the synthetic desktop, scaled with the viewport in Fit and unscaled in 1:1. `--scenario desktop`: no overlay; hovering the viewport shows the mock arrow as the *host* cursor — **hover cannot be verified from here** (no synthetic events); hand this one to the user. Screenshot the noAgent overlay and look at it: black arrow, white outline, top-left hotspot at (300, 260).
 
 Dev server: a VGA guest sends no shapes; the overlay stays empty and the guest's own arrow (in the framebuffer) is what moves. Say so.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceSee/MetalSurfaceView.swift Sources/SpiceSee/GuestInputView.swift
@@ -2753,7 +2753,7 @@ git commit -m "feat(app): guest cursor as NSCursor in client mode, Metal overlay
 **Files:**
 - Modify: `CLAUDE.md` (Architecture paragraph: M2 shipped, what M3 lacks), `docs/dev-server.md` (if anything changed in Tasks 10–12), this plan (tick boxes), `docs/superpowers/plans/2026-08-22-spicesee-m0-m1-pixels.md` untouched.
 
-- [ ] **Step 1: Whole suite and the app**
+- [x] **Step 1: Whole suite and the app**
 
 ```bash
 swift test 2>&1 | tail -1
@@ -2763,13 +2763,13 @@ xcodegen generate && xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -co
 
 Expected: every test passes (60 before this plan + the ~30 added), notices script exit 0, `BUILD SUCCEEDED`.
 
-- [ ] **Step 2: The M2 exit criterion, live**
+- [x] **Step 2: The M2 exit criterion, live**
 
 Spec §9: "Keyboard, mouse both modes, native cursor." On the dev guest, in one sitting: click to capture, use the mouse to open the language dropdown, use the keyboard to pick an entry and Tab to "Next", press Enter, watch the installer advance to the next screen, press ⌃⌥ to release. Record it through `spicerec` and keep the c2s inputs capture in `recordings/` (gitignored) as evidence; quote the frame types you saw in the report.
 
 Client mode and the cursor channel with real shapes need a guest with vdagent or a QXL driver. If the user has one (a Linux desktop guest on the same box would do: `quickemu --vm ubuntu.conf` with `spice-vdagent` in the guest), verify: pointer moves without capture, the host cursor turns into the guest's I-beam over a text field, no HUD ever shows. Otherwise list these as **not verified** in the recap — do not imply they work.
 
-- [ ] **Step 3: Update CLAUDE.md**
+- [x] **Step 3: Update CLAUDE.md**
 
 Replace the "**M0–M1 are done**" paragraph's "What does not" sentence and the following paragraph with:
 
@@ -2788,11 +2788,11 @@ the single source of fit/1:1 geometry for present, mouse mapping and the cursor 
 
 and delete the "Because input is M2…" paragraph (it is no longer true).
 
-- [ ] **Step 4: Memory**
+- [x] **Step 4: Memory**
 
 Update `~/.claude/projects/-Users-aaronpollock-code-spicesee/memory/spicesee-plan-sequence.md`: M2 shipped (date), M3 next, what could and could not be verified live, and the xdotool recording recipe as the way to get reference bytes for any client→server message.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add CLAUDE.md docs
@@ -2807,3 +2807,18 @@ git commit -m "docs: M2 shipped — input, capture and cursor; refresh CLAUDE.md
 - **Known deviations:** Pause/PrintScreen not mapped (no Mac keys). Cursor trails ignored. Motion deltas are in view points, not device pixels — on a 2× display a captured pointer moves at half the raw rate; revisit if it feels slow (multiply by `backingScaleFactor` in `pointerMoved`). HiDPI coordinate scaling waits for M5 monitors config.
 - **Cross-implementation checks:** T3 pins scancode packing, motion, press/release and the KEY_SCANCODE cap against `remote-viewer`'s bytes; T5 replays the recorded cursor channel; T10–11 drive the real guest.
 - **Type consistency:** `XTScancode(_:extended:)`, `wireCode(pressed:)`, `MouseButtonState` (array-literal), `LockKeys`, `InputsChannel.syncCapsLock(_:)`, `CursorChange.shape/.moved` (engine, `SpiceCanvas`) vs app `CursorChange` (same case names, `CursorImage` payload), `SessionEvent.cursor(_, displayID:)`, `GuestInput.pointerPosition(x:y:displayID:)` with `UInt32`/`UInt8` vs app `InputEvent.pointerPosition(x:y:viewportID:)` with `Int`, `ViewportTransform.guestPoint(fromView:)` / `viewRect(forGuest:)`, `SessionModel.viewportEvents(for:)` / `setPointerCaptured(_:)` / `sendInput(_:)`, `GuestSurfaceView.transform` / `apply(_ change:)` / `showsCursorOverlay` / `inputView` — spelled the same in every task that uses them.
+
+## Execution notes — 2026-08-24
+
+- KEY_SCANCODE (104) path added: the dev server advertises the capability and `remote-viewer` uses it, so `InputsChannel` picks 104 vs. 101/102 from the server's link-reply caps instead of always sending 101/102.
+- Client-mode dev guest changed Task 3's expectations: the recording is `MOUSE_POSITION` (absolute), not `MOUSE_MOTION`, because the guest runs a USB tablet.
+- `fakeLink` tests skip only the ticket, not the auth word.
+- No fixed sleeps in tests.
+- `CursorTracker` caches hidden shapes.
+- `ViewportTransform` clamps to 0 and takes a `backingScale` parameter (1:1 means one guest pixel per device pixel).
+- `GuestPoint` struct added.
+- The input FIFO uses `.begin`/`.end` sentinels and a cancelled-handshake guard, replacing a per-connect cancel.
+- `GuestInputView` overrides `isFlipped`.
+- Notification observers live in a non-isolated box (Swift 6 forbids reading main-actor storage from a nonisolated `deinit`).
+- Task 5's fixture test and `Package.swift` wiring moved into Task 3.
+- Live checks (Task 13 Step 2) were handed to the user — synthetic input is impossible on this machine.

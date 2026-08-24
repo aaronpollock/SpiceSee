@@ -67,6 +67,16 @@ first. **Only commit a golden you have actually looked at.**
 open -n /path/to/SpiceSee.app --args --mock --scenario desktop --autoconnect
 ```
 
+On this machine that form opens no window — `open --args` lands the flags in `NSArgumentDomain`,
+which this app doesn't read that early. The form that works is launching the built binary directly
+with the mock env var:
+
+```bash
+BUILT_PRODUCTS_DIR=$(xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -configuration Debug -showBuildSettings | grep BUILT_PRODUCTS_DIR | awk '{print $3}')
+SPICESEE_MOCK=1 "$BUILT_PRODUCTS_DIR/SpiceSee.app/Contents/MacOS/SpiceSee" --scenario desktop --autoconnect
+# quit with: osascript -e 'tell application "SpiceSee" to quit'
+```
+
 - `--scenario desktop | noAgent | refused | badPassword | certMismatch | migrate` — drives connect progress, the three failure sheets, the migration sheet, agent states, and a synthetic framebuffer.
 - `--autoconnect` — connects the selected host on launch.
 - `--open acknowledgements` — opens that window at launch. (`--open settings` exists but is unreliable that early in launch; use ⌘, once the app is frontmost.)
@@ -83,9 +93,11 @@ SpiceKit     facade: SpiceSession, the only type the app sees
 SpiceSee     SwiftUI + AppKit app
 ```
 
-**M0–M1 are done: a real guest renders in the app.** `docs/superpowers/plans/2026-08-22-spicesee-m0-m1-pixels.md` (tasks 1–16b, all ticked) built the stack; `docs/superpowers/specs/2026-08-22-spicesee-design.md` is the design spec it argues from. What exists now: the link handshake with ticket auth, main and display channels, the vendored QUIC/LZ/GLZ codecs, tier-1 draws, and `SpiceSession`. What does not: **input (M2)** — no mouse, no keyboard, no Ctrl-Alt-Del; TLS and `.vv` (M3); streams/video, tiers 2–3 (M4); agent and clipboard (M5); audio (M6). Later plans are written one at a time, after the previous milestone ships.
+**M0–M2 are done: a real guest renders and can be driven.** `docs/superpowers/plans/2026-08-22-spicesee-m0-m1-pixels.md` (tasks 1–16b) and `docs/superpowers/plans/2026-08-24-spicesee-m2-input.md` (tasks 1–13, all ticked) built the stack; `docs/superpowers/specs/2026-08-22-spicesee-design.md` is the design spec it argues from. What exists now: the link handshake with ticket auth, main/display/inputs/cursor channels, the vendored QUIC/LZ/GLZ codecs, tier-1 draws, `SpiceSession`, positional keyboard mapping (`SpiceKit.KeyMap`), both mouse modes with server-mode capture, and the guest cursor. What does not: **TLS and `.vv` (M3)**; streams/video, tiers 2–3 (M4); agent and clipboard (M5); audio (M6). Later plans are written one at a time, after the previous milestone ships. M2 shipped pending the manual exit check in `docs/dev-server.md` (`## M2 exit check (manual)`) — synthetic input is impossible on this machine, so that step is the user's.
 
-Because input is M2, the session window shows the guest but cannot drive it. The captured-pointer HUD appears whenever the agent is absent (`SessionModel` sets `pointerCaptured` on `.agent(.absent)`) even though nothing is actually captured yet — M2 makes that honest by implementing capture.
+Input rules that are easy to break: `SpiceSession.send`/`SessionBackend.sendInput` are synchronous and ordered on purpose — never wrap an input event in its own `Task`. Caps lock is synced as lock *state* (`INPUTS_KEY_MODIFIERS`), never sent as a scancode. `ViewportTransform` is the single source of fit/1:1 geometry for present, mouse mapping and the cursor overlay, and takes a `backingScale` so 1:1 means one guest pixel per *device* pixel. Keys go out as `INPUTS_KEY_SCANCODE` (message 104, raw scancode bytes) when the server advertises the capability, falling back to `KEY_DOWN`/`KEY_UP` (101/102) otherwise — the plan assumed 101/102 only; `remote-viewer` against the dev server proved otherwise (`docs/dev-server.md`). `SpiceKitBackend`'s input FIFO uses `.begin`/`.end` sentinels and its consumer is never cancelled — cancelling an `AsyncStream` consumer would leave every later session silent.
+
+The dev guest is now in **client** mouse mode (USB tablet), so server-mode capture can only be exercised via `--mock --scenario noAgent`.
 
 **`SessionBackend` is the seam.** The UI talks to a protocol (`Sources/SpiceSee/SessionBackend.swift`), never to SPICE. `SpiceKitBackend` is the real implementation and `MockSessionBackend` still backs `--mock` for design review, so every screen stays reviewable without a server. Landing the real engine required **no view changes** — keep it that way: **if a view needs editing to accommodate the engine, the seam is wrong — fix the adapter, not the view.** Error classification lives in `SpiceKit.ConnectFailureKind` (tested); the failure wording stays in the app, and the raw `SpiceError` goes to the log, never to the sheet.
 
