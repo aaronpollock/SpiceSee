@@ -1821,7 +1821,7 @@ git add -A && git commit -m "feat(core): link handshake with auth selection and 
   }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -1875,12 +1875,12 @@ private func msg(_ type: UInt16, _ payload: [UInt8]) -> [UInt8] {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter ChannelReaderTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```swift
 import Foundation
@@ -1978,12 +1978,12 @@ public actor ChannelReader {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter ChannelReaderTests`
 Expected: 3 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(core): channel read loop with ack window and ping/pong"
