@@ -9,7 +9,14 @@ final class GuestInputView: NSView {
     var onCaptureChange: (Bool) -> Void = { _ in }
     var keyboardMapping = KeyboardMapping()
     var sendLockKeys = true
-    var pointerMode: PointerMode = .client { didSet { if pointerMode == .client, oldValue != .client { releaseCapture() } } }
+    var pointerMode: PointerMode = .client {
+        didSet {
+            if pointerMode == .client, oldValue != .client { releaseCapture() }
+            // `resetCursorRects` otherwise only re-runs on resize or scroll, so a mode flip would
+            // leave the rect holding the other mode's cursor — possibly the hidden one.
+            window?.invalidateCursorRects(for: self)
+        }
+    }
     var releaseChord: ReleaseChord = .controlOption
     var viewportID = 0
     /// Supplies the surface geometry; set by MetalSurfaceView.
