@@ -122,7 +122,7 @@ USB tablet) for this recording, so `remote-viewer` never grabs the pointer and s
 # here
 swift run spicerec 5901 192.168.50.6 5930 recordings/win-input
 # on the Ubuntu box — MACIP is this Mac's address as seen from the box (a VPN address, not
-# ipconfig getifaddr en0's LAN address, when the box reaches the Mac over VPN)
+# ipconfig getifaddr en0's LAN address, when the box reaches the Mac over VPN): 192.168.4.3
 ssh aaron@192.168.50.6 'cat > /tmp/drive.sh' <<'EOF'
 #!/bin/sh
 remote-viewer spice://MACIP:5901 &

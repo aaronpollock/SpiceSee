@@ -50,6 +50,10 @@ private func referenceInputFrames() throws -> [(type: UInt16, payload: [UInt8])]
         #expect(p.count == 11)
         #expect(p.last == 0)   // display_id
     }
+    // Exact-bytes pin against our own encoder, not just shape: the two recorded moves land at
+    // (395, 249) and (405, 254), both with an empty buttons_state.
+    #expect(positions.contains(ClientMessage.mousePosition(x: 395, y: 249, buttons: [], displayID: 0)))
+    #expect(positions.contains(ClientMessage.mousePosition(x: 405, y: 254, buttons: [], displayID: 0)))
 }
 
 /// Checks the *server's* advertised channel caps (from the link reply), not the client's own —
