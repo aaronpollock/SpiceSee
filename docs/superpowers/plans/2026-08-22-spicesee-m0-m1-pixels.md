@@ -92,7 +92,7 @@ Tests/
 **Interfaces:**
 - Produces: module names `SpiceWire`, `SpiceCore`, `SpiceCanvas`, `SpiceKit`, `CSpiceCodec`, executables `spicerec`, `spicesee-cli`.
 
-- [ ] **Step 1: Write Package.swift**
+- [x] **Step 1: Write Package.swift**
 
 ```swift
 // swift-tools-version: 6.0
@@ -127,7 +127,7 @@ let package = Package(
 )
 ```
 
-- [ ] **Step 2: Create placeholders so every target compiles**
+- [x] **Step 2: Create placeholders so every target compiles**
 
 ```bash
 mkdir -p Sources/{CSpiceCodec/include,CSpiceCodec/shim,CSpiceCodec/vendor,SpiceWire,SpiceCore,SpiceCanvas,SpiceKit,spicerec,spicesee-cli}
@@ -151,7 +151,7 @@ echo 'print("spicesee-cli")' > Sources/spicesee-cli/main.swift
 printf '.build/\n*.xcodeproj\nDerivedData/\n.DS_Store\n' > .gitignore
 ```
 
-- [ ] **Step 3: Write smoke test**
+- [x] **Step 3: Write smoke test**
 
 `Tests/SpiceWireTests/SmokeTests.swift`:
 ```swift
@@ -161,12 +161,12 @@ import Testing
 @Test func packageBuilds() { #expect(true) }
 ```
 
-- [ ] **Step 4: Build and test**
+- [x] **Step 4: Build and test**
 
 Run: `swift build && swift test`
 Expected: `Build complete`, `Test run with 1 test passed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "build: SPM scaffold with module layout"
@@ -212,7 +212,7 @@ git add -A && git commit -m "build: SPM scaffold with module layout"
   }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -254,12 +254,12 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter SpiceWireTests`
 Expected: compile error `cannot find 'SpiceReader'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `WireError.swift`:
 ```swift
@@ -335,12 +335,12 @@ public struct SpiceWriter: Sendable {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter SpiceWireTests`
 Expected: 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git rm -q Sources/SpiceWire/SpiceWire.swift
@@ -368,7 +368,7 @@ git add -A && git commit -m "feat(wire): bounds-checked SpiceReader and SpiceWri
   public enum Link { static let magic: UInt32 = 0x51444552; static let major: UInt32 = 2; static let minor: UInt32 = 2; static let ticketPubkeyBytes = 162; static let ticketBytes = 128; static let maxPasswordLength = 60 }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -419,12 +419,12 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter LinkTests`
 Expected: compile errors for missing types.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Constants.swift`:
 ```swift
@@ -546,12 +546,12 @@ public struct SpiceLinkReply: Sendable, Equatable {
 
 > Note on the final `skip`: the body is `r`'s remaining bytes from its current offset; after parsing, advance `r` by the total consumed (`caps.offset` is absolute within the shared storage, so the expression reduces to `caps.offset - r.offset`). If that reads confusingly, replace with `try r.skip(caps.offset - r.offset)` — same value.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter LinkTests`
 Expected: 3 pass. (If `linkReplyParses` fails on `remaining`, fix the skip expression per the note.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(wire): channel types, capability sets, link handshake messages"
@@ -591,7 +591,7 @@ git add -A && git commit -m "feat(wire): channel types, capability sets, link ha
       static func frame(type: UInt16, payload: [UInt8], mini: Bool, serial: UInt64) -> [UInt8] }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -644,12 +644,12 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter MainMessageTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `DataHeader.swift`:
 ```swift
@@ -813,12 +813,12 @@ public enum ClientMessage {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter MainMessageTests`
 Expected: 6 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(wire): data headers, common and main channel messages"
@@ -854,7 +854,7 @@ git add -A && git commit -m "feat(wire): data headers, common and main channel m
       static func at(pointer: UInt32, base: SpiceReader) throws -> SpiceImage? }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -916,12 +916,12 @@ private func bitmapMessage() -> [UInt8] {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter ImageTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Geometry.swift`:
 ```swift
@@ -1104,12 +1104,12 @@ public struct SpiceImage: Sendable, Equatable {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter ImageTests`
 Expected: 6 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(wire): geometry, clip, brush, qmask and image descriptors"
@@ -1145,7 +1145,7 @@ git add -A && git commit -m "feat(wire): geometry, clip, brush, qmask and image 
   extension ClientMessage { static func displayInit(cacheID: UInt8 = 1, cacheSize: Int64, glzDictionaryID: UInt8 = 1, glzWindowSize: Int32) -> [UInt8] }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -1206,12 +1206,12 @@ private func base(surface: UInt32 = 0) -> SpiceWriter {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter DisplayMessageTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `DisplayMessages.swift`:
 ```swift
@@ -1364,12 +1364,12 @@ extension ClientMessage {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter DisplayMessageTests`
 Expected: 5 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(wire): display channel messages for tier-1 drawing"
@@ -1392,7 +1392,7 @@ git add -A && git commit -m "feat(wire): display channel messages for tier-1 dra
   public enum Ticket { static func encrypt(password: String, publicKey der: [UInt8]) throws -> [UInt8] }
   ```
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```swift
 import Testing
@@ -1421,12 +1421,12 @@ import Security
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter TicketTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `SpiceError.swift`:
 ```swift
@@ -1490,12 +1490,12 @@ public enum Ticket {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter TicketTests`
 Expected: 2 pass. If `unwrapSPKI` rejects a real server key later (Task 12), dump the 162 bytes with `xxd` and adjust the layout check — the format above is what `spice-server` produces via `i2d_RSA_PUBKEY` for 1024-bit keys.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git rm -q Sources/SpiceCore/SpiceCore.swift
@@ -1520,7 +1520,7 @@ git add -A && git commit -m "feat(core): RSA-OAEP ticket encryption via Security
   public actor NWTransport: Transport { public static func connect(host: String, port: UInt16) async throws -> NWTransport; public func close() }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -1548,12 +1548,12 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter ByteSourceTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `ByteSource.swift`:
 ```swift
@@ -1628,12 +1628,12 @@ public actor NWTransport: Transport {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter ByteSourceTests`
 Expected: 4 pass. (`nwConnectRefusedThrowsConnect` relies on nothing listening on port 1 — true on a default Mac.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(core): ByteSource/ByteSink with in-memory and NWConnection transports"
@@ -1658,7 +1658,7 @@ git add -A && git commit -m "feat(core): ByteSource/ByteSink with in-memory and 
                                  channelCaps: CapabilitySet, password: String?) async throws -> LinkResult }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -1733,12 +1733,12 @@ extension SpiceReader {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter LinkHandshakeTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `LinkHandshake.swift`:
 ```swift
@@ -1787,12 +1787,12 @@ public enum LinkHandshake {
 
 > Servers with `disable-ticketing` still expect the 128-byte ticket; the empty password encrypts to a valid blob. Do not special-case it.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter LinkHandshakeTests`
 Expected: 3 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(core): link handshake with auth selection and ticket"
@@ -1821,7 +1821,7 @@ git add -A && git commit -m "feat(core): link handshake with auth selection and 
   }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -1875,12 +1875,12 @@ private func msg(_ type: UInt16, _ payload: [UInt8]) -> [UInt8] {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter ChannelReaderTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```swift
 import Foundation
@@ -1978,12 +1978,12 @@ public actor ChannelReader {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter ChannelReaderTests`
 Expected: 3 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(core): channel read loop with ack window and ping/pong"
@@ -2011,7 +2011,7 @@ git add -A && git commit -m "feat(core): channel read loop with ack window and p
   }
   ```
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```swift
 import Testing
@@ -2057,12 +2057,12 @@ import SpiceWire
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter MainChannelTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```swift
 import os
@@ -2136,12 +2136,12 @@ public actor MainChannel {
 
 > If the compiler rejects capturing `iterator` (non-Sendable) into the `pump` task, move the pump into a `nonisolated` static helper that takes the `ChannelReader` and re-creates the iterator from `reader.messages` — an `AsyncStream` can only be iterated once, so in that case hold pending messages and consume via the same stream object rather than a copied iterator. Resolve whichever way compiles under strict concurrency; the test pins the behaviour.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter MainChannelTests`
 Expected: 1 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(core): main channel bring-up (MAIN_INIT, ATTACH_CHANNELS, CHANNELS_LIST)"
