@@ -13,12 +13,28 @@ struct MetalSurfaceView: NSViewRepresentable {
     func makeNSView(context: Context) -> GuestSurfaceView {
         let view = GuestSurfaceView()
         view.scaling = session.scaling
+        let input = GuestInputView(frame: view.bounds)
+        input.autoresizingMask = [.width, .height]
+        view.addSubview(input)
+        view.inputView = input
+        configure(input)
         context.coordinator.pump(session.viewportEvents(for: viewport.id), into: view)
         return view
     }
 
     func updateNSView(_ nsView: GuestSurfaceView, context: Context) {
         nsView.scaling = session.scaling
+        nsView.inputView.map(configure)
+    }
+
+    /// Reading the model's observable properties here is what subscribes `updateNSView` to them.
+    private func configure(_ input: GuestInputView) {
+        input.onInput = { [session] in session.sendInput($0) }
+        input.onCaptureChange = { [session] in session.setPointerCaptured($0) }
+        input.keyboardMapping = session.keyboardMapping
+        input.sendLockKeys = session.sendLockKeys
+        input.pointerMode = session.pointerMode
+        input.releaseChord = session.releaseChord
     }
 
     static func dismantleNSView(_ nsView: GuestSurfaceView, coordinator: Coordinator) {
@@ -58,6 +74,9 @@ final class GuestSurfaceView: NSView {
     private let smoothSampler: MTLSamplerState?
     private let sharpSampler: MTLSamplerState?
     private var texture: MTLTexture?
+
+    /// The event-taking view layered over the surface; owned as a subview, held here to reconfigure.
+    var inputView: GuestInputView?
 
     var scaling: ScalingMode = .fit {
         didSet { if scaling != oldValue { render() } }
