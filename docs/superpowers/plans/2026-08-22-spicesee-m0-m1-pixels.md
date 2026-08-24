@@ -26,7 +26,11 @@
 - `SpiceWire` is the security boundary: every reader accessor throws; a malformed message must never trap. No `!` unwraps, no unchecked subscripts on wire data.
 - `SpiceCanvas` imports nothing from `SpiceCore`. `SpiceCore` never touches pixels.
 - Only vendored C is `Sources/CSpiceCodec` (decode-only codecs, LGPL-2.1+). It builds as a **dynamic** library product. No OpenSSL, no glib, no pixman.
-- Capabilities advertised: common `AUTH_SPICE`, `MINI_HEADER`; display `MJPEG`, `H264` (decoders land in M4, but caps are set once here so recordings match). Never advertise `VP8`/`VP9`.
+- Capabilities advertised: common `PROTOCOL_AUTH_SELECTION`, `AUTH_SPICE`, `MINI_HEADER`; display `MJPEG`, `H264` (decoders land in M4, but caps are set once here so recordings match). Never advertise `VP8`/`VP9`.
+  (`PROTOCOL_AUTH_SELECTION` was missing from this list originally. It is not optional: spice-server
+  decides whether a 4-byte auth mechanism precedes the ticket by testing *the client's* caps, so
+  sending the mechanism without advertising the cap shifts the ticket and the link is refused with
+  `permissionDenied`. Found in task 12 against a real server.)
 - Tests use Swift Testing (`import Testing`). Fixtures live in `Tests/<Target>Tests/Fixtures/`.
 - Commit after every task. Conventional-commit prefixes: `feat:`, `test:`, `build:`, `chore:`.
 - Library code logs via `os.Logger(subsystem: "com.spicesee", category: "<module>")`. No `print` outside executables.
@@ -2157,7 +2161,7 @@ git add -A && git commit -m "feat(core): main channel bring-up (MAIN_INIT, ATTAC
 **Interfaces:**
 - Produces: `spicerec <listen-port> <host> <port> <out-dir>` writes `<out-dir>/conn-N.s2c.bin` and `conn-N.c2s.bin` per accepted TCP connection (one per SPICE channel). `spicesee-cli connect <host> <port> [password]` prints `MAIN_INIT` fields and the channel list. `spicesee-cli dump <host> <port> [password] <out.png>` (filled in Task 16).
 
-- [ ] **Step 1: Find where the dev server lives**
+- [x] **Step 1: Find where the dev server lives**
 
 Run, in order, and record the outcome in `docs/dev-server.md`:
 ```bash
@@ -2196,7 +2200,7 @@ limactl shell spicesee sh -c '
 ```
 Either way: `chmod +x scripts/dev-server.sh`, run it, confirm with `nc -vz 127.0.0.1 5900`.
 
-- [ ] **Step 2: Write spicerec**
+- [x] **Step 2: Write spicerec**
 
 `Sources/spicerec/main.swift`:
 ```swift
@@ -2244,7 +2248,7 @@ print("spicerec listening on \(listen) -> \(upstreamHost):\(upstreamPort), writi
 dispatchMain()
 ```
 
-- [ ] **Step 3: Write spicesee-cli connect**
+- [x] **Step 3: Write spicesee-cli connect**
 
 `Sources/spicesee-cli/main.swift`:
 ```swift
@@ -2274,7 +2278,7 @@ Task {
 sem.wait()
 ```
 
-- [ ] **Step 4: Verify M0 exit criterion**
+- [x] **Step 4: Verify M0 exit criterion**
 
 Run, with the dev server up:
 ```bash
@@ -2282,7 +2286,7 @@ swift run spicesee-cli connect 127.0.0.1 5900
 ```
 Expected: `MAIN_INIT session=... mouse=...` and `channels: display/0 inputs/0 cursor/0 playback/0 record/0`. Paste the actual output into `docs/dev-server.md`.
 
-- [ ] **Step 5: Record a fixture for later tasks**
+- [x] **Step 5: Record a fixture for later tasks**
 
 ```bash
 mkdir -p recordings/alpine-boot
@@ -2297,7 +2301,7 @@ Note which `conn-N` is the display channel (its `c2s.bin` begins with the link m
 
 > Recording a reference client (not our own) means the fixture exercises caps we also advertise (MINI_HEADER) — check the display `c2s.bin` caps words and, if the reference client lacked MINI_HEADER, the replay test in Task 15 must pass `miniHeader: false`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A && git commit -m "feat: M0 spike — dev server script, spicerec proxy, spicesee-cli connect"
