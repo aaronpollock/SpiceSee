@@ -13,10 +13,13 @@ final class SpiceKitBackend: SessionBackend {
     private let live = LiveSession()
     private let log = Logger(subsystem: "com.spicesee", category: "backend")
 
-    /// One FIFO for the backend's lifetime: `sendInput` yields into it synchronously and the connect
-    /// task drains it, so the guest sees events in the order the views produced them. Input sent
-    /// while no session is up ages out of the bounded buffer.
-    private enum Queued: Sendable { case host(InputEvent), guest(GuestInput) }
+    /// One FIFO for the backend's lifetime: `sendInput` yields into it synchronously and the session's
+    /// pump drains it, so the guest sees events in the order the views produced them. The pump is
+    /// never cancelled — cancelling an `AsyncStream`'s consumer terminates the stream, and every later
+    /// session would be silent. It starts at its own `.begin` and returns on `.end`, so anything queued
+    /// between sessions is discarded rather than replayed into the next guest. The bounded buffer only
+    /// caps memory.
+    private enum Queued: Sendable { case begin, end, host(InputEvent), guest(GuestInput) }
     private let inputs: AsyncStream<Queued>
     private let inputCont: AsyncStream<Queued>.Continuation
 
@@ -47,16 +50,20 @@ final class SpiceKitBackend: SessionBackend {
                 }
                 await live.store(session)
 
-                let inputs = inputs
-                let pump = Task {
+                let inputs = inputs, inputCont = inputCont
+                inputCont.yield(.begin)
+                Task {
+                    var started = false
                     for await q in inputs {
                         switch q {
-                        case let .host(e): Self.translate(e).forEach(session.send)
-                        case let .guest(g): session.send(g)
+                        case .begin: started = true
+                        case .end: return
+                        case let .host(e): if started { Self.translate(e).forEach(session.send) }
+                        case let .guest(g): if started { session.send(g) }
                         }
                     }
                 }
-                defer { pump.cancel() }
+                defer { inputCont.yield(.end) }
 
                 let displays = session.info.channels.filter { $0.type == .display }
                 // In M1 there is one display channel and one primary surface; M5 maps surfaces to

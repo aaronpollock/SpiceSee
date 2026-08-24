@@ -133,7 +133,10 @@ final class SessionModel {
     /// Called by the input view when it grabs or lets go of the pointer (server mode).
     func setPointerCaptured(_ captured: Bool) { pointerCaptured = captured }
 
-    func sendCtrlAltDel() { Task { [backend] in await backend.sendCtrlAltDel() } }
+    func sendCtrlAltDel() {
+        guard phase == .connected else { return }
+        Task { [backend] in await backend.sendCtrlAltDel() }
+    }
 
     func releasePointer() { pointerCaptured = false }
 
