@@ -97,6 +97,9 @@ gitignored and only these three files are kept.
 | `win-display.s2c.bin` | conn-7 s2c, 18.6 KB | `SURFACE_CREATE`, `DRAW_COPY`, `MONITORS_CONFIG`, `MARK`, `INVAL_ALL_PALETTES`, `SET_ACK`, 4×`PING` |
 | `win-display.c2s.bin` | conn-7 c2s, 276 B | the reference client's link mess, so its negotiated caps stay checkable |
 | `win-main.s2c.bin` | conn-1 s2c, 250 KB | `MAIN_INIT`, `NAME`, `UUID`, `CHANNELS_LIST`, `MOUSE_MODE`, `NOTIFY`, pings |
+| `win-inputs.c2s.bin` | conn-8 c2s, 348 B | `KEY_MODIFIERS`, `PONG`×2, `MOUSE_POSITION`×2, `MOUSE_PRESS`/`MOUSE_RELEASE` (left×2, right, wheel-up), `KEY_SCANCODE`×3 |
+| `win-inputs.s2c.bin` | conn-8 s2c, 266 B | `INPUTS_INIT`, `PING`×2, `KEY_MODIFIERS`×2 |
+| `win-cursor.s2c.bin` | conn-9 s2c, 269 B | `SET_ACK`, `CURSOR_INIT` (flags NONE — VGA guest, no cursor commands), `PING`×2 |
 
 Two things task 15 needs from this:
 
@@ -108,6 +111,52 @@ Two things task 15 needs from this:
 `win-main.s2c.bin` is large because 250 KB of it is one `PING`: spice-server's bandwidth net test
 (`NET_TEST_BYTES`, 250 KB + a 12-byte ping header = 256012). Our `ChannelReader` already handles it —
 `Ping` reads only the leading id and timestamp, and the `PONG` echoes 12 bytes.
+
+### Recording input: the xdotool recipe
+
+`recordings/win-input`, captured 2026-08-24. The guest was in **client mouse mode** (`mouse=2`, a
+USB tablet) for this recording, so `remote-viewer` never grabs the pointer and sends absolute
+`MOUSE_POSITION` rather than relative `MOUSE_MOTION`:
+
+```sh
+# here
+swift run spicerec 5901 192.168.50.6 5930 recordings/win-input
+# on the Ubuntu box — MACIP is this Mac's address as seen from the box (a VPN address, not
+# ipconfig getifaddr en0's LAN address, when the box reaches the Mac over VPN)
+ssh aaron@192.168.50.6 'cat > /tmp/drive.sh' <<'EOF'
+#!/bin/sh
+remote-viewer spice://MACIP:5901 &
+sleep 8
+W=$(xdotool search --sync --classname remote-viewer | tail -1)
+xdotool windowactivate --sync $W
+xdotool mousemove --window $W 400 300; sleep 0.5
+xdotool click 1;                 sleep 0.5
+xdotool mousemove --window $W 410 305; sleep 0.3
+xdotool click 1;                 sleep 0.3
+xdotool click 3;                 sleep 0.3
+xdotool key a;                   sleep 0.3
+xdotool key Delete;              sleep 0.3
+xdotool key Left;                sleep 0.3
+xdotool click 4;                 sleep 0.3
+sleep 2
+kill %1
+EOF
+ssh aaron@192.168.50.6 "timeout 40 xvfb-run -a -s '-screen 0 1280x1024x24' sh /tmp/drive.sh"
+```
+
+`xdotool windowactivate --sync` fails under bare Xvfb (`no _NET_ACTIVE_WINDOW`, no window manager
+running) and the trailing `kill %1` then misses its target — neither matters, since `mousemove`,
+`click`, and `key` deliver synthetic X events directly and don't need window focus with only one
+window open.
+
+**The reference client sends keys as `SPICE_MSGC_INPUTS_KEY_SCANCODE` (message 104), not
+`KEY_DOWN`/`KEY_UP` (101/102).** This dev server advertises `SPICE_INPUTS_CAP_KEY_SCANCODE` in the
+inputs channel's link reply (channel caps bit 0), and spice-gtk (`channel-inputs.c`) gates on the
+*server's* advertised capability, not its own: a quick tap goes out as one 104 frame carrying the
+raw press-then-release scancode bytes back to back (`e0 53 e0 d3` for Delete, E0 leading each half
+— the same byte order `XTScancode.wireCode`/`rawBytes` already use). `InputsChannel` now mirrors
+this: it picks 104 vs. 101/102 once, from the server's link-reply caps, and falls back to 101/102
+when the server doesn't advertise the capability.
 
 ## Why this guest is a good fixture
 
