@@ -4,6 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SpiceSee is a native macOS SPICE client (remote console for Proxmox VE and plain QEMU/libvirt guests).
 
+## General Rules:
+- Before implementing any new function or type, grep the codebase for something that already does this.
+- If you're not sure whether a change affects other parts of the system, say so explicitly before writing code, don't guess and proceed.
+- Performance first: Choose optimal algorithms and data structures.
+- Modern syntax: Use language-specific best practices, async/await patterns, and native methods.
+
+## Commenting & Documentation Rules
+- No obvious comments: Do not explain what the code does if it is readable.
+- Explain the Why: Only use comments to explain complex business logic, non-obvious workarounds, or critical edge cases.
+- Docstrings: Provide concise docstrings for public APIs, complex functions, and modules. State parameters and return types clearly.
+
 ## Two build systems, and what each one covers
 
 This trips people up: **`swift build` does not compile the app.**
