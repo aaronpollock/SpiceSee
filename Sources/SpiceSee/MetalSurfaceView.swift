@@ -38,6 +38,7 @@ struct MetalSurfaceView: NSViewRepresentable {
         input.releaseChord = session.releaseChord
         input.viewportID = viewport.id
         input.transform = { [weak view] in view?.transform }
+        view.showsCursorOverlay = session.pointerMode == .server
     }
 
     static func dismantleNSView(_ nsView: GuestSurfaceView, coordinator: Coordinator) {
@@ -55,7 +56,7 @@ struct MetalSurfaceView: NSViewRepresentable {
                     guard let view else { return }
                     switch event {
                     case let .frame(update): view.apply(update)
-                    case .cursor: break            // Task 12
+                    case let .cursor(change): view.apply(change)
                     }
                 }
             }
@@ -74,6 +75,7 @@ final class GuestSurfaceView: NSView {
     private let device = MTLCreateSystemDefaultDevice()
     private let queue: MTLCommandQueue?
     private let pipeline: MTLRenderPipelineState?
+    private let overlayPipeline: MTLRenderPipelineState?
     private let smoothSampler: MTLSamplerState?
     private let sharpSampler: MTLSamplerState?
     private var texture: MTLTexture?
@@ -96,7 +98,8 @@ final class GuestSurfaceView: NSView {
 
     override init(frame frameRect: NSRect) {
         queue = device?.makeCommandQueue()
-        pipeline = device.flatMap(Self.makePipeline)
+        pipeline = device.flatMap { Self.makePipeline($0, blended: false) }
+        overlayPipeline = device.flatMap { Self.makePipeline($0, blended: true) }
         smoothSampler = device.flatMap { Self.makeSampler($0, filter: .linear) }
         sharpSampler = device.flatMap { Self.makeSampler($0, filter: .nearest) }
         super.init(frame: frameRect)
@@ -182,6 +185,47 @@ final class GuestSurfaceView: NSView {
         return device.makeTexture(descriptor: descriptor)
     }
 
+    // MARK: Cursor
+
+    private var cursorTexture: MTLTexture?
+    private var cursorHotspot = (x: 0, y: 0)
+    private var cursorPosition: (x: Int, y: Int)?
+
+    /// Server mode draws the guest's cursor into the surface; client mode leaves it to the host
+    /// pointer's shape (`GuestInputView.hostCursor`).
+    var showsCursorOverlay = false {
+        didSet { if showsCursorOverlay != oldValue { render() } }
+    }
+
+    func apply(_ change: CursorChange) {
+        switch change {
+        case let .shape(image):
+            cursorTexture = image.flatMap(makeCursorTexture)
+            cursorHotspot = image.map { ($0.hotX, $0.hotY) } ?? (0, 0)
+            inputView?.hostCursor = image?.nsCursor
+        case let .moved(x, y):
+            cursorPosition = (x, y)
+        }
+        render()
+    }
+
+    private func makeCursorTexture(_ image: CursorImage) -> MTLTexture? {
+        guard let device, image.width > 0, image.height > 0,
+              image.pixels.count >= image.width * image.height * 4
+        else { return nil }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: image.width, height: image.height, mipmapped: false)
+        descriptor.usage = .shaderRead
+        descriptor.storageMode = .managed
+        guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
+        image.pixels.withUnsafeBytes { buffer in
+            guard let base = buffer.baseAddress else { return }
+            texture.replace(region: MTLRegionMake2D(0, 0, image.width, image.height),
+                            mipmapLevel: 0, withBytes: base, bytesPerRow: image.width * 4)
+        }
+        return texture
+    }
+
     // MARK: Presentation
 
     private func render() {
@@ -210,6 +254,19 @@ final class GuestSurfaceView: NSView {
         encoder.setFragmentTexture(texture, index: 0)
         encoder.setFragmentSamplerState(sampler, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+
+        // The shape is never smoothed: a cursor is authored at guest resolution and reads as mush
+        // under a linear filter.
+        if showsCursorOverlay, let cursorTexture, let overlayPipeline, let position = cursorPosition {
+            let rect = t.viewRect(forGuest: CGRect(x: position.x - cursorHotspot.x, y: position.y - cursorHotspot.y,
+                                                   width: cursorTexture.width, height: cursorTexture.height))
+            var placement = Self.clipSpace(rect, in: bounds.size)
+            encoder.setRenderPipelineState(overlayPipeline)
+            encoder.setVertexBytes(&placement, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
+            encoder.setFragmentTexture(cursorTexture, index: 0)
+            encoder.setFragmentSamplerState(sharpSampler, index: 0)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        }
         encoder.endEncoding()
         buffer.present(drawable)
         buffer.commit()
@@ -245,7 +302,8 @@ final class GuestSurfaceView: NSView {
     }
     """
 
-    private static func makePipeline(_ device: MTLDevice) -> MTLRenderPipelineState? {
+    /// `blended` gives the cursor overlay straight-alpha compositing over the surface quad.
+    private static func makePipeline(_ device: MTLDevice, blended: Bool) -> MTLRenderPipelineState? {
         guard let library = try? device.makeLibrary(source: shaderSource, options: nil),
               let vertexFunction = library.makeFunction(name: "surface_vertex"),
               let fragmentFunction = library.makeFunction(name: "surface_fragment")
@@ -253,7 +311,15 @@ final class GuestSurfaceView: NSView {
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = vertexFunction
         descriptor.fragmentFunction = fragmentFunction
-        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        guard let attachment = descriptor.colorAttachments[0] else { return nil }
+        attachment.pixelFormat = .bgra8Unorm
+        if blended {
+            attachment.isBlendingEnabled = true
+            attachment.sourceRGBBlendFactor = .sourceAlpha
+            attachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
+            attachment.sourceAlphaBlendFactor = .one
+            attachment.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        }
         return try? device.makeRenderPipelineState(descriptor: descriptor)
     }
 

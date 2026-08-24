@@ -2,8 +2,8 @@ import AppKit
 import SpiceKit
 
 /// Receives every host event meant for the guest. Sits over the Metal surface, fills it, and is the
-/// window's first responder while a session is on screen. Keyboard and pointer here; cursor shape in
-/// `MetalSurfaceView` (Task 12).
+/// window's first responder while a session is on screen. Keyboard, pointer, and — in client mode —
+/// the host pointer's shape; server mode composites the guest cursor in `MetalSurfaceView`.
 final class GuestInputView: NSView {
     var onInput: (InputEvent) -> Void = { _ in }
     var onCaptureChange: (Bool) -> Void = { _ in }
@@ -144,6 +144,23 @@ final class GuestInputView: NSView {
         tracking = area
     }
 
+    // MARK: Cursor (client mode)
+
+    /// The guest's cursor shape, worn by the host pointer in client mode. nil = the guest hid it.
+    var hostCursor: NSCursor? = .arrow {
+        didSet { window?.invalidateCursorRects(for: self) }
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        guard pointerMode == .client else { return }
+        (hostCursor ?? CursorImage.hidden).set()
+    }
+
+    override func resetCursorRects() {
+        guard pointerMode == .client else { return }
+        addCursorRect(bounds, cursor: hostCursor ?? CursorImage.hidden)
+    }
+
     // MARK: Motion
 
     override func mouseMoved(with event: NSEvent) { pointerMoved(event) }
@@ -223,4 +240,24 @@ final class GuestInputView: NSView {
         onInput(.releaseAllKeys)     // the chord's own modifiers were forwarded on the way in
         onCaptureChange(false)
     }
+}
+
+extension CursorImage {
+    /// BGRA straight alpha → `NSCursor`. `.first` + `byteOrder32Little` is the BGRA reading; `.last`
+    /// would silently swap channels.
+    var nsCursor: NSCursor? {
+        guard width > 0, height > 0, pixels.count >= width * height * 4 else { return nil }
+        let data = Data(pixels)
+        guard let provider = CGDataProvider(data: data as CFData),
+              let cg = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                               bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                               bitmapInfo: CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.first.rawValue),
+                               provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+        else { return nil }
+        return NSCursor(image: NSImage(cgImage: cg, size: NSSize(width: width, height: height)),
+                        hotSpot: NSPoint(x: hotX, y: hotY))
+    }
+
+    /// A 1×1 transparent cursor: what the pointer wears when the guest has hidden its own.
+    @MainActor static let hidden = NSCursor(image: NSImage(size: NSSize(width: 1, height: 1)), hotSpot: .zero)
 }
