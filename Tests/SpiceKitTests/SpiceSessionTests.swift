@@ -5,7 +5,7 @@ import SpiceCore
 @testable import SpiceKit
 
 @Test func sessionBringsUpMainAndDisplayFromRecordings() async throws {
-    func fixture(_ name: String) throws -> [UInt8] {
+    @Sendable func fixture(_ name: String) throws -> [UInt8] {
         [UInt8](try Data(contentsOf: try #require(Bundle.module.url(forResource: name, withExtension: "bin", subdirectory: "Fixtures"))))
     }
     let main = try fixture("win-main.s2c"), display = try fixture("win-display.s2c")
@@ -13,6 +13,8 @@ import SpiceCore
         switch desc.type {
         case .main: return InMemoryTransport(input: main)
         case .display: return InMemoryTransport(input: display)
+        case .inputs: return InMemoryTransport(input: try fixture("win-inputs.s2c"))
+        case .cursor: return InMemoryTransport(input: try fixture("win-cursor.s2c"))
         default: throw SpiceError(.unsupported("not in M1"), channel: desc)
         }
     }

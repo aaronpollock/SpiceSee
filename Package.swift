@@ -26,7 +26,7 @@ let package = Package(
         .executableTarget(name: "spicerec"),
         .executableTarget(name: "spicesee-cli", dependencies: ["SpiceKit", "SpiceCanvas", "SpiceCore", "SpiceWire"]),
         .testTarget(name: "SpiceWireTests", dependencies: ["SpiceWire"]),
-        .testTarget(name: "SpiceCoreTests", dependencies: ["SpiceCore"]),
+        .testTarget(name: "SpiceCoreTests", dependencies: ["SpiceCore"], resources: [.copy("Fixtures")]),
         .testTarget(name: "SpiceCanvasTests", dependencies: ["SpiceCanvas", "CSpiceCodec"]),
         .testTarget(name: "SpiceKitTests", dependencies: ["SpiceKit", "SpiceCore", "SpiceCanvas"],
                     resources: [.copy("Fixtures")]),
