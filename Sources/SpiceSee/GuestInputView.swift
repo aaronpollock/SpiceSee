@@ -1,15 +1,19 @@
 import AppKit
+import SpiceKit
 
 /// Receives every host event meant for the guest. Sits over the Metal surface, fills it, and is the
-/// window's first responder while a session is on screen. Keyboard here; pointer in the extension
-/// below (Task 11); cursor shape in `MetalSurfaceView` (Task 12).
+/// window's first responder while a session is on screen. Keyboard and pointer here; cursor shape in
+/// `MetalSurfaceView` (Task 12).
 final class GuestInputView: NSView {
     var onInput: (InputEvent) -> Void = { _ in }
     var onCaptureChange: (Bool) -> Void = { _ in }
     var keyboardMapping = KeyboardMapping()
     var sendLockKeys = true
-    var pointerMode: PointerMode = .client { didSet { if pointerMode == .client { releaseCapture() } } }
+    var pointerMode: PointerMode = .client { didSet { if pointerMode == .client, oldValue != .client { releaseCapture() } } }
     var releaseChord: ReleaseChord = .controlOption
+    var viewportID = 0
+    /// Supplies the surface geometry; set by MetalSurfaceView.
+    var transform: () -> ViewportTransform? = { nil }
 
     /// kVK_CapsLock. Caps lock is synced as lock state (INPUTS_KEY_MODIFIERS), never as a scancode — see SpiceKit.KeyMap.
     private static let capsLockKeyCode: UInt16 = 0x39
@@ -29,6 +33,10 @@ final class GuestInputView: NSView {
 
     private let observers = Observers()
 
+    /// Matches `GuestSurfaceView`: `ViewportTransform` works in top-left view points, so the pointer
+    /// location must arrive in the same space the surface is laid out in.
+    override var isFlipped: Bool { true }
+
     override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
@@ -44,6 +52,14 @@ final class GuestInputView: NSView {
         })
         observers.add(NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.lostFocus() }
+        })
+        // The view never resigns first responder over a Cmd-Tab, so a caps-lock change made while we
+        // were away would otherwise never reach the guest.
+        observers.add(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.sendLockKeys else { return }
+                self.onInput(.capsLock(on: NSEvent.modifierFlags.contains(.capsLock)))
+            }
         })
     }
 
@@ -114,8 +130,97 @@ final class GuestInputView: NSView {
         return down == releaseChord.modifiers
     }
 
-    // MARK: Capture state (behaviour in Task 11)
+    // MARK: Pointer
+
+    private var tracking: NSTrackingArea?
+    private var wheel = WheelAccumulator()
+    private var motionCarry = CGPoint.zero
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        tracking.map(removeTrackingArea)
+        let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect, .cursorUpdate], owner: self)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    // MARK: Motion
+
+    override func mouseMoved(with event: NSEvent) { pointerMoved(event) }
+    override func mouseDragged(with event: NSEvent) { pointerMoved(event) }
+    override func rightMouseDragged(with event: NSEvent) { pointerMoved(event) }
+    override func otherMouseDragged(with event: NSEvent) { pointerMoved(event) }
+
+    private func pointerMoved(_ event: NSEvent) {
+        switch pointerMode {
+        case .client:
+            guard let t = transform() else { return }
+            let p = convert(event.locationInWindow, from: nil)
+            let g = t.guestPoint(fromView: p)
+            onInput(.pointerPosition(x: g.x, y: g.y, viewportID: viewportID))
+        case .server:
+            guard pointerCaptured else { return }
+            // Deltas are fractional on trackpads; carry the remainder so slow motion is not lost.
+            motionCarry.x += event.deltaX; motionCarry.y += event.deltaY
+            let dx = Int(motionCarry.x.rounded(.towardZero)), dy = Int(motionCarry.y.rounded(.towardZero))
+            motionCarry.x -= CGFloat(dx); motionCarry.y -= CGFloat(dy)
+            if dx != 0 || dy != 0 { onInput(.pointerMotion(dx: dx, dy: dy)) }
+        }
+    }
+
+    // MARK: Buttons
+
+    override func mouseDown(with event: NSEvent) { button(.left, down: true, event) }
+    override func mouseUp(with event: NSEvent) { button(.left, down: false, event) }
+    override func rightMouseDown(with event: NSEvent) { button(.right, down: true, event) }
+    override func rightMouseUp(with event: NSEvent) { button(.right, down: false, event) }
+    override func otherMouseDown(with event: NSEvent) { if event.buttonNumber == 2 { button(.middle, down: true, event) } }
+    override func otherMouseUp(with event: NSEvent) { if event.buttonNumber == 2 { button(.middle, down: false, event) } }
+
+    private func button(_ b: PointerButton, down: Bool, _ event: NSEvent) {
+        window?.makeFirstResponder(self)
+        if pointerMode == .server, !pointerCaptured {
+            // The grabbing click is swallowed, like spice-gtk: the user asked for the pointer, not a click.
+            if down { capture() }
+            return
+        }
+        if pointerMode == .client { pointerMoved(event) }   // the press lands where the pointer is
+        onInput(down ? .buttonDown(b) : .buttonUp(b))
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard pointerMode == .client || pointerCaptured else { return }
+        let clicks = wheel.add(precise: event.hasPreciseScrollingDeltas, delta: event.scrollingDeltaY)
+        if clicks != 0 { onInput(.wheel(clicks: clicks)) }
+    }
+
+    // MARK: Capture (server mode)
 
     private(set) var pointerCaptured = false
-    func releaseCapture() {}   // replaced in Task 11
+
+    /// Hide the host pointer and stop it moving; from here on the guest owns it and we forward deltas.
+    private func capture() {
+        guard !pointerCaptured, let window else { return }
+        pointerCaptured = true
+        motionCarry = .zero
+        NSCursor.hide()
+        CGAssociateMouseAndMouseCursorPosition(0)
+        // Park the (invisible) pointer mid-view so it stays over us however far the user moves.
+        let centre = window.convertPoint(toScreen: convert(CGPoint(x: bounds.midX, y: bounds.midY), to: nil))
+        // CG's global space is top-left origin and is anchored to the *primary* display, not to the
+        // one the window happens to be on, so the flip has to measure from `screens.first`.
+        if let primary = NSScreen.screens.first {
+            CGWarpMouseCursorPosition(CGPoint(x: centre.x, y: primary.frame.maxY - centre.y))
+        }
+        onCaptureChange(true)
+    }
+
+    func releaseCapture() {
+        guard pointerCaptured else { return }
+        pointerCaptured = false
+        CGAssociateMouseAndMouseCursorPosition(1)
+        NSCursor.unhide()
+        onInput(.releaseAllKeys)     // the chord's own modifiers were forwarded on the way in
+        onCaptureChange(false)
+    }
 }

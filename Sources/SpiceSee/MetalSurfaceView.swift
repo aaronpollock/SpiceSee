@@ -1,5 +1,6 @@
 import Metal
 import QuartzCore
+import SpiceKit
 import SwiftUI
 
 /// The guest framebuffer. Keeps one texture the size of the guest surface, patches dirty rects into
@@ -17,24 +18,26 @@ struct MetalSurfaceView: NSViewRepresentable {
         input.autoresizingMask = [.width, .height]
         view.addSubview(input)
         view.inputView = input
-        configure(input)
+        configure(input, in: view)
         context.coordinator.pump(session.viewportEvents(for: viewport.id), into: view)
         return view
     }
 
     func updateNSView(_ nsView: GuestSurfaceView, context: Context) {
         nsView.scaling = session.scaling
-        nsView.inputView.map(configure)
+        nsView.inputView.map { configure($0, in: nsView) }
     }
 
     /// Reading the model's observable properties here is what subscribes `updateNSView` to them.
-    private func configure(_ input: GuestInputView) {
+    private func configure(_ input: GuestInputView, in view: GuestSurfaceView) {
         input.onInput = { [session] in session.sendInput($0) }
         input.onCaptureChange = { [session] in session.setPointerCaptured($0) }
         input.keyboardMapping = session.keyboardMapping
         input.sendLockKeys = session.sendLockKeys
         input.pointerMode = session.pointerMode
         input.releaseChord = session.releaseChord
+        input.viewportID = viewport.id
+        input.transform = { [weak view] in view?.transform }
     }
 
     static func dismantleNSView(_ nsView: GuestSurfaceView, coordinator: Coordinator) {
@@ -80,6 +83,13 @@ final class GuestSurfaceView: NSView {
 
     var scaling: ScalingMode = .fit {
         didSet { if scaling != oldValue { render() } }
+    }
+
+    /// Guest ↔ view geometry for the current scaling; nil until the surface size is known.
+    var transform: ViewportTransform? {
+        guard let texture else { return nil }
+        return ViewportTransform(viewSize: bounds.size, surfaceSize: CGSize(width: texture.width, height: texture.height),
+                                 scaling: scaling == .fit ? .fit : .oneToOne)
     }
 
     override init(frame frameRect: NSRect) {
@@ -173,8 +183,9 @@ final class GuestSurfaceView: NSView {
     // MARK: Presentation
 
     private func render() {
-        guard let metalLayer, let queue, let pipeline, let texture,
+        guard let metalLayer, let queue, let pipeline, let texture, let t = transform,
               let sampler = scaling == .fit ? smoothSampler : sharpSampler,
+              bounds.width > 0, bounds.height > 0,
               metalLayer.drawableSize.width > 0, metalLayer.drawableSize.height > 0,
               let drawable = metalLayer.nextDrawable(),
               let buffer = queue.makeCommandBuffer()
@@ -190,9 +201,10 @@ final class GuestSurfaceView: NSView {
             buffer.commit()
             return
         }
-        var extent = clipExtent(drawable: metalLayer.drawableSize, texture: texture)
+        let r = t.viewRect(forGuest: CGRect(x: 0, y: 0, width: texture.width, height: texture.height))
+        var extent = Self.clipSpace(r, in: bounds.size)
         encoder.setRenderPipelineState(pipeline)
-        encoder.setVertexBytes(&extent, length: MemoryLayout<SIMD2<Float>>.size, index: 0)
+        encoder.setVertexBytes(&extent, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
         encoder.setFragmentTexture(texture, index: 0)
         encoder.setFragmentSamplerState(sampler, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
@@ -201,21 +213,10 @@ final class GuestSurfaceView: NSView {
         buffer.commit()
     }
 
-    /// Half-extent of the presented surface in clip space, centred. `.fit` preserves aspect ratio and
-    /// letterboxes; `.oneToOne` maps one guest pixel to one device pixel and lets the edges clip.
-    private func clipExtent(drawable: CGSize, texture: MTLTexture) -> SIMD2<Float> {
-        let drawableWidth = Float(drawable.width), drawableHeight = Float(drawable.height)
-        let surfaceWidth = Float(texture.width), surfaceHeight = Float(texture.height)
-        guard drawableWidth > 0, drawableHeight > 0, surfaceWidth > 0, surfaceHeight > 0 else {
-            return SIMD2(1, 1)
-        }
-        switch scaling {
-        case .fit:
-            let scale = min(drawableWidth / surfaceWidth, drawableHeight / surfaceHeight)
-            return SIMD2(surfaceWidth * scale / drawableWidth, surfaceHeight * scale / drawableHeight)
-        case .oneToOne:
-            return SIMD2(surfaceWidth / drawableWidth, surfaceHeight / drawableHeight)
-        }
+    /// Centre and half-extent of a view rect in Metal clip space (y up).
+    static func clipSpace(_ r: CGRect, in view: CGSize) -> SIMD4<Float> {
+        let cx = Float((r.midX / view.width) * 2 - 1), cy = Float(1 - (r.midY / view.height) * 2)
+        return SIMD4(cx, cy, Float(r.width / view.width), Float(r.height / view.height))
     }
 
     // MARK: Pipeline
@@ -226,11 +227,11 @@ final class GuestSurfaceView: NSView {
 
     struct Vertex { float4 position [[position]]; float2 uv; };
 
-    vertex Vertex surface_vertex(uint id [[vertex_id]], constant float2 &extent [[buffer(0)]]) {
+    vertex Vertex surface_vertex(uint id [[vertex_id]], constant float4 &placement [[buffer(0)]]) {
         const float2 corners[4] = { float2(-1, -1), float2(1, -1), float2(-1, 1), float2(1, 1) };
         const float2 coords[4]  = { float2(0, 1),   float2(1, 1),  float2(0, 0),  float2(1, 0) };
         Vertex out;
-        out.position = float4(corners[id] * extent, 0, 1);
+        out.position = float4(placement.xy + corners[id] * placement.zw, 0, 1);
         out.uv = coords[id];
         return out;
     }
