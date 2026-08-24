@@ -19,9 +19,10 @@ public struct CursorTracker: Sendable {
         switch m {
         case let .`init`(position, visible, cursor), let .set(position, visible, cursor):
             var out: [CursorChange] = []
+            let shape = resolve(cursor)
             if !visible {
                 out.append(.shape(nil))
-            } else if let shape = resolve(cursor) {
+            } else if let shape {
                 out.append(.shape(shape))
             }
             out.append(.moved(x: Int(position.x), y: Int(position.y)))

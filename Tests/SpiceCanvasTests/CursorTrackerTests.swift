@@ -35,3 +35,13 @@ private let shape = CursorShape(width: 1, height: 1, hotX: 0, hotY: 0, pixels: s
                                 cursor: SpiceCursor(flags: 0, header: CursorHeader(unique: 0, type: .alpha, width: 4, height: 4, hotX: 0, hotY: 0), data: [1]))
     #expect(t.apply(bad) == [.moved(x: 0, y: 0)])
 }
+
+@Test func hiddenShapeIsStillCached() {
+    var t = CursorTracker()
+    let hiddenSet = CursorMessage.set(position: SpicePoint16(x: 3, y: 4), visible: false,
+                                      cursor: SpiceCursor(flags: CursorFlags.cacheMe, header: shapeHeader, data: shapePixels))
+    #expect(t.apply(hiddenSet) == [.shape(nil), .moved(x: 3, y: 4)])
+    let fromCache = CursorMessage.set(position: SpicePoint16(x: 0, y: 0), visible: true,
+                                      cursor: SpiceCursor(flags: CursorFlags.fromCache, header: shapeHeader, data: []))
+    #expect(t.apply(fromCache) == [.shape(shape), .moved(x: 0, y: 0)])
+}
