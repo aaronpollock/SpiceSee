@@ -1520,7 +1520,7 @@ git add -A && git commit -m "feat(core): RSA-OAEP ticket encryption via Security
   public actor NWTransport: Transport { public static func connect(host: String, port: UInt16) async throws -> NWTransport; public func close() }
   ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -1548,12 +1548,12 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter ByteSourceTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `ByteSource.swift`:
 ```swift
@@ -1628,12 +1628,12 @@ public actor NWTransport: Transport {
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter ByteSourceTests`
 Expected: 4 pass. (`nwConnectRefusedThrowsConnect` relies on nothing listening on port 1 — true on a default Mac.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(core): ByteSource/ByteSink with in-memory and NWConnection transports"
