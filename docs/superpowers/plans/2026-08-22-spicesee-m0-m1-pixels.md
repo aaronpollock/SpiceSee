@@ -2011,7 +2011,7 @@ git add -A && git commit -m "feat(core): channel read loop with ack window and p
   }
   ```
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```swift
 import Testing
@@ -2057,12 +2057,12 @@ import SpiceWire
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter MainChannelTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```swift
 import os
@@ -2136,12 +2136,12 @@ public actor MainChannel {
 
 > If the compiler rejects capturing `iterator` (non-Sendable) into the `pump` task, move the pump into a `nonisolated` static helper that takes the `ChannelReader` and re-creates the iterator from `reader.messages` — an `AsyncStream` can only be iterated once, so in that case hold pending messages and consume via the same stream object rather than a copied iterator. Resolve whichever way compiles under strict concurrency; the test pins the behaviour.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `swift test --filter MainChannelTests`
 Expected: 1 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat(core): main channel bring-up (MAIN_INIT, ATTACH_CHANNELS, CHANNELS_LIST)"
