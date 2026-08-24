@@ -40,9 +40,14 @@ public enum Certificates {
               let entries = subject[kSecPropertyKeyValue as String] as? [[String: Any]] else {
             throw SpiceError(.tls(.badCertificate("certificate has no readable subject")))
         }
-        return entries.compactMap { entry in
+        // Fail closed: silently dropping an entry (e.g. a multi-valued RDN or an exotic attribute
+        // delivered as data, not a String) would shrink the component count, and `matches` relies
+        // on that count to reject anything but an exact, same-length subject.
+        return try entries.map { entry in
             guard let oid = entry[kSecPropertyKeyLabel as String] as? String,
-                  let value = entry[kSecPropertyKeyValue as String] as? String else { return nil }
+                  let value = entry[kSecPropertyKeyValue as String] as? String else {
+                throw SpiceError(.tls(.badCertificate("certificate has an unreadable subject entry")))
+            }
             return (shortName(forOID: oid), value)
         }
     }
@@ -64,8 +69,10 @@ public enum Certificates {
         }
     }
 
-    /// Splits "OU=a,O=b,CN=c" on unescaped commas, then on the FIRST '=' of each component, so a
-    /// value may itself contain '='. Returns [] for anything that is not in that shape.
+    /// Splits "OU=a,O=b,CN=c" on commas, then on the FIRST '=' of each component, so a value may
+    /// itself contain '='. Escaped commas (RFC 4514 `\,`) are not interpreted — a value containing
+    /// one splits into a fragment with no '=', which safely fails to parse (and so fails to match)
+    /// rather than being read as part of the value. Returns [] for anything that is not in that shape.
     public static func parseSubject(_ dn: String) -> [(attribute: String, value: String)] {
         var parts: [(String, String)] = []
         for component in dn.split(separator: ",", omittingEmptySubsequences: false) {

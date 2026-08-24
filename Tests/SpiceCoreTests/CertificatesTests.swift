@@ -68,3 +68,13 @@ private let proxmoxSubject = "OU=PVE Cluster Node,O=Proxmox Virtual Environment,
     #expect(parts.map(\.attribute) == ["CN", "O"])
     #expect(parts.map(\.value) == ["a=b", "x"])
 }
+
+// A multi-valued RDN ("/CN=foo+OU=bar") makes Security.framework deliver an entry that is itself a
+// nested section (no string `label`/`value`), instead of a plain string pair. `subjectComponents`
+// must fail closed on that rather than silently dropping the entry — a dropped entry would shrink
+// the component count `matches` relies on for its "same length" check.
+@Test func failsClosedOnAnUnreadableSubjectEntry() throws {
+    let certificate = try #require(try Certificates.parsePEM(try pem("multivalued-rdn.pem")).first)
+    #expect(throws: SpiceError.self) { try Certificates.subjectComponents(of: certificate) }
+    #expect(throws: SpiceError.self) { try Certificates.matches(hostSubject: "CN=foo", certificate: certificate) }
+}
