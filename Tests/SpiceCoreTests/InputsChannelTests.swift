@@ -20,9 +20,18 @@ private func openInputs(_ body: [UInt8] = frame(InputsServerMsg.`init`.rawValue,
     return (try await InputsChannel.open(transport: t, connectionID: 1, password: nil), t)
 }
 
+/// The INIT frame has to travel reader.run -> AsyncStream -> pump task -> handle before
+/// guestLockKeys reflects it; poll instead of a fixed sleep so this isn't flaky under load.
+private func waitForLockKeys(_ ch: InputsChannel) async throws {
+    for _ in 0 ..< 400 {
+        if await ch.guestLockKeys != [] { return }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+}
+
 @Test func advertisesKeyScancodeAndReadsInit() async throws {
     let (ch, t) = try await openInputs()
-    try await Task.sleep(for: .milliseconds(50))
+    try await waitForLockKeys(ch)
     #expect(await ch.guestLockKeys == [.numLock])
     var r = SpiceReader(await t.written); try r.skip(16 + 4 + 2 + 4 + 4 + 4 + 4)   // header, conn id, type/id, ncommon, nchannel, offset, common word
     #expect(CapabilitySet(words: [try r.u32()]).contains(InputsCap.keyScancode))
@@ -62,7 +71,7 @@ private func openInputs(_ body: [UInt8] = frame(InputsServerMsg.`init`.rawValue,
 
 @Test func capsLockSyncPreservesGuestNumAndScroll() async throws {
     let (ch, t) = try await openInputs(frame(InputsServerMsg.`init`.rawValue, [3, 0]))   // guest: scroll + num
-    try await Task.sleep(for: .milliseconds(50))
+    try await waitForLockKeys(ch)
     try await ch.syncCapsLock(true)
     let f = try await sentFrames(t).filter { $0.0 == InputsClientMsg.keyModifiers.rawValue }
     #expect(f.last?.1 == ClientMessage.keyModifiers([.scrollLock, .numLock, .capsLock]))
