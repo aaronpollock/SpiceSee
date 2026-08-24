@@ -13,17 +13,32 @@ final class SpiceKitBackend: SessionBackend {
     private let live = LiveSession()
     private let log = Logger(subsystem: "com.spicesee", category: "backend")
 
-    /// One FIFO for the backend's lifetime: `sendInput` yields into it synchronously and the session's
-    /// pump drains it, so the guest sees events in the order the views produced them. The pump is
-    /// never cancelled — cancelling an `AsyncStream`'s consumer terminates the stream, and every later
-    /// session would be silent. It starts at its own `.begin` and returns on `.end`, so anything queued
-    /// between sessions is discarded rather than replayed into the next guest. The bounded buffer only
-    /// caps memory.
-    private enum Queued: Sendable { case begin, end, host(InputEvent), guest(GuestInput) }
-    private let inputs: AsyncStream<Queued>
+    /// One FIFO for the backend's lifetime: `sendInput` yields into it synchronously and a single
+    /// consumer — started in `init` and never cancelled — drains it, so the guest sees events in the
+    /// order the views produced them. There is exactly one consumer because two would race: the
+    /// stdlib hands each element to whichever is waiting, so a connect task still unwinding could
+    /// swallow the next session's `.begin` and leave the live session silent. The sentinels therefore
+    /// carry the session they delimit: `.end` only clears the current session if it is that session.
+    /// Input queued before `.begin` or after `.end` is dropped, not replayed into the next guest,
+    /// because there is no current session to send it to. The bounded buffer only caps memory.
+    private enum Queued: Sendable { case begin(SpiceSession), end(SpiceSession), host(InputEvent), guest(GuestInput) }
     private let inputCont: AsyncStream<Queued>.Continuation
 
-    init() { (inputs, inputCont) = AsyncStream.makeStream(of: Queued.self, bufferingPolicy: .bufferingNewest(1024)) }
+    init() {
+        let (inputs, continuation) = AsyncStream.makeStream(of: Queued.self, bufferingPolicy: .bufferingNewest(1024))
+        inputCont = continuation
+        Task {
+            var current: SpiceSession?
+            for await q in inputs {
+                switch q {
+                case let .begin(s): current = s
+                case let .end(s): if current === s { current = nil }
+                case let .host(e): if let s = current { Self.translate(e).forEach(s.send) }
+                case let .guest(g): current?.send(g)
+                }
+            }
+        }
+    }
 
     func sendInput(_ event: InputEvent) { inputCont.yield(.host(event)) }
 
@@ -57,20 +72,8 @@ final class SpiceKitBackend: SessionBackend {
                 }
                 await live.store(session)
 
-                let inputs = inputs, inputCont = inputCont
-                inputCont.yield(.begin)
-                Task {
-                    var started = false
-                    for await q in inputs {
-                        switch q {
-                        case .begin: started = true
-                        case .end: return
-                        case let .host(e): if started { Self.translate(e).forEach(session.send) }
-                        case let .guest(g): if started { session.send(g) }
-                        }
-                    }
-                }
-                defer { inputCont.yield(.end) }
+                inputCont.yield(.begin(session))
+                defer { inputCont.yield(.end(session)) }
 
                 let displays = session.info.channels.filter { $0.type == .display }
                 // In M1 there is one display channel and one primary surface; M5 maps surfaces to
