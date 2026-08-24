@@ -28,6 +28,7 @@ struct SpiceSeeApp: App {
                           let connection = store.selected else { return }
                     session.connect(connection, password: nil)
                 }
+                .onChange(of: settings.sendLockKeys, initial: true) { _, on in session.sendLockKeys = on }
         }
         .defaultSize(Metric.Window.connectionManager)
         .windowStyle(.hiddenTitleBar)

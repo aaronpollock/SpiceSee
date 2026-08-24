@@ -13,6 +13,17 @@ final class SpiceKitBackend: SessionBackend {
     private let live = LiveSession()
     private let log = Logger(subsystem: "com.spicesee", category: "backend")
 
+    /// One FIFO for the backend's lifetime: `sendInput` yields into it synchronously and the connect
+    /// task drains it, so the guest sees events in the order the views produced them. Input sent
+    /// while no session is up ages out of the bounded buffer.
+    private enum Queued: Sendable { case host(InputEvent), guest(GuestInput) }
+    private let inputs: AsyncStream<Queued>
+    private let inputCont: AsyncStream<Queued>.Continuation
+
+    init() { (inputs, inputCont) = AsyncStream.makeStream(of: Queued.self, bufferingPolicy: .bufferingNewest(1024)) }
+
+    func sendInput(_ event: InputEvent) { inputCont.yield(.host(event)) }
+
     func connect(host: String, port: UInt16, tlsPort: UInt16?, password: String?) -> AsyncStream<BackendEvent> {
         // tlsPort is honoured in M3, when the TLS verify block lands; M1 is plain TCP.
         let endpoint = "\(host):\(port)"
@@ -35,6 +46,17 @@ final class SpiceKitBackend: SessionBackend {
                     return
                 }
                 await live.store(session)
+
+                let inputs = inputs
+                let pump = Task {
+                    for await q in inputs {
+                        switch q {
+                        case let .host(e): Self.translate(e).forEach(session.send)
+                        case let .guest(g): session.send(g)
+                        }
+                    }
+                }
+                defer { pump.cancel() }
 
                 let displays = session.info.channels.filter { $0.type == .display }
                 // In M1 there is one display channel and one primary surface; M5 maps surfaces to
@@ -71,6 +93,12 @@ final class SpiceKitBackend: SessionBackend {
                         log.notice("canvas: \(what)")
                     case .canvas(.surfaceDestroyed):
                         break
+                    case let .pointerMode(mode):
+                        continuation.yield(.pointerMode(mode == .client ? .client : .server))
+                    case let .cursor(change, displayID):
+                        continuation.yield(.cursor(viewportID: Int(displayID), Self.translate(change)))
+                    case let .agent(connected):
+                        continuation.yield(.agent(connected ? .connected : .absent))
                     case let .channelFailed(desc, error):
                         // A failed secondary channel degrades the session; only main is fatal.
                         if desc.type == .main {
@@ -98,8 +126,36 @@ final class SpiceKitBackend: SessionBackend {
 
     func disconnect() async { await live.disconnect() }
 
-    /// Needs the inputs channel, which lands in M2.
-    func sendCtrlAltDel() async { log.notice("ctrl-alt-del ignored: the inputs channel arrives in M2") }
+    /// The guest's secure attention sequence: LCtrl, LAlt, Delete down, then up in reverse.
+    func sendCtrlAltDel() async {
+        for s in [XTScancode.leftControl, .leftAlt, .delete] { inputCont.yield(.guest(.keyDown(s))) }
+        for s in [XTScancode.delete, .leftAlt, .leftControl] { inputCont.yield(.guest(.keyUp(s))) }
+    }
+
+    private static func translate(_ e: InputEvent) -> [GuestInput] {
+        switch e {
+        case let .keyDown(code, m):
+            return KeyMap.scancode(keyCode: code, commandMapsTo: target(m.commandMapsTo), optionMapsTo: target(m.optionMapsTo)).map { [.keyDown($0)] } ?? []
+        case let .keyUp(code, m):
+            return KeyMap.scancode(keyCode: code, commandMapsTo: target(m.commandMapsTo), optionMapsTo: target(m.optionMapsTo)).map { [.keyUp($0)] } ?? []
+        case let .capsLock(on): return [.hostCapsLock(on)]
+        case .releaseAllKeys: return [.releaseAllKeys]
+        case let .pointerPosition(x, y, id): return [.pointerPosition(x: UInt32(max(0, x)), y: UInt32(max(0, y)), displayID: UInt8(clamping: id))]
+        case let .pointerMotion(dx, dy): return [.pointerMotion(dx: Int32(clamping: dx), dy: Int32(clamping: dy))]
+        case let .buttonDown(b): return [.buttonDown(button(b))]
+        case let .buttonUp(b): return [.buttonUp(button(b))]
+        case let .wheel(clicks): return clicks == 0 ? [] : [.wheel(clicks: clicks)]
+        }
+    }
+
+    private static func target(_ m: GuestModifier) -> ModifierTarget { switch m { case .super: .super; case .ctrl: .ctrl; case .alt: .alt } }
+    private static func button(_ b: PointerButton) -> MouseButton { switch b { case .left: .left; case .middle: .middle; case .right: .right } }
+    private static func translate(_ c: SpiceCanvas.CursorChange) -> CursorChange {
+        switch c {
+        case let .shape(s): .shape(s.map { CursorImage(width: $0.width, height: $0.height, hotX: $0.hotX, hotY: $0.hotY, pixels: $0.pixels) })
+        case let .moved(x, y): .moved(x: x, y: y)
+        }
+    }
 
     /// The category comes from `SpiceKit`, which is tested; the wording is the design's and stays here.
     private static func failure(for error: SpiceError, endpoint: String) -> ConnectFailure {

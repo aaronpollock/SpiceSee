@@ -24,8 +24,12 @@ final class SessionModel {
     var muted = false
     var pointerCaptured = false
     var releaseChord: ReleaseChord = .controlOption
+    private(set) var pointerMode: PointerMode = .client
+    var keyboardMapping = KeyboardMapping()
+    /// Mirrors AppSettings.sendLockKeys; SpiceSeeApp keeps it current.
+    var sendLockKeys = true
 
-    private var frameSubscribers: [UUID: (viewportID: Int, continuation: AsyncStream<FrameUpdate>.Continuation)] = [:]
+    private var viewportSubscribers: [UUID: (viewportID: Int, continuation: AsyncStream<ViewportEvent>.Continuation)] = [:]
     private let backend: any SessionBackend
     private var pump: Task<Void, Never>?
 
@@ -36,17 +40,21 @@ final class SessionModel {
         self.backend = backend
     }
 
-    /// Every viewport window gets its OWN stream. One shared stream would split frames between
+    /// Every viewport window gets its OWN stream. One shared stream would split events between
     /// windows — each element is delivered to a single consumer — so a two-monitor guest would
     /// drop half its updates in each window.
-    func frames(for viewportID: Int) -> AsyncStream<FrameUpdate> {
-        let (stream, continuation) = AsyncStream.makeStream(of: FrameUpdate.self, bufferingPolicy: .unbounded)
+    func viewportEvents(for viewportID: Int) -> AsyncStream<ViewportEvent> {
+        let (stream, continuation) = AsyncStream.makeStream(of: ViewportEvent.self, bufferingPolicy: .unbounded)
         let key = UUID()
-        frameSubscribers[key] = (viewportID, continuation)
+        viewportSubscribers[key] = (viewportID, continuation)
         continuation.onTermination = { [weak self] _ in
-            Task { @MainActor in self?.frameSubscribers[key] = nil }
+            Task { @MainActor in self?.viewportSubscribers[key] = nil }
         }
         return stream
+    }
+
+    private func publish(_ event: ViewportEvent, to viewportID: Int) {
+        for (_, s) in viewportSubscribers where s.viewportID == viewportID { s.continuation.yield(event) }
     }
 
     var completedSteps: Set<ConnectStep> {
@@ -60,6 +68,8 @@ final class SessionModel {
         scaling = .fit
         hiDPI = connection.advanced.hiDPI
         releaseChord = connection.advanced.releaseChord
+        keyboardMapping = KeyboardMapping(commandMapsTo: connection.advanced.commandMapsTo,
+                                          optionMapsTo: connection.advanced.optionMapsTo)
         phase = .connecting(completed: [])
         pump?.cancel()
         pump = Task { [backend] in
@@ -78,13 +88,14 @@ final class SessionModel {
             self.viewports = viewports
             phase = .connected
         case let .agent(state):
-            agent = state
-            // Without an agent the guest cannot deliver absolute pointer positions, so we capture.
-            if state == .absent { pointerCaptured = true }
+            agent = state          // capture is decided by pointer mode now, not by agent presence
+        case let .pointerMode(mode):
+            pointerMode = mode
+            if mode == .client { pointerCaptured = false }   // an agent came up: absolute pointer, nothing to release
         case let .frame(update):
-            for (_, subscriber) in frameSubscribers where subscriber.viewportID == update.viewportID {
-                subscriber.continuation.yield(update)
-            }
+            publish(.frame(update), to: update.viewportID)
+        case let .cursor(viewportID, change):
+            publish(.cursor(change), to: viewportID)
         case let .migrated(offer):
             migrationOffer = offer
         case let .failed(failure):
@@ -92,6 +103,7 @@ final class SessionModel {
         case .disconnected:
             phase = .idle
             viewports = []
+            pointerCaptured = false
         }
     }
 
@@ -112,6 +124,14 @@ final class SessionModel {
         phase = .idle
         Task { [backend] in await backend.disconnect() }
     }
+
+    func sendInput(_ event: InputEvent) {
+        guard phase == .connected else { return }
+        backend.sendInput(event)
+    }
+
+    /// Called by the input view when it grabs or lets go of the pointer (server mode).
+    func setPointerCaptured(_ captured: Bool) { pointerCaptured = captured }
 
     func sendCtrlAltDel() { Task { [backend] in await backend.sendCtrlAltDel() } }
 

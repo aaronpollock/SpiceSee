@@ -10,11 +10,57 @@ struct FrameUpdate: Sendable {
     var pixels: [UInt8]
 }
 
+/// Which side owns the pointer position. Client = absolute (`MOUSE_POSITION`, host cursor shows
+/// the guest's shape); server = relative (`MOUSE_MOTION`, pointer captured while working).
+enum PointerMode: Equatable, Sendable { case client, server }
+
+enum PointerButton: Sendable { case left, middle, right }
+
+struct KeyboardMapping: Equatable, Sendable {
+    var commandMapsTo: GuestModifier = .super
+    var optionMapsTo: GuestModifier = .alt
+}
+
+/// Host input in the host's own terms; the adapter translates key codes and coordinates.
+enum InputEvent: Sendable {
+    case keyDown(keyCode: UInt16, mapping: KeyboardMapping)
+    case keyUp(keyCode: UInt16, mapping: KeyboardMapping)
+    /// Host caps-lock state — on change and on focus — so the guest's lock keys follow the Mac's.
+    case capsLock(on: Bool)
+    case releaseAllKeys
+    /// Client mode: absolute guest pixels.
+    case pointerPosition(x: Int, y: Int, viewportID: Int)
+    /// Server mode: raw deltas while captured.
+    case pointerMotion(dx: Int, dy: Int)
+    case buttonDown(PointerButton), buttonUp(PointerButton)
+    /// Positive = up, negative = down.
+    case wheel(clicks: Int)
+}
+
+/// BGRA, straight alpha, `width * 4` bytes per row; hotspot in cursor pixels.
+struct CursorImage: Sendable, Equatable {
+    var width: Int, height: Int, hotX: Int, hotY: Int
+    var pixels: [UInt8]
+}
+
+enum CursorChange: Sendable, Equatable {
+    case shape(CursorImage?)          // nil hides the pointer
+    case moved(x: Int, y: Int)        // server mode only
+}
+
+/// What one viewport window consumes: pixels and the pointer drawn over them.
+enum ViewportEvent: Sendable {
+    case frame(FrameUpdate)
+    case cursor(CursorChange)
+}
+
 enum BackendEvent: Sendable {
     case step(ConnectStep)
     case connected(viewports: [ViewportInfo])
     case agent(AgentState)
+    case pointerMode(PointerMode)
     case frame(FrameUpdate)
+    case cursor(viewportID: Int, CursorChange)
     case migrated(MigrationOffer)
     case failed(ConnectFailure)
     case disconnected
@@ -29,4 +75,6 @@ protocol SessionBackend: Sendable {
     func connect(host: String, port: UInt16, tlsPort: UInt16?, password: String?) -> AsyncStream<BackendEvent>
     func disconnect() async
     func sendCtrlAltDel() async
+    /// Synchronous on purpose: the backend must preserve order, and a `Task` per event would not.
+    func sendInput(_ event: InputEvent)
 }

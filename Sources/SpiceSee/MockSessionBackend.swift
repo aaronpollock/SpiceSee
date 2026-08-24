@@ -46,10 +46,14 @@ final class MockSessionBackend: SessionBackend {
                         ViewportInfo(id: 1, index: 1, total: 2, width: 2560, height: 1440),
                     ]))
                     continuation.yield(.agent(scenario == .noAgent ? .absent : .negotiating))
+                    continuation.yield(.pointerMode(scenario == .noAgent ? .server : .client))
                     continuation.yield(.frame(Self.desktop(width: size.width, height: size.height)))
+                    continuation.yield(.cursor(viewportID: 0, .shape(Self.arrowCursor)))
+                    continuation.yield(.cursor(viewportID: 0, .moved(x: 300, y: 260)))
                     if scenario != .noAgent {
                         try await Task.sleep(for: .milliseconds(900))
                         continuation.yield(.agent(.connected))
+                        continuation.yield(.pointerMode(.client))
                     }
                     if scenario == .migrate {
                         try await Task.sleep(for: .seconds(3))
@@ -71,6 +75,22 @@ final class MockSessionBackend: SessionBackend {
 
     func disconnect() async {}
     func sendCtrlAltDel() async {}
+    func sendInput(_ event: InputEvent) {}
+
+    /// A 12×20 black arrow with a white outline — enough to see the overlay in `--mock`.
+    private static let arrowCursor: CursorImage = {
+        let w = 12, h = 20
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        for y in 0 ..< h {
+            let span = min(y, w - 1)   // widening diagonal
+            for x in 0 ... span {
+                let i = (y * w + x) * 4
+                let edge = x == 0 || x == span || y == h - 1
+                px[i] = edge ? 255 : 0; px[i + 1] = edge ? 255 : 0; px[i + 2] = edge ? 255 : 0; px[i + 3] = 255
+            }
+        }
+        return CursorImage(width: w, height: h, hotX: 0, hotY: 0, pixels: px)
+    }()
 
     /// A flat desktop with a title bar band, so scaling and 1:1 are visibly different.
     private static func desktop(width: Int, height: Int) -> FrameUpdate {

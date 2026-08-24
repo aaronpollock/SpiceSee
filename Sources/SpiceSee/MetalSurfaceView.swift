@@ -13,7 +13,7 @@ struct MetalSurfaceView: NSViewRepresentable {
     func makeNSView(context: Context) -> GuestSurfaceView {
         let view = GuestSurfaceView()
         view.scaling = session.scaling
-        context.coordinator.pump(session.frames(for: viewport.id), viewportID: viewport.id, into: view)
+        context.coordinator.pump(session.viewportEvents(for: viewport.id), into: view)
         return view
     }
 
@@ -29,12 +29,15 @@ struct MetalSurfaceView: NSViewRepresentable {
     final class Coordinator {
         private var task: Task<Void, Never>?
 
-        func pump(_ frames: AsyncStream<FrameUpdate>, viewportID: Int, into view: GuestSurfaceView) {
+        func pump(_ events: AsyncStream<ViewportEvent>, into view: GuestSurfaceView) {
             task?.cancel()
             task = Task { [weak view] in
-                for await update in frames where update.viewportID == viewportID {
+                for await event in events {
                     guard let view else { return }
-                    view.apply(update)
+                    switch event {
+                    case let .frame(update): view.apply(update)
+                    case .cursor: break            // Task 12
+                    }
                 }
             }
         }
