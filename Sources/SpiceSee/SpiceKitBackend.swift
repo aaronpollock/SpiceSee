@@ -48,6 +48,13 @@ final class SpiceKitBackend: SessionBackend {
                     continuation.finish()
                     return
                 }
+                // A Cancel during the handshake cannot interrupt `SpiceSession.connect`, so a session
+                // that arrives after the task was cancelled is stale: close it instead of storing it.
+                if Task.isCancelled {
+                    await session.disconnect()
+                    continuation.finish()
+                    return
+                }
                 await live.store(session)
 
                 let inputs = inputs, inputCont = inputCont
