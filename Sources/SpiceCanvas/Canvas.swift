@@ -23,6 +23,10 @@ public actor Canvas {
 
     public func snapshot(surfaceID: UInt32) -> DecodedImage? { surfaces[surfaceID]?.snapshot() }
 
+    /// Ends `events`. Call once no further messages will be applied, so a consumer draining the
+    /// stream terminates instead of hanging.
+    public func finish() { cont.finish() }
+
     public func apply(_ m: DisplayMessage) {
         do { try applyThrowing(m) } catch {
             log.error("canvas: \(String(describing: error))")

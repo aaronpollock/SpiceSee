@@ -3413,7 +3413,7 @@ git add -A && git commit -m "feat(core): display channel; replay golden test fro
   }
   ```
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```swift
 import Foundation
@@ -3446,12 +3446,12 @@ import SpiceCore
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter SpiceSessionTests`
 Expected: compile errors.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```swift
 import os
@@ -3545,12 +3545,12 @@ Add to `spicesee-cli/main.swift` a `dump` subcommand — replace the argument gu
 ```
 and for `dump`: `SpiceSession.connect(ConnectionConfig(...))`, `try await Task.sleep(for: .seconds(n))`, `PNG.encode(await session.snapshotPrimary()!)` written to the path, then `disconnect()`. (Import `SpiceKit` and `SpiceCanvas`.)
 
-- [ ] **Step 4: Run tests and the live dump**
+- [x] **Step 4: Run tests and the live dump**
 
 Run: `swift test --filter SpiceSessionTests` → PASS.
 Run (dev server up): `swift run spicesee-cli dump 127.0.0.1 5900 5 /tmp/frame.png && open /tmp/frame.png` → the Alpine console renders.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git rm -q Sources/SpiceKit/SpiceKit.swift
