@@ -180,10 +180,10 @@ open SpiceSee.app          # select the dev guest (192.168.50.6:5930) in the sid
 
 ### (b) Keyboard
 
-- [ ] **Tab** / **Shift-Tab**: the installer's focus ring moves within a frame. If this doesn't move,
+- [x] **Tab** / **Shift-Tab**: the installer's focus ring moves within a frame. If this doesn't move,
       nothing else below will either.
-- [ ] **⌥N** activates "Next", **⌥B** goes back (Option maps to Alt by default).
-- [ ] **Ctrl-Alt-Del wire check.** Proxy the connection and hit the toolbar's Ctrl-Alt-Del button:
+- [x] **⌥N** activates "Next", **⌥B** goes back (Option maps to Alt by default).
+- [x] **Ctrl-Alt-Del wire check.** Proxy the connection and hit the toolbar's Ctrl-Alt-Del button:
       ```sh
       swift run spicerec 5901 192.168.50.6 5930 recordings/live   # then connect to 127.0.0.1:5901
       ```
@@ -191,10 +191,14 @@ open SpiceSee.app          # select the dev guest (192.168.50.6:5930) in the sid
       (ctrl), `38` (alt), `e0 53` (delete), then breaks `e0 d3`, `b8`, `9d`. (A single letter is the
       same shape — "a" = `1e` then `9e`.) `log stream --predicate 'subsystem == "com.spicesee"'
       --level debug` should stay error-free throughout.
-- [ ] **Focus loss releases held keys.** Hold **Shift** and **Cmd-Tab** away — the recording must
+- [x] **Focus loss releases held keys.** Hold **Shift** and **Cmd-Tab** away — the recording must
       show Shift's `KEY_UP` (`aa`) at that moment, not a stuck modifier. Same check for clicking
       another app's window, and for the app losing active state entirely. Come back and confirm
       typing is normal again.
+- [ ] **A ⌘ chord breaks its letter.** Type **⌘V** into a guest text field: exactly one character,
+      no runaway repeat. AppKit never routes `keyUp` to the responder chain while ⌘ is held, so
+      `GuestInputView` picks those up from a local event monitor — the recording must show `2f`
+      followed by `af`. (⌘ maps to Super by default, so the guest sees Win+V, not paste.)
 
 ### (c) Mouse, client mode (dev guest — USB tablet, `mouse=2`)
 
@@ -202,15 +206,15 @@ open SpiceSee.app          # select the dev guest (192.168.50.6:5930) in the sid
 swift run spicerec 5901 192.168.50.6 5930 recordings/m2-mouse   # optional, for the PRESS 2/3 checks
 ```
 
-- [ ] Moving the mouse over the viewport moves the installer's own arrow; **no capture ever happens**
+- [x] Moving the mouse over the viewport moves the installer's own arrow; **no capture ever happens**
       and the HUD never appears.
-- [ ] The host pointer stays visible the whole time.
-- [ ] Clicking "Next" / "Back" works — the press lands where the pointer is.
-- [ ] Right-click: nothing visible in the installer, but the capture shows `PRESS 3`.
-- [ ] Middle-click (physical mouse button 2, not a trackpad): the capture shows `PRESS 2`.
-- [ ] Scrolling over the language list scrolls it in the same direction a Mac list would.
-- [ ] Dragging past the window edge clamps the guest pointer at the guest's edge, no jump or wrap.
-- [ ] Both Fit and 1:1: a click lands where the pointer is drawn.
+- [x] The host pointer stays visible the whole time.
+- [x] Clicking "Next" / "Back" works — the press lands where the pointer is.
+- [x] Right-click: nothing visible in the installer, but the capture shows `PRESS 3`.
+- [x] Middle-click (physical mouse button 2, not a trackpad): the capture shows `PRESS 2`.
+- [x] Scrolling over the language list scrolls it in the same direction a Mac list would.
+- [x] Dragging past the window edge clamps the guest pointer at the guest's edge, no jump or wrap.
+- [x] Both Fit and 1:1: a click lands where the pointer is drawn.
 
 ### (d) Mouse capture, server mode (`--mock --scenario noAgent` — the dev guest is client-mode only)
 
@@ -219,28 +223,28 @@ BUILT_PRODUCTS_DIR=$(xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -co
 SPICESEE_MOCK=1 "$BUILT_PRODUCTS_DIR/SpiceSee.app/Contents/MacOS/SpiceSee" --scenario noAgent --autoconnect
 ```
 
-- [ ] Window opens with no HUD, no cue.
-- [ ] The grabbing click's button-down is swallowed (doesn't reach the guest); host pointer
+- [x] Window opens with no HUD, no cue.
+- [x] The grabbing click's button-down is swallowed (doesn't reach the guest); host pointer
       disappears and the HUD flashes. The matching release does reach the guest.
-- [ ] The first small movement after capture does not make the guest pointer jump.
-- [ ] The cue stays in the top-trailing corner while captured.
-- [ ] While captured, the pointer cannot leave the window and produces no host cursor movement
+- [x] The first small movement after capture does not make the guest pointer jump.
+- [x] The cue stays in the top-trailing corner while captured.
+- [x] While captured, the pointer cannot leave the window and produces no host cursor movement
       anywhere on screen.
-- [ ] **⌃⌥ releases**: host pointer reappears where it was parked, cue and HUD go.
-- [ ] **Cmd-Tab while captured also releases** the pointer (a lone Super tap may open the Start menu
+- [x] **⌃⌥ releases**: host pointer reappears where it was parked, cue and HUD go.
+- [x] **Cmd-Tab while captured also releases** the pointer (a lone Super tap may open the Start menu
       on a real Windows guest — expected, not a bug).
-- [ ] **⌃⌥ while *not* captured does nothing** — no stray release, typing still works after.
-- [ ] Caps lock: turn it on while backgrounded, Cmd-Tab back — the guest's caps state should follow
+- [x] **⌃⌥ while *not* captured does nothing** — no stray release, typing still works after.
+- [x] Caps lock: turn it on while backgrounded, Cmd-Tab back — the guest's caps state should follow
       (mock only logs this; the real check is against the dev guest).
 
 ### (e) Cursor
 
-- [ ] `--mock --scenario desktop --autoconnect`, hover the viewport: host pointer becomes the mock's
+- [x] `--mock --scenario desktop --autoconnect`, hover the viewport: host pointer becomes the mock's
       black-and-white arrow (12×20, tip at the pointer), back to normal outside the viewport.
-- [ ] Against a **QXL + vdagent guest** (client mode): the host cursor takes the guest's shapes — an
+- [x] Against a **QXL + vdagent guest** (client mode): the host cursor takes the guest's shapes — an
       I-beam over a text field, a resize cursor over a window edge — and disappears where the guest
       hides its pointer (e.g. a full-screen video player).
-- [ ] Against the **VGA installer guest** (no agent, server mode): the guest draws its own arrow into
+- [x] Against the **VGA installer guest** (no agent, server mode): the guest draws its own arrow into
       the framebuffer; the Metal overlay stays empty — nothing to see there is correct, not a
       regression.
 

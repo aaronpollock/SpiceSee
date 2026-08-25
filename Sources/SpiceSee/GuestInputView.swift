@@ -25,17 +25,24 @@ final class GuestInputView: NSView {
     /// kVK_CapsLock. Caps lock is synced as lock state (INPUTS_KEY_MODIFIERS), never as a scancode — see SpiceKit.KeyMap.
     private static let capsLockKeyCode: UInt16 = 0x39
 
-    /// Block observers are not unregistered for you. A nonisolated `deinit` may not read main-actor
-    /// storage in Swift 6, so the tokens live one level down: dropping the box with the view is what
-    /// removes them.
+    /// Block observers and event monitors are not unregistered for you. A nonisolated `deinit` may
+    /// not read main-actor storage in Swift 6, so the tokens live one level down: dropping the box
+    /// with the view is what removes them.
     private final class Observers {
         private var tokens: [any NSObjectProtocol] = []
+        private var monitors: [Any] = []
         func add(_ token: any NSObjectProtocol) { tokens.append(token) }
+        func addMonitor(_ monitor: Any?) { if let monitor { monitors.append(monitor) } }
         func removeAll() {
             tokens.forEach(NotificationCenter.default.removeObserver)
             tokens.removeAll()
+            monitors.forEach(NSEvent.removeMonitor)
+            monitors.removeAll()
         }
-        deinit { tokens.forEach(NotificationCenter.default.removeObserver) }
+        deinit {
+            tokens.forEach(NotificationCenter.default.removeObserver)
+            monitors.forEach(NSEvent.removeMonitor)
+        }
     }
 
     private let observers = Observers()
@@ -67,6 +74,17 @@ final class GuestInputView: NSView {
                 guard let self, self.sendLockKeys else { return }
                 self.onInput(.capsLock(on: NSEvent.modifierFlags.contains(.capsLock)))
             }
+        })
+        // AppKit never routes a `keyUp` to the responder chain while ⌘ is held — `NSApplication`
+        // receives it and drops it. Without this the guest keeps the letter made and auto-repeats it
+        // forever (⌘V typing an endless "v"). A local monitor is the last place the event is visible.
+        observers.addMonitor(NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            guard event.modifierFlags.contains(.command) else { return event }
+            MainActor.assumeIsolated {
+                guard let self, self.window?.isKeyWindow == true, self.window?.firstResponder === self else { return }
+                self.keyUp(with: event)
+            }
+            return event
         })
     }
 
