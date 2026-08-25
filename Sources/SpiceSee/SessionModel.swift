@@ -144,6 +144,9 @@ final class SessionModel {
         Task { [backend] in await backend.sendCtrlAltDel() }
     }
 
+    /// Shows a failure that happened before a connection was attempted (an unreadable `.vv`).
+    func presentFailure(_ failure: ConnectFailure) { phase = .failed(failure) }
+
     /// Dismiss a failure sheet, returning the detail pane to its editable form.
     func dismissFailure() { if case .failed = phase { phase = .idle } }
 

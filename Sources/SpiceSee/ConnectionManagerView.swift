@@ -12,6 +12,7 @@ struct ConnectionManagerView: View {
 
     /// Set by the − button; non-nil is what presents the confirmation.
     @State private var pendingDeletion: SavedConnection?
+    private let opener = VVOpener()
 
     var body: some View {
         NavigationSplitView {
@@ -153,7 +154,7 @@ struct ConnectionManagerView: View {
         panel.allowedContentTypes = [.vvConnection]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        store.importVV(at: url)
+        opener.open(url, store: store, session: session, settings: settings)
     }
 
     // MARK: Bindings
@@ -217,7 +218,7 @@ struct ConnectionRowView: View {
     }
 
     private var subtitle: String {
-        let endpoint = "\(connection.host):\(connection.port)"
+        let endpoint = connection.endpoint
         if isConnecting { return "\(endpoint) · Connecting…" }
         if isConnected { return "\(endpoint) · Connected" }
         return connection.sidebarSubtitle

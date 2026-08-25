@@ -92,7 +92,6 @@ final class ConnectionStore {
 extension SavedConnection {
     /// "192.168.1.20:5900 · Today 09:14" — the sidebar row's second line.
     var sidebarSubtitle: String {
-        let endpoint = "\(host):\(port)"
         guard let lastConnected else { return endpoint }
         let formatter = DateFormatter()
         if Calendar.current.isDateInToday(lastConnected) {

@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct SpiceSeeApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @State private var opener = VVOpener()
     @State private var store = ConnectionStore.isRunningMock ? .preview : ConnectionStore()
     @State private var settings = AppSettings()
     @State private var session = SessionModel(backend: ConnectionStore.isRunningMock
@@ -12,6 +14,11 @@ struct SpiceSeeApp: App {
         Window("SpiceSee", id: "manager") {
             ConnectionManagerView(store: store, settings: settings, session: session)
                 .task {
+                    AppDelegate.openHandler = { url in
+                        openWindow(id: "manager")
+                        opener.open(url, store: store, session: session, settings: settings)
+                    }
+                    AppDelegate.drainPending()
                     // --mock --autoconnect drives the whole flow without a server, for design review.
                     if let i = CommandLine.arguments.firstIndex(of: "--open"), i + 1 < CommandLine.arguments.count {
                         switch CommandLine.arguments[i + 1] {
@@ -99,7 +106,32 @@ struct SpiceSeeApp: App {
         panel.allowedContentTypes = [.vvConnection]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        store.importVV(at: url)
+        opener.open(url, store: store, session: session, settings: settings)
+    }
+}
+
+/// Finder and the Proxmox web UI hand `.vv` files to the app through the delegate, not through a
+/// SwiftUI scene — `Window` has no document support.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Set by the manager window once the app's state objects exist; a file opened during launch
+    /// waits here until then.
+    @MainActor static var openHandler: ((URL) -> Void)?
+    @MainActor private static var pending: [URL] = []
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        MainActor.assumeIsolated {
+            for url in urls {
+                if let handler = Self.openHandler { handler(url) } else { Self.pending.append(url) }
+            }
+        }
+    }
+
+    @MainActor
+    static func drainPending() {
+        guard let handler = openHandler else { return }
+        let urls = pending
+        pending = []
+        urls.forEach(handler)
     }
 }
 
@@ -113,22 +145,6 @@ extension ConnectionStore {
     /// `--mock` (or SPICESEE_MOCK=1) seeds the artboard hosts so every screen can be reviewed without a server.
     static var isRunningMock: Bool {
         CommandLine.arguments.contains("--mock") || ProcessInfo.processInfo.environment["SPICESEE_MOCK"] == "1"
-    }
-
-    /// Parses a Proxmox `.vv` INI and adds it as a connection. Full parsing lands with SpiceCore in M3.
-    func importVV(at url: URL) {
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
-        var fields: [String: String] = [:]
-        for line in text.split(separator: "\n") {
-            guard let eq = line.firstIndex(of: "=") else { continue }
-            fields[line[line.startIndex ..< eq].trimmingCharacters(in: .whitespaces).lowercased()] =
-                line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
-        }
-        guard let host = fields["host"] else { return }
-        var connection = SavedConnection(name: fields["title"] ?? host, host: host)
-        if let port = fields["port"], let p = UInt16(port) { connection.port = p }
-        if let tls = fields["tls-port"], let p = UInt16(tls) { connection.tlsPort = p }
-        addImported(connection)
     }
 }
 
