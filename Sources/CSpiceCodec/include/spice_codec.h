@@ -46,8 +46,9 @@ void           sc_glz_window_clear(sc_glz_window *);
 void           sc_glz_window_destroy(sc_glz_window *);
 sc_glz  *sc_glz_create(sc_glz_window *);
 void     sc_glz_destroy(sc_glz *);
-/* On success *out points at BGRA pixels owned by the window; copy before the next decode. */
-int      sc_glz_decode(sc_glz *, const uint8_t *data, size_t len, const uint8_t **out, int *width, int *height, int *stride);
+/* On success *out points at BGRA pixels owned by the window; copy before the next decode.
+   top_down is 0 when the GLZ header marks the rows bottom-up, as Windows guests routinely send. */
+int      sc_glz_decode(sc_glz *, const uint8_t *data, size_t len, const uint8_t **out, int *width, int *height, int *stride, int *top_down);
 
 #ifdef __cplusplus
 }

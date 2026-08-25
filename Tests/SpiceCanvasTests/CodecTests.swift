@@ -52,8 +52,8 @@ private func gradient(_ w: Int, _ h: Int) -> [UInt8] {
 @Test func glzWindowLifecycle() {
     let win = sc_glz_window_create()!
     let dec = sc_glz_create(win)!
-    var out: UnsafePointer<UInt8>? = nil; var w: Int32 = 0, h: Int32 = 0, s: Int32 = 0
+    var out: UnsafePointer<UInt8>? = nil; var w: Int32 = 0, h: Int32 = 0, s: Int32 = 0, topDown: Int32 = 1
     let junk = [UInt8](repeating: 0xFF, count: 32)
-    #expect(junk.withUnsafeBufferPointer { sc_glz_decode(dec, $0.baseAddress, 32, &out, &w, &h, &s) } < 0)
+    #expect(junk.withUnsafeBufferPointer { sc_glz_decode(dec, $0.baseAddress, 32, &out, &w, &h, &s, &topDown) } < 0)
     sc_glz_destroy(dec); sc_glz_window_destroy(win)
 }

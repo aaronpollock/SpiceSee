@@ -61,10 +61,13 @@ public struct ImageDecoder: ~Copyable {
     }
 
     private func decodeGLZ(_ data: [UInt8]) throws -> DecodedImage {
-        var p: UnsafePointer<UInt8>? = nil; var w: Int32 = 0, h: Int32 = 0, s: Int32 = 0
-        guard data.withUnsafeBufferPointer({ sc_glz_decode(glz, $0.baseAddress, data.count, &p, &w, &h, &s) }) == 0, let p else { throw CanvasError.decode("glz") }
+        var p: UnsafePointer<UInt8>? = nil; var w: Int32 = 0, h: Int32 = 0, s: Int32 = 0, topDown: Int32 = 1
+        guard data.withUnsafeBufferPointer({ sc_glz_decode(glz, $0.baseAddress, data.count, &p, &w, &h, &s, &topDown) }) == 0, let p else { throw CanvasError.decode("glz") }
         var out = [UInt8](repeating: 0, count: Int(w) * Int(h) * 4)
-        for y in 0 ..< Int(h) { out.replaceSubrange(y * Int(w) * 4 ..< (y + 1) * Int(w) * 4, with: UnsafeBufferPointer(start: p + y * Int(s), count: Int(w) * 4)) }
+        for y in 0 ..< Int(h) {
+            let srcRow = topDown != 0 ? y : Int(h) - 1 - y
+            out.replaceSubrange(y * Int(w) * 4 ..< (y + 1) * Int(w) * 4, with: UnsafeBufferPointer(start: p + srcRow * Int(s), count: Int(w) * 4))
+        }
         for i in stride(from: 3, to: out.count, by: 4) { out[i] = 0xFF }
         return DecodedImage(width: Int(w), height: Int(h), pixels: out, hasAlpha: false)
     }

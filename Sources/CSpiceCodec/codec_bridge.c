@@ -232,7 +232,7 @@ sc_glz *sc_glz_create(sc_glz_window *w)
 void sc_glz_destroy(sc_glz *g) { if (g) { glz_decoder_destroy(g->d); free(g); } }
 
 int sc_glz_decode(sc_glz *g, const uint8_t *data, size_t len, const uint8_t **out,
-                  int *w, int *h, int *stride)
+                  int *w, int *h, int *stride, int *top_down)
 {
     if (!g || !data || len < 4) return -1;
     (void)len;   /* the GLZ stream is self-delimiting; the window bounds every back-reference */
@@ -246,5 +246,6 @@ int sc_glz_decode(sc_glz *g, const uint8_t *data, size_t len, const uint8_t **ou
     *w = sc_glz_image_width(img);
     *h = sc_glz_image_height(img);
     *stride = sc_glz_image_stride(img);
+    *top_down = sc_glz_image_top_down(img);
     return 0;
 }
