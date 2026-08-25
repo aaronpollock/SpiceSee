@@ -96,7 +96,7 @@ case "connect":
         }
         // --ca takes a file so a certificate never sits in shell history or a process list.
         let caPEM = try flags["--ca"].map { try String(contentsOf: URL(fileURLWithPath: $0), encoding: .utf8) }
-        let policy = tlsPort != nil ? try TLSPolicy(caPEM: caPEM, hostSubject: flags["--host-subject"]) : nil
+        let policy = tlsPort != nil ? try TLSPolicy(caPEM: caPEM, hostSubject: flags["--host-subject"], host: host) : nil
         try await printMainInit(host: host, port: tlsPort ?? port, tls: policy, password: password)
     } catch {
         print("error: \(describe(error))"); exit(1)
@@ -132,7 +132,7 @@ case "vv":
             guard let port = config.tlsPort ?? config.port else {
                 print("error: the file names no port"); exit(1)
             }
-            let policy = config.usesTLS ? try TLSPolicy(caPEM: config.caPEM, hostSubject: config.hostSubject) : nil
+            let policy = config.usesTLS ? try TLSPolicy(caPEM: config.caPEM, hostSubject: config.hostSubject, host: config.host) : nil
             try await printMainInit(host: config.host, port: port, tls: policy, password: config.password)
         }
     } catch {

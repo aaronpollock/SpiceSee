@@ -72,7 +72,7 @@ public actor SpiceSession {
     /// Every channel dials the same port and the same policy, which is what spice-gtk does: the
     /// server hands out one TLS port for the whole session.
     public static func connect(_ config: ConnectionConfig) async throws -> SpiceSession {
-        let policy = config.usesTLS ? try TLSPolicy(caPEM: config.caPEM, hostSubject: config.hostSubject) : nil
+        let policy = config.usesTLS ? try TLSPolicy(caPEM: config.caPEM, hostSubject: config.hostSubject, host: config.host) : nil
         guard let port = config.tlsPort ?? config.port else {
             throw SpiceError(.connect, underlying: "no port")
         }
