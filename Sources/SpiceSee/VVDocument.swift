@@ -36,8 +36,9 @@ final class VVOpener {
         let name = vv.title.map(Self.cleanTitle) ?? vv.host
         var connection = SavedConnection(vv: vv, name: name)
         connection.lastConnected = Date()
-        store.addImported(connection)
-        session.connect(connection, password: vv.password)
+        // Connect with the row the store actually holds: a refreshed row keeps its own id and name,
+        // and the manager matches a running session to a sidebar row by id.
+        session.connect(store.addImported(connection), password: vv.password)
 
         // Deleted the moment the connect is kicked off, not when it succeeds: the single-use ticket
         // inside is spent either way, so waiting for a result would only leave the file behind on
