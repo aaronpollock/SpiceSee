@@ -243,3 +243,83 @@ SPICESEE_MOCK=1 "$BUILT_PRODUCTS_DIR/SpiceSee.app/Contents/MacOS/SpiceSee" --sce
 - [ ] Against the **VGA installer guest** (no agent, server mode): the guest draws its own arrow into
       the framebuffer; the Metal overlay stays empty — nothing to see there is correct, not a
       regression.
+
+## TLS dev endpoint
+
+There is no Proxmox cluster to point at, so M3's TLS path is proved against a real *foreign* TLS
+implementation instead: OpenSSL, via `socat`, in front of the same SPICE server. This proves the
+verify block interoperates and — the part that matters — rejects what it must.
+
+`scripts/dev-tls.sh` makes the material in `.dev-tls/` (gitignored, idempotent, nothing secret):
+
+| File | What it is |
+|---|---|
+| `ca.pem` / `ca.key` | throwaway CA, subject `O=PVE Cluster Manager CA, CN=Proxmox Virtual Environment Cluster Manager CA` |
+| `server.pem` / `server.key` | leaf issued by that CA, subject `OU=PVE Cluster Node, O=Proxmox Virtual Environment, CN=pve1.example.com` — the RDN order Proxmox emits |
+| `server-bundle.pem` | key + leaf concatenated, which is what `socat`'s `cert=` wants |
+| `other-ca.pem` | a second CA the server never uses, for the wrong-CA case |
+
+Stand it up:
+
+```sh
+./scripts/dev-tls.sh
+scp .dev-tls/server-bundle.pem aaron@192.168.50.6:/tmp/spicesee-server.pem
+ssh -n aaron@192.168.50.6 'setsid socat OPENSSL-LISTEN:5931,cert=/tmp/spicesee-server.pem,verify=0,reuseaddr,fork TCP:127.0.0.1:5930 </dev/null >/tmp/socat.log 2>&1 & sleep 1; ss -lnt | grep 5931'
+```
+
+`setsid` and the explicit `</dev/null` matter: a plain `nohup … &` over `ssh` exits with the session
+and leaves no listener.
+
+Then write a `.vv` naming that port and that CA, and run the three cases:
+
+```sh
+python3 - <<'EOF'
+import pathlib
+ca = pathlib.Path('.dev-tls/ca.pem').read_text().replace('\n', '\\n')
+pathlib.Path('/tmp/dev.vv').write_text(
+    "[virt-viewer]\ntype=spice\nhost=192.168.50.6\nport=0\ntls-port=5931\n"
+    "host-subject=OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=pve1.example.com\n"
+    f"ca={ca}\n")
+EOF
+sed 's/CN=pve1.example.com/CN=pve3.example.com/' /tmp/dev.vv > /tmp/wrong-subject.vv
+# /tmp/wrong-ca.vv: the same file with other-ca.pem in the ca= line
+
+swift run spicesee-cli vv /tmp/dev.vv              # MAIN_INIT + the ten channels
+swift run spicesee-cli vv /tmp/dev.vv 5 /tmp/tls.png   # and a PNG, to prove the whole stack
+swift run spicesee-cli vv /tmp/wrong-subject.vv    # subject mismatch, both subjects named
+swift run spicesee-cli vv /tmp/wrong-ca.vv         # untrusted — NOT a subject mismatch
+```
+
+**Verified 2026-08-24.** The positive case printed the same `MAIN_INIT` and channel list as plain
+TCP, and the 5-second capture wrote a 1280×800 PNG of the Windows 11 Setup partition dialog. The two
+rejections came back as they should:
+
+```
+error: TLS: the server's certificate subject is not the one host-subject asks for
+  expected:  OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=pve3.example.com
+  presented: OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=pve1.example.com
+
+error: TLS: the server's certificate is not trusted by the file's CA — “pve1.example.com” certificate is not trusted
+```
+
+A wrong-CA file reported as a *subject* mismatch would mean the trust evaluation is being skipped —
+that is the check worth re-running whenever `TLSPolicy` changes. Both arrived as `SpiceError.tls`,
+not as a generic `.connect`, which is the only live proof that `NWTransport` carries the verify
+block's reason out past the connection failure.
+
+Tear down when done. **Do not use the pattern verbatim** — `pkill -f "OPENSSL-LISTEN:5931"` matches
+the very shell `ssh` started to run it, so it kills itself, prints nothing, and hangs the session:
+
+```sh
+ssh -n aaron@192.168.50.6 'pkill -f "OPENSSL-LIST[E]N:5931"; rm -f /tmp/spicesee-server.pem /tmp/socat.log'
+```
+
+### What this does *not* prove
+
+- **No Proxmox cluster.** The CA, the leaf and the RDN order are modelled on Proxmox's, not captured
+  from one. A real cluster CA chain (Proxmox issues through a cluster manager CA with its own
+  extensions) has never been through this code.
+- **No ticket flow.** The dev server is ticketless, so the `password=` line of a real `.vv` — a
+  one-shot ticket that expires in about 30 seconds — is exercised only by unit tests.
+- **`socat` is not spice-server's TLS.** It terminates TLS and proxies plaintext; a real Proxmox
+  console has the SPICE server itself doing the handshake.

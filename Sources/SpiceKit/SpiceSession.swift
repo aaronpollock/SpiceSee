@@ -4,8 +4,27 @@ import SpiceCore
 import SpiceWire
 
 public struct ConnectionConfig: Sendable {
-    public var host: String, port: UInt16, password: String?
-    public init(host: String, port: UInt16, password: String?) { self.host = host; self.port = port; self.password = password }
+    public var host: String
+    public var port: UInt16?
+    public var tlsPort: UInt16?
+    public var password: String?
+    public var hostSubject: String?
+    public var caPEM: String?
+
+    public init(host: String, port: UInt16? = nil, tlsPort: UInt16? = nil, password: String? = nil,
+                hostSubject: String? = nil, caPEM: String? = nil) {
+        self.host = host; self.port = port; self.tlsPort = tlsPort; self.password = password
+        self.hostSubject = hostSubject; self.caPEM = caPEM
+    }
+
+    public init(vv: VVFile) {
+        self.init(host: vv.host, port: vv.port, tlsPort: vv.tlsPort, password: vv.password,
+                  hostSubject: vv.hostSubject, caPEM: vv.caPEM)
+    }
+
+    /// TLS wins when the file offers both: a Proxmox `.vv` carries `tls-port` precisely because the
+    /// console is meant to be encrypted.
+    public var usesTLS: Bool { tlsPort != nil }
 }
 
 public enum PointerMode: Sendable, Equatable { case server, client }
@@ -49,8 +68,16 @@ public actor SpiceSession {
     public private(set) var pointerMode: PointerMode
     private let log = Logger(subsystem: "com.spicesee", category: "session")
 
+    /// Every channel dials the same port and the same policy, which is what spice-gtk does: the
+    /// server hands out one TLS port for the whole session.
     public static func connect(_ config: ConnectionConfig) async throws -> SpiceSession {
-        try await connect(password: config.password) { _ in try await NWTransport.connect(host: config.host, port: config.port) }
+        let policy = config.usesTLS ? try TLSPolicy(caPEM: config.caPEM, hostSubject: config.hostSubject) : nil
+        guard let port = config.tlsPort ?? config.port else {
+            throw SpiceError(.connect, underlying: "no port")
+        }
+        return try await connect(password: config.password) { _ in
+            try await NWTransport.connect(host: config.host, port: port, tls: policy)
+        }
     }
 
     public static func connect(password: String?, transports: @escaping TransportFactory) async throws -> SpiceSession {
