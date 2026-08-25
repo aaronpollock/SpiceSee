@@ -20,6 +20,7 @@ SpiceSee is a native macOS SPICE client (remote console for Proxmox VE and plain
 This trips people up: **`swift build` does not compile the app.**
 
 - `Package.swift` builds the engine only — `CSpiceCodec`, `SpiceWire`, `SpiceCore`, `SpiceCanvas`, `SpiceKit`, plus the `spicesee-cli` and `spicerec` executables. Nothing there imports SwiftUI, which is what keeps the whole stack testable headless.
+- `SpiceSeeTests` is the app target's own test bundle. It compiles `Sources/SpiceSee` **into itself** rather than hosting the app, because the Debug app is a launcher stub plus `SpiceSee.debug.dylib` and a `TEST_HOST` bundle cannot load that reliably. It is where anything needing AppKit — `ClipboardBridge` and `NSPasteboard`, say — gets covered; `swift test` never sees this code, which is how a clipboard bug that only broke one direction shipped.
 - The app target lives in `Sources/SpiceSee/` and is **not** a member of the SPM package. It is built by an Xcode project generated from `project.yml` by [xcodegen](https://github.com/yonaskolb/XcodeGen). `SpiceSee.xcodeproj` is generated output and is gitignored — never edit it, edit `project.yml`.
 
 ```bash
@@ -32,6 +33,9 @@ swift test --filter packageBuilds           # one test
 # the app (re-run xcodegen after adding or removing files under Sources/SpiceSee)
 xcodegen generate
 xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -configuration Debug -destination 'platform=macOS' build
+
+# the app's own tests — `swift test` does NOT cover Sources/SpiceSee
+xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSeeTests -destination 'platform=macOS' test
 
 # regenerate app + document icons into Assets.xcassets (idempotent)
 swift Tools/make-icons.swift

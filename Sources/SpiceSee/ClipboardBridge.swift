@@ -52,8 +52,15 @@ final class ClipboardBridge {
 
     func handle(_ event: ClipboardEvent) { eventCont.yield(event) }
 
+    /// Begins watching the host pasteboard for this session.
+    ///
+    /// Deliberately does not touch `available`, and so cannot be written as `stop()` + restart:
+    /// capability negotiation usually finishes *before* the primary surface exists, so
+    /// `.available(true)` lands before the `.connected` that starts the poll. Clearing it here left
+    /// the guest never told the Mac had anything, and only in that direction — the guest-to-host
+    /// path does not consult `available`.
     func start() {
-        stop()
+        poll?.cancel()
         lastSeenChangeCount = pasteboard.changeCount
         poll = Task { [weak self] in
             while !Task.isCancelled {
