@@ -155,6 +155,10 @@ struct FailureSheet: View {
                 .frame(width: detailLabelWidth, alignment: .leading)
             Text(value)
                 .foregroundStyle(tinted ? Color.chiliRed : Color.primary)
+                // A real Proxmox subject is far wider than the sheet, and the element that differs
+                // is not always last — truncating it would defeat the row's only purpose.
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .font(Font.mono(Metric.Sheet.mono))
     }
