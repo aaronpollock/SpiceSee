@@ -10,19 +10,19 @@ final class MockSessionBackend: SessionBackend {
     private let scenario: Scenario
     init(scenario: Scenario = .desktop) { self.scenario = scenario }
 
-    func connect(host: String, port: UInt16, tlsPort: UInt16?, password: String?) -> AsyncStream<BackendEvent> {
+    func connect(_ target: ConnectionTarget) -> AsyncStream<BackendEvent> {
         let scenario = self.scenario
-        let endpoint = "\(host):\(tlsPort ?? port)"
+        let endpoint = target.endpoint
         return AsyncStream { continuation in
             let task = Task {
                 do {
                     try await Task.sleep(for: .milliseconds(400))
-                    continuation.yield(.step(.tls))
+                    if target.usesTLS { continuation.yield(.step(.tls)) }
                     if scenario == .certMismatch {
                         try await Task.sleep(for: .milliseconds(300))
                         continuation.yield(.failed(.hostSubjectMismatch(
-                            expected: "CN=pve1,O=PVE Cluster Manager CA",
-                            presented: "CN=pve3,O=PVE Cluster Manager CA",
+                            expected: "OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=pve1.example.com",
+                            presented: "OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=pve3.example.com",
                             host: endpoint)))
                         continuation.finish(); return
                     }
@@ -57,7 +57,9 @@ final class MockSessionBackend: SessionBackend {
                     }
                     if scenario == .migrate {
                         try await Task.sleep(for: .seconds(3))
-                        continuation.yield(.migrated(MigrationOffer(vmName: "win11-desk", newHost: "pve3.lan", newPort: 5904)))
+                        continuation.yield(.migrated(MigrationOffer(
+                            vmName: "win11-desk", newHost: "pve3.lan", newPort: 5904, newTLSPort: 5901,
+                            certSubject: "CN=pve3,O=PVE Cluster Manager CA")))
                     }
                     // Blink a caret so the viewport is visibly live.
                     var on = true

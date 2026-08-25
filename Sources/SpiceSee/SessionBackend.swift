@@ -66,13 +66,28 @@ enum BackendEvent: Sendable {
     case disconnected
 }
 
+/// Everything needed to open one session. Grouped rather than passed as six arguments because a
+/// `.vv` file supplies most of it at once.
+struct ConnectionTarget: Sendable {
+    var host: String
+    var port: UInt16?
+    var tlsPort: UInt16?
+    var hostSubject: String?
+    var caPEM: String?
+    var password: String?
+
+    /// "pve1.lan:61000" — the TLS port when there is one, matching `SavedConnection.endpoint`.
+    var endpoint: String { "\(host):\(tlsPort ?? port ?? 0)" }
+    var usesTLS: Bool { tlsPort != nil }
+}
+
 /// The seam between the UI and the SPICE engine.
 ///
 /// `SpiceKitBackend` drives this with the real engine; `MockSessionBackend` still backs `--mock`, so
 /// every screen stays reviewable without a server. Landing the engine needed no view changes — if one
 /// ever seems to, the seam is wrong and the fix belongs in the adapter.
 protocol SessionBackend: Sendable {
-    func connect(host: String, port: UInt16, tlsPort: UInt16?, password: String?) -> AsyncStream<BackendEvent>
+    func connect(_ target: ConnectionTarget) -> AsyncStream<BackendEvent>
     func disconnect() async
     func sendCtrlAltDel() async
     /// Synchronous on purpose: the backend must preserve order, and a `Task` per event would not.

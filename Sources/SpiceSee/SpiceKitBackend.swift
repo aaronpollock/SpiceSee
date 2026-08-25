@@ -42,15 +42,16 @@ final class SpiceKitBackend: SessionBackend {
 
     func sendInput(_ event: InputEvent) { inputCont.yield(.host(event)) }
 
-    func connect(host: String, port: UInt16, tlsPort: UInt16?, password: String?) -> AsyncStream<BackendEvent> {
-        // tlsPort is honoured in M3, when the TLS verify block lands; M1 is plain TCP.
-        let endpoint = "\(host):\(port)"
+    func connect(_ target: ConnectionTarget) -> AsyncStream<BackendEvent> {
+        let endpoint = target.endpoint
         let live = live, log = log
         return AsyncStream { continuation in
             let task = Task {
                 let session: SpiceSession
                 do {
-                    session = try await SpiceSession.connect(ConnectionConfig(host: host, port: port, password: password))
+                    session = try await SpiceSession.connect(ConnectionConfig(
+                        host: target.host, port: target.port, tlsPort: target.tlsPort,
+                        password: target.password, hostSubject: target.hostSubject, caPEM: target.caPEM))
                 } catch let error as SpiceError {
                     log.error("connect failed: \(String(describing: error))")
                     continuation.yield(.failed(Self.failure(for: error, endpoint: endpoint)))
@@ -70,6 +71,9 @@ final class SpiceKitBackend: SessionBackend {
                     continuation.finish()
                     return
                 }
+                // `connect` returning means the handshake and the host-subject verify both passed —
+                // but only a TLS connection did either, so a plain-TCP session never claims the step.
+                if target.usesTLS { continuation.yield(.step(.tls)) }
                 await live.store(session)
 
                 inputCont.yield(.begin(session))
@@ -116,6 +120,14 @@ final class SpiceKitBackend: SessionBackend {
                         continuation.yield(.cursor(viewportID: Int(displayID), Self.translate(change)))
                     case let .agent(connected):
                         continuation.yield(.agent(connected ? .connected : .absent))
+                    case let .migrated(t):
+                        // The adapter only knows the host it dialled; SessionModel substitutes the
+                        // connection's display name, which is what the sheet actually quotes.
+                        continuation.yield(.migrated(MigrationOffer(vmName: target.host,
+                                                                    newHost: t.host,
+                                                                    newPort: t.port ?? 0,
+                                                                    newTLSPort: t.tlsPort,
+                                                                    certSubject: t.certSubject)))
                     case let .channelFailed(desc, error):
                         // A failed secondary channel degrades the session; only main is fatal.
                         if desc.type == .main {

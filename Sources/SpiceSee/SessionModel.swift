@@ -73,10 +73,13 @@ final class SessionModel {
         phase = .connecting(completed: [])
         pump?.cancel()
         pump = Task { [backend] in
-            for await event in backend.connect(host: connection.host, port: connection.port,
-                                               tlsPort: connection.tlsPort, password: password) {
-                apply(event)
-            }
+            let target = ConnectionTarget(host: connection.host,
+                                          port: connection.port == 0 ? nil : connection.port,
+                                          tlsPort: connection.tlsPort,
+                                          hostSubject: connection.hostSubject,
+                                          caPEM: connection.caPEM,
+                                          password: password)
+            for await event in backend.connect(target) { apply(event) }
         }
     }
 
@@ -96,7 +99,10 @@ final class SessionModel {
             publish(.frame(update), to: update.viewportID)
         case let .cursor(viewportID, change):
             publish(.cursor(change), to: viewportID)
-        case let .migrated(offer):
+        case var .migrated(offer):
+            // The backend knows only the host it dialled; the sheet quotes the VM by the name the
+            // user gave the connection.
+            if let name = connection?.name, !name.isEmpty { offer.vmName = name }
             migrationOffer = offer
         case let .failed(failure):
             phase = .failed(failure)
@@ -142,11 +148,16 @@ final class SessionModel {
     func dismissFailure() { if case .failed = phase { phase = .idle } }
 
     /// Accept the migration offer: reconnect to the host the cluster moved the VM to.
-    func acceptMigration(host: String, port: UInt16, password: String?) {
+    ///
+    /// The CA is kept — a cluster CA does not change when a VM moves between its nodes — but the
+    /// subject does, since it names the node, so it is replaced whenever the message supplied one.
+    /// A target that offers a TLS port is reconnected over TLS; the plain port is not a fallback.
+    func acceptMigration(host: String, port: UInt16?, tlsPort: UInt16?, certSubject: String?, password: String?) {
         guard var connection else { return }
         connection.host = host
-        connection.port = port
-        connection.tlsPort = nil
+        if let port { connection.port = port }
+        connection.tlsPort = tlsPort
+        if let certSubject { connection.hostSubject = certSubject }
         migrationOffer = nil
         connect(connection, password: password)
     }

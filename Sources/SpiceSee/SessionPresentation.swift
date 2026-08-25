@@ -100,15 +100,27 @@ private struct MigrationPresenter: ViewModifier {
                     port: $port,
                     reconnectAutomatically: $reconnectAutomatically,
                     onCancel: { session.migrationOffer = nil },
-                    onReconnect: { session.acceptMigration(host: host, port: UInt16(port) ?? offer.newPort, password: nil) }
+                    onReconnect: { reconnect(to: offer) }
                 )
             }
         }
         .onChange(of: session.migrationOffer) { _, offer in
             guard let offer else { return }
             host = offer.newHost
-            port = String(offer.newPort)
+            port = String(offer.newTLSPort ?? offer.newPort)
         }
+    }
+
+    /// The single port field edits whichever port the cluster offered — the secure one when there
+    /// is one, so an edited port never silently downgrades the reconnect to plain TCP.
+    private func reconnect(to offer: MigrationOffer) {
+        let entered = UInt16(port)
+        let secure = offer.newTLSPort != nil
+        session.acceptMigration(host: host,
+                                port: secure ? nil : (entered ?? offer.newPort),
+                                tlsPort: secure ? (entered ?? offer.newTLSPort) : nil,
+                                certSubject: offer.certSubject,
+                                password: nil)
     }
 
     /// Only one window shows the dialog, otherwise a two-monitor guest raises two of them.

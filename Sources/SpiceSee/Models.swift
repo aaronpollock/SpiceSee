@@ -157,4 +157,10 @@ struct MigrationOffer: Equatable {
     var vmName: String
     var newHost: String
     var newPort: UInt16
+    /// A cluster that runs its consoles over TLS advertises the secure port here; the reconnect
+    /// must use it rather than dropping to `newPort`.
+    var newTLSPort: UInt16?
+    /// The certificate subject the new host will present — it differs from the old one, since the
+    /// subject names the node the VM moved to.
+    var certSubject: String?
 }
