@@ -53,6 +53,21 @@ private let proxmoxSubject = "OU=PVE Cluster Node,O=Proxmox Virtual Environment,
     }
 }
 
+@Test func acceptsTheDialledHostWhenTheCertificateNamesIt() throws {
+    // The positive half of the hostname path — plain QEMU/libvirt over TLS with no `host-subject`.
+    // `test-server-san.pem` is the same CA's certificate for `spice.test`. Apple's TLS rules bind it
+    // to 397 days, so it expires around 2027-09-26; `scripts/dev-tls.sh` re-mints it.
+    let policy = try TLSPolicy(caPEM: try fixture("test-ca.pem"), hostSubject: nil, host: "spice.test")
+    #expect(policy.verify(peerChain: try certificates("test-server-san.pem")) == nil)
+}
+
+@Test func rejectsACertificateIssuedToAnotherHost() throws {
+    let policy = try TLSPolicy(caPEM: try fixture("test-ca.pem"), hostSubject: nil, host: "wrong.test")
+    guard case .untrusted? = policy.verify(peerChain: try certificates("test-server-san.pem")) else {
+        Issue.record("expected untrusted"); return
+    }
+}
+
 @Test func withoutASubjectTheNameIsEvaluatedNotWaivedThrough() throws {
     // The widening case: a pinned CA and no `host-subject` used to accept anything that CA had
     // signed, whatever name it carried. Now an SSL policy for the dialled host evaluates the name.

@@ -1791,7 +1791,7 @@ git commit -m "docs: M3 shipped — .vv, TLS and migration; refresh CLAUDE.md"
 ## Execution notes — 2026-08-24
 
 - Task order was swapped to 1, 3, 2, 4, … so `SpiceError.tls(TLSFailure)` existed before Task 2's tests needed it, resolving the plan's own ordering note by landing the type first rather than forward-declaring it.
-- `.vv` size is checked with `stat` (`URL.resourceValues(forKeys: [.fileSizeKey])`) before the file is read, not after — an oversized file never gets a read attempt.
+- `.vv` size is bounded by the read itself: one `FileHandle.read(upToCount: maxFileBytes + 1)`, and anything longer is rejected. A `stat` first would only be a second answer the file could invalidate by growing before the read.
 - `Certificates.subjectComponents` fails closed: an unreadable subject entry throws rather than being dropped, since a silently shortened subject could spuriously match a shorter `host-subject`.
 - The TLS verify block's rejection reason travels out via a synchronous `AsyncStream` yield before `complete(false)`, not the racy actor hop the plan sketched — the yield is guaranteed ordered before the connection can fail, so the reason is always in hand by the time the `catch` reads it.
 - `#available(macOS 12)` guards were dropped; the deployment target is already macOS 14.
