@@ -37,22 +37,32 @@ public actor ChannelReader {
     public func run() async {
         defer { continuation.finish() }
         do {
-            while !Task.isCancelled {
+            // Runs until the transport throws — closing it is how a channel is ended. Checking
+            // `Task.isCancelled` here instead would drop a message the transport already holds
+            // when the cancel lands first; cancellation only classifies the log line below.
+            while true {
                 let header = try await readHeader()
                 guard header.size <= Self.maxMessageSize else {
                     log.error("\(self.channel.type.rawValue)/\(self.channel.id): message size \(header.size) exceeds limit")
                     return
                 }
                 let payload = try await source.read(exactly: Int(header.size))
-                if try await handleCommon(type: header.type, payload: payload) { continue }
-                continuation.yield(RawMessage(type: header.type, payload: payload))
+                // Every message the server sends counts against its ack window, including the ones
+                // consumed below — counting only what we forward drifts by one per ping until the
+                // window is exhausted and the server stops sending on this channel.
                 if ackWindow > 0 {
                     sinceAck += 1
                     if sinceAck >= ackWindow { sinceAck = 0; try await send(type: CommonClientMsg.ack.rawValue, payload: ClientMessage.ack()) }
                 }
+                if try await handleCommon(type: header.type, payload: payload) { continue }
+                continuation.yield(RawMessage(type: header.type, payload: payload))
             }
+        } catch where Task.isCancelled {
+            log.info("\(self.channel.type.rawValue)/\(self.channel.id): closed: \(String(describing: error), privacy: .public)")
         } catch {
-            log.info("\(self.channel.type.rawValue)/\(self.channel.id): loop ended: \(String(describing: error))")
+            // Not our doing: the server dropped this channel. `.info` is not persisted by the
+            // unified log, which is how a silently frozen display went unexplained.
+            log.error("\(self.channel.type.rawValue)/\(self.channel.id): connection lost: \(String(describing: error), privacy: .public)")
         }
     }
 

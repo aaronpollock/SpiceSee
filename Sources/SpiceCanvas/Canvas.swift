@@ -29,7 +29,7 @@ public actor Canvas {
 
     public func apply(_ m: DisplayMessage) {
         do { try applyThrowing(m) } catch {
-            log.error("canvas: \(String(describing: error))")
+            log.error("canvas: \(String(describing: error), privacy: .public)")
             cont.yield(.unsupported(String(describing: error)))
         }
     }

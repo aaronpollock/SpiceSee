@@ -111,7 +111,7 @@ final class SpiceKitBackend: SessionBackend {
                     case .canvas(.updated), .canvas(.surfaceCreated):
                         break   // off-screen surfaces are scratch buffers, not viewport content
                     case let .canvas(.unsupported(what)):
-                        log.notice("canvas: \(what)")
+                        log.notice("canvas: \(what, privacy: .public)")
                     case .canvas(.surfaceDestroyed):
                         break
                     case let .pointerMode(mode):

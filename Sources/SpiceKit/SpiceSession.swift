@@ -66,6 +66,9 @@ public actor SpiceSession {
     private var cursors: [CursorChannel] = []
     private var inputs: InputsChannel?
     private var tasks: [Task<Void, Never>] = []
+    private var closing = false
+    /// Set when a channel ended without `disconnect` being called; reported with `.disconnected`.
+    private var lossReason: SpiceError?
     public private(set) var pointerMode: PointerMode
     private let log = Logger(subsystem: "com.spicesee", category: "session")
 
@@ -116,14 +119,18 @@ public actor SpiceSession {
                 case .display:
                     let d = try await DisplayChannel.open(transport: try await transports(desc), connectionID: info.connectionID, id: desc.id, password: password)
                     displays.append(d)
-                    let pump = Task { [canvas] in for await m in d.messages { await canvas.apply(m) } }
+                    let pump = Task { [canvas, weak self] in
+                        for await m in d.messages { await canvas.apply(m) }
+                        await self?.channelEnded(desc)
+                    }
                     displayPumps.append(pump); tasks.append(pump)
                 case .cursor:
                     let c = try await CursorChannel.open(transport: try await transports(desc), connectionID: info.connectionID, id: desc.id, password: password)
                     cursors.append(c)
-                    let pump = Task { [cont] in
+                    let pump = Task { [cont, weak self] in
                         var tracker = CursorTracker()
                         for await m in c.messages { for change in tracker.apply(m) { cont.yield(.cursor(change, displayID: desc.id)) } }
+                        await self?.channelEnded(desc)
                     }
                     cursorPumps.append(pump); tasks.append(pump)
                 case .inputs where desc.id == 0:
@@ -162,15 +169,39 @@ public actor SpiceSession {
         // `.disconnected` must come after every pixel and every cursor change, or a consumer that
         // stops on it (the app, and the replay test) loses the tail of the session. Main ending only
         // means the connection is gone; the other channels may still hold buffered messages, and the
-        // canvas may still hold events those produced. Drain in that order, then close.
+        // canvas may still hold events those produced. Drain in that order, then close. Main ends
+        // either because the server dropped it or because `channelEnded` closed it on another
+        // channel's behalf — the pumps below finish either way, since every channel is closed.
         tasks.append(Task { [weak self, main, canvas, cont] in
             for await m in main.events { await self?.handleMain(m) }
+            await self?.channelEnded(MainChannel.descriptor)
             for pump in displayPumps { _ = await pump.value }
             for pump in cursorPumps { _ = await pump.value }
             await canvas.finish()
             _ = await canvasPump.value
-            cont.yield(.disconnected(nil))
+            cont.yield(.disconnected(await self?.lossReason))
         })
+    }
+
+    /// A channel the server closed on its own ends the whole session: a display gone quiet while
+    /// main still answers pings is a frozen picture, not a degraded session — spice-server drops
+    /// just the display client on `flush_commands: flush timeout`, and virt-viewer disconnects on
+    /// any channel error. Closing everything makes the drain above run and report the loss.
+    private func channelEnded(_ desc: ChannelDescriptor) async {
+        guard !closing else { return }
+        lossReason = SpiceError(.closed, channel: desc, underlying: "the server closed the channel")
+        log.error("\(String(describing: desc.type), privacy: .public)/\(desc.id) closed by the server; ending the session")
+        await closeChannels()
+    }
+
+    private func closeChannels() async {
+        guard !closing else { return }
+        closing = true
+        inputCont.finish()
+        for d in displays { await d.close() }
+        for c in cursors { await c.close() }
+        await inputs?.close()
+        await main.close()
     }
 
     private func handleMain(_ m: MainMessage) async {
@@ -219,13 +250,9 @@ public actor SpiceSession {
         return await canvas.snapshot(surfaceID: id)
     }
 
-    public func disconnect() {
+    public func disconnect() async {
         tasks.forEach { $0.cancel() }
-        inputCont.finish()
-        displays.forEach { d in Task { await d.close() } }
-        cursors.forEach { c in Task { await c.close() } }
-        if let inputs { Task { await inputs.close() } }
-        Task { [main] in await main.close() }
+        await closeChannels()
         cont.yield(.disconnected(nil)); cont.finish()
     }
 }

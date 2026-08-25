@@ -80,11 +80,17 @@ final class GuestSurfaceView: NSView {
     private let sharpSampler: MTLSamplerState?
     private var texture: MTLTexture?
 
+    /// Dirty rects are patched into the texture as they arrive, but presented once per refresh:
+    /// `nextDrawable()` blocks until vsync frees one of the layer's three drawables, so presenting
+    /// per rect pinned the main thread at ~60 rects/s and every animation crawled behind it.
+    private var displayLink: CADisplayLink?
+    private var needsPresent = false
+
     /// The event-taking view layered over the surface; owned as a subview, held here to reconfigure.
     var inputView: GuestInputView?
 
     var scaling: ScalingMode = .fit {
-        didSet { if scaling != oldValue { render() } }
+        didSet { if scaling != oldValue { setNeedsPresent() } }
     }
 
     /// Guest ↔ view geometry for the current scaling; nil until the surface size is known.
@@ -129,6 +135,8 @@ final class GuestSurfaceView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        // The link retains its target; drop it when the view leaves its window or neither is freed.
+        if window == nil { displayLink?.invalidate(); displayLink = nil }
         resizeDrawable()
     }
 
@@ -173,7 +181,7 @@ final class GuestSurfaceView: NSView {
             texture.replace(region: MTLRegionMake2D(update.x, update.y, update.width, update.height),
                             mipmapLevel: 0, withBytes: base, bytesPerRow: update.width * 4)
         }
-        render()
+        setNeedsPresent()
     }
 
     private func makeTexture(width: Int, height: Int) -> MTLTexture? {
@@ -194,7 +202,7 @@ final class GuestSurfaceView: NSView {
     /// Server mode draws the guest's cursor into the surface; client mode leaves it to the host
     /// pointer's shape (`GuestInputView.hostCursor`).
     var showsCursorOverlay = false {
-        didSet { if showsCursorOverlay != oldValue { render() } }
+        didSet { if showsCursorOverlay != oldValue { setNeedsPresent() } }
     }
 
     func apply(_ change: CursorChange) {
@@ -206,7 +214,7 @@ final class GuestSurfaceView: NSView {
         case let .moved(x, y):
             cursorPosition = (x, y)
         }
-        render()
+        setNeedsPresent()
     }
 
     private func makeCursorTexture(_ image: CursorImage) -> MTLTexture? {
@@ -227,6 +235,24 @@ final class GuestSurfaceView: NSView {
     }
 
     // MARK: Presentation
+
+    /// Coalesces every change since the last refresh into one present. The link runs only while
+    /// there is something to show: a tick with nothing pending pauses it.
+    private func setNeedsPresent() {
+        needsPresent = true
+        if displayLink == nil, window != nil {
+            let link = displayLink(target: self, selector: #selector(present(_:)))
+            link.add(to: .main, forMode: .common)
+            displayLink = link
+        }
+        displayLink?.isPaused = false
+    }
+
+    @objc private func present(_ link: CADisplayLink) {
+        guard needsPresent else { link.isPaused = true; return }
+        needsPresent = false
+        render()
+    }
 
     private func render() {
         guard let metalLayer, let queue, let pipeline, let texture, let t = transform,

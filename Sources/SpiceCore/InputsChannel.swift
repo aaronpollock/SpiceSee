@@ -7,6 +7,7 @@ import SpiceWire
 public actor InputsChannel {
     public static let descriptor = ChannelDescriptor(type: .inputs, id: 0)
     private let reader: ChannelReader
+    private let transport: any Transport
     private let loop: Task<Void, Never>
     private var pump: Task<Void, Never>?
     private let log = Logger(subsystem: "com.spicesee", category: "inputs")
@@ -25,18 +26,24 @@ public actor InputsChannel {
     public static func clientCaps() -> CapabilitySet { CapabilitySet(bits: [InputsCap.keyScancode]) }
 
     public static func open(transport: any Transport, connectionID: UInt32, password: String?) async throws -> InputsChannel {
-        let link = try await LinkHandshake.perform(on: transport, connectionID: connectionID, channel: descriptor,
+        let link: LinkResult
+        do {
+            link = try await LinkHandshake.perform(on: transport, connectionID: connectionID, channel: descriptor,
                                                    channelCaps: clientCaps(), password: password)
+        } catch {
+            await transport.close()
+            throw error
+        }
         let reader = ChannelReader(source: transport, sink: transport, miniHeader: link.miniHeader, channel: descriptor)
-        let loop = Task { await reader.run() }
-        let channel = InputsChannel(reader: reader, loop: loop,
+        let loop = Task { await reader.run(); await transport.close() }
+        let channel = InputsChannel(reader: reader, transport: transport, loop: loop,
                                      serverSendsScancodes: link.serverChannelCaps.contains(InputsCap.keyScancode))
         await channel.startPump()
         return channel
     }
 
-    private init(reader: ChannelReader, loop: Task<Void, Never>, serverSendsScancodes: Bool) {
-        self.reader = reader; self.loop = loop; self.serverSendsScancodes = serverSendsScancodes
+    private init(reader: ChannelReader, transport: any Transport, loop: Task<Void, Never>, serverSendsScancodes: Bool) {
+        self.reader = reader; self.transport = transport; self.loop = loop; self.serverSendsScancodes = serverSendsScancodes
     }
 
     private func startPump() {
@@ -136,5 +143,5 @@ public actor InputsChannel {
         }
     }
 
-    public func close() { pump?.cancel(); loop.cancel() }
+    public func close() async { loop.cancel(); await transport.close() }
 }

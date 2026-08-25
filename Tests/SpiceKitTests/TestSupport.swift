@@ -28,3 +28,25 @@ func fakeLink(channelCaps: UInt32 = 0, body: [UInt8]) throws -> [UInt8] {
 func frame(_ type: UInt16, _ payload: [UInt8]) -> [UInt8] {
     ClientMessage.frame(type: type, payload: payload, mini: true, serial: 0)
 }
+
+/// Serves `input`, then blocks every further read until `close()` — a live socket with a quiet
+/// peer. `closed` records whether the owner ever released it.
+actor BlockingTransport: Transport {
+    private let input: [UInt8]
+    private var cursor = 0
+    private var waiters: [CheckedContinuation<[UInt8], Error>] = []
+    private(set) var closed = false
+    init(input: [UInt8]) { self.input = input }
+
+    func read(exactly n: Int) async throws -> [UInt8] {
+        guard !closed else { throw SpiceError(.closed, underlying: "closed") }
+        if input.count - cursor >= n { defer { cursor += n }; return Array(input[cursor ..< cursor + n]) }
+        return try await withCheckedThrowingContinuation { waiters.append($0) }
+    }
+    func write(_ bytes: [UInt8]) {}
+    func close() {
+        closed = true
+        waiters.forEach { $0.resume(throwing: SpiceError(.closed, underlying: "closed")) }
+        waiters.removeAll()
+    }
+}

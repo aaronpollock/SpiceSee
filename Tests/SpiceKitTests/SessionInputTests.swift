@@ -62,9 +62,11 @@ private func waitForFrames(_ t: InMemoryTransport, type: UInt16, count: Int) asy
     let inputs = InMemoryTransport(input: try fakeLink(body: frame(InputsServerMsg.`init`.rawValue, [2, 0])))
     let session = try await SpiceSession.connect(password: nil) { desc in
         switch desc.type {
-        case .main: return InMemoryTransport(input: try mainBytes(supported: 1, current: 1))
+        // Every channel but inputs stays open: a channel the server closes now ends the session,
+        // which would race the sends below.
+        case .main: return BlockingTransport(input: try mainBytes(supported: 1, current: 1))
         case .inputs: return inputs
-        default: return InMemoryTransport(input: try fakeLink(body: []))
+        default: return BlockingTransport(input: try fakeLink(body: []))
         }
     }
     let a = XTScancode(0x1E)
