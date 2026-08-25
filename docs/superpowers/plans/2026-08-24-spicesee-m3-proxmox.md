@@ -1801,3 +1801,4 @@ git commit -m "docs: M3 shipped — .vv, TLS and migration; refresh CLAUDE.md"
 - `sidebarSubtitle` lives in `ConnectionStore.swift`, not `Models.swift`.
 - `ConnectionStore.addImported` persists the imported row and dedupes on host + effective port (`tlsPort ?? port`), refreshing connection material on a match while preserving the user's existing row name; it returns the stored row so the caller connects using the same identity the sidebar shows.
 - Dismissing a file-error sheet restores the phase the session was in before the file error interrupted it (`SessionModel.phaseBeforeFileFailure`), rather than resetting to `.idle`.
+- `ConnectionManagerView.swift` was edited under controller approval, against the plan's "no view changes": it gained the `opener` property, a second `importVV` call site the plan did not know about, and a fix to `ConnectionRowView`'s duplicate `host:port` composition, which rendered `…:0` for a TLS-only connection.
