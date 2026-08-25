@@ -23,7 +23,10 @@ final class ConnectionStore {
         if let connections { self.connections = connections; return }
         if let data = try? Data(contentsOf: url),
            let decoded = try? JSONDecoder().decode([SavedConnection].self, from: data) {
-            self.connections = decoded
+            // Bring unnamed rows in step with their host on the way in, not only when the host is
+            // next edited — otherwise a row saved as the placeholder sits there reading
+            // "New Connection" forever despite having a perfectly good host to be named after.
+            self.connections = decoded.map { var c = $0; c.hostDidChange(); return c }
         }
     }
 
@@ -44,7 +47,7 @@ final class ConnectionStore {
     }
 
     func add() {
-        let new = SavedConnection(name: "New Connection", host: "")
+        let new = SavedConnection(name: SavedConnection.placeholderName, nameIsCustom: false, host: "")
         connections.append(new)
         selection = new.id
         save()
@@ -54,6 +57,7 @@ final class ConnectionStore {
         var copy = connection
         copy.id = UUID()
         copy.name = "\(connection.name) copy"
+        copy.nameIsCustom = true
         copy.lastConnected = nil
         connections.append(copy)
         selection = copy.id

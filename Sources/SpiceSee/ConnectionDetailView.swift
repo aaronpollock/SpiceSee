@@ -9,6 +9,10 @@ struct ConnectionDetailView: View {
     var onShowDisplays: () -> Void
 
     @State private var password = ""
+    /// Non-nil only while the heading is being edited; holds the uncommitted text.
+    @State private var nameDraft: String?
+    @State private var nameHovering = false
+    @FocusState private var nameFocused: Bool
     @AppStorage private var advancedExpanded: Bool
 
     init(connection: Binding<SavedConnection>, session: SessionModel, settings: AppSettings,
@@ -35,15 +39,12 @@ struct ConnectionDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(nsColor: .controlBackgroundColor))
         .ignoresSafeArea(.container, edges: .top)
-        .onChange(of: connection.id) { password = "" }
+        .onChange(of: connection.id) { password = ""; nameDraft = nil }
     }
 
     private var header: some View {
         HStack(spacing: 10) {
-            Text(connection.name)
-                .font(.system(size: 22, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            nameField
             Text(tagText)
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
@@ -52,6 +53,56 @@ struct ConnectionDetailView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: Metric.Window.titlebar)
+    }
+
+    /// The heading doubles as the rename field: artboard 01 has no `Name:` row, so editing happens
+    /// where the name already is. The hover cue and the field are drawn with negative padding so the
+    /// glyphs stay on the 16pt margin the spec puts them on, editing or not.
+    @ViewBuilder private var nameField: some View {
+        let font = Font.system(size: 22, weight: .semibold)
+        if let draft = nameDraft {
+            TextField("", text: Binding(get: { draft }, set: { nameDraft = $0 }))
+                .textFieldStyle(.plain)
+                .font(font)
+                .focused($nameFocused)
+                .frame(maxWidth: 320)
+                .background(nameBackdrop(Color(nsColor: .textBackgroundColor)))
+                .onSubmit { commitName() }
+                // Escape abandons the edit; the name is unchanged.
+                .onExitCommand { nameDraft = nil }
+                .onChange(of: nameFocused) { _, focused in if !focused { commitName() } }
+                .task { nameFocused = true }
+        } else {
+            Text(connection.name)
+                .font(font)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .background(nameBackdrop(nameHovering ? Color(nsColor: .quaternaryLabelColor) : .clear))
+                .contentShape(.rect)
+                .onHover { nameHovering = $0 }
+                .onTapGesture { nameDraft = connection.name }
+                .help("Click to rename")
+                .accessibilityAddTraits(.isButton)
+        }
+    }
+
+    private func nameBackdrop(_ fill: Color) -> some View {
+        RoundedRectangle(cornerRadius: Metric.Form.fieldRadius)
+            .fill(fill)
+            .padding(.horizontal, -6)
+            .padding(.vertical, -3)
+    }
+
+    private func commitName() {
+        guard let draft = nameDraft else { return }
+        nameDraft = nil
+        connection.rename(to: draft)
+    }
+
+    /// Writes through `hostDidChange` so an unnamed connection's title follows what is typed.
+    private var hostBinding: Binding<String> {
+        Binding(get: { connection.host },
+                set: { connection.host = $0; connection.hostDidChange() })
     }
 
     /// True while this is the connection the live session belongs to — including after its
@@ -68,7 +119,7 @@ struct ConnectionDetailView: View {
         VStack(alignment: .leading, spacing: Metric.Form.rowRhythm) {
             HStack(spacing: Metric.Form.labelGap) {
                 FormLabel("Host:")
-                FormTextField(text: $connection.host)
+                FormTextField(text: hostBinding)
             }
             HStack(spacing: Metric.Form.labelGap) {
                 FormLabel("Port:")

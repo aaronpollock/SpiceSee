@@ -5,8 +5,10 @@ import SpiceCore
 extension SavedConnection {
     /// A connection made from a `.vv`. The ticket is deliberately not stored: Proxmox tickets expire
     /// within seconds, so a saved one is worse than none.
+    /// A file that named itself has been named; one that fell back to its host has not, and should
+    /// keep following the host if it is ever edited.
     init(vv: VVFile, name: String) {
-        self.init(name: name, host: vv.host, port: vv.port ?? 0, tlsPort: vv.tlsPort)
+        self.init(name: name, nameIsCustom: vv.title != nil, host: vv.host, port: vv.port ?? 0, tlsPort: vv.tlsPort)
         hostSubject = vv.hostSubject
         caPEM = vv.caPEM
         savePasswordInKeychain = false

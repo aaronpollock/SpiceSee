@@ -2,8 +2,21 @@ import Foundation
 
 /// A host the user has saved in the connection manager.
 struct SavedConnection: Identifiable, Hashable, Codable {
+    /// What a connection is called before anyone names it.
+    static let placeholderName = "New Connection"
+
     var id = UUID()
+    /// The sidebar row title and the detail pane's heading. Editable in place; until it is edited it
+    /// follows the host.
     var name: String
+    /// Whether the user named this connection themselves.
+    ///
+    /// `Optional` is load-bearing, not laziness: synthesised `Codable` decoding throws on a missing
+    /// key **even when the property has a default value**, and `ConnectionStore` decodes with `try?`
+    /// — so a non-optional field added here would silently empty everyone's saved connections on the
+    /// next launch. Absent means "leave the name alone", except for a row still carrying the
+    /// placeholder, which has plainly never been named.
+    var nameIsCustom: Bool?
     var host: String
     var port: UInt16 = 5900
     var tlsPort: UInt16?
@@ -19,6 +32,24 @@ struct SavedConnection: Identifiable, Hashable, Codable {
 
     var endpoint: String { "\(host):\(tlsPort ?? port)" }
     var usesTLS: Bool { tlsPort != nil }
+
+    var hasCustomName: Bool { nameIsCustom ?? (name != Self.placeholderName) }
+
+    /// What an unnamed connection is called: the host, as soon as there is one.
+    var derivedName: String { host.isEmpty ? Self.placeholderName : host }
+
+    /// Renames from the UI. Emptying the field is not an error — it hands the name back to the host.
+    mutating func rename(to newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        nameIsCustom = !trimmed.isEmpty
+        name = trimmed.isEmpty ? derivedName : trimmed
+    }
+
+    /// Keeps an unnamed connection's name in step with the host as it is typed.
+    mutating func hostDidChange() {
+        guard !hasCustomName else { return }
+        name = derivedName
+    }
 }
 
 /// Per-connection overrides of the global defaults.
