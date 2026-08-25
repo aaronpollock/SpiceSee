@@ -323,3 +323,50 @@ ssh -n aaron@192.168.50.6 'pkill -f "OPENSSL-LIST[E]N:5931"; rm -f /tmp/spicesee
   one-shot ticket that expires in about 30 seconds — is exercised only by unit tests.
 - **`socat` is not spice-server's TLS.** It terminates TLS and proxies plaintext; a real Proxmox
   console has the SPICE server itself doing the handshake.
+
+## M3 exit criterion
+
+Unlike M2, this one *was* driven from this machine, end to end, cold:
+
+```sh
+open -a SpiceSee.app /tmp/dev.vv
+```
+
+**Met, 2026-08-24.** A cold launch (app not already running) opened `/tmp/dev.vv`, the connection
+manager listed it, and a session window rendered the Windows 11 installer — over TLS, not the plain
+port: the dev box's connection table showed four established connections to the TLS port (5931) and
+none to the plain SPICE port (5930) for the duration. The file's `delete-this-file=1` took effect —
+`/tmp/dev.vv` was gone after connecting. Opening a deliberately malformed `.vv` (truncated INI) raised
+the failure sheet with no crash and no hang.
+
+What this does *not* prove, same as the TLS dev endpoint above: no real Proxmox cluster, so a genuine
+`.vv`, a cluster CA chain, the one-shot ticket flow, and live migration are still unexercised here —
+see the manual checklist below.
+
+## M3 exit check (manual)
+
+Two things need a real Proxmox cluster, which does not exist here — this is the user's checklist.
+
+- [ ] **A genuine `.vv`.** From a Proxmox web UI, download the console file for a running VM and
+      double-click it (or `open` it) while SpiceSee is *not* already running. Expect a console window,
+      the same as the synthetic-CA check above. If it fails, the likely culprit is something about the
+      real cluster CA chain or RDN order that `scripts/dev-tls.sh`'s throwaway CA doesn't reproduce.
+- [ ] **Live migration.** With a console open, migrate that VM to another node in the cluster. Expect
+      the reconnect sheet to appear with the new host prefilled, driven by a real
+      `MAIN_MIGRATE_BEGIN`/`MAIN_MIGRATE_SWITCH_HOST` pair. This is the one piece of M3 with **no local
+      header confirming the wire layout** — `Sources/CSpiceCodec/vendor/spice/` carries `enums.h` only,
+      so the message shapes are transcribed from `spice.proto` and parsed defensively. If migration
+      fails to reconnect, capture it with `spicerec` first (as in the Ctrl-Alt-Del check above) before
+      changing any parsing code.
+
+Neither has been exercised here: there is no Proxmox cluster on this network, only the standalone
+quickemu guest this whole document is otherwise about.
+
+## Known issues (not fixed, out of M3's scope)
+
+- **The app cannot be quit while a connection-failure sheet is up.**
+  `osascript -e 'tell application "SpiceSee" to quit'` returns `-128` and the process survives; it
+  quits normally once the sheet clears. Pre-existing behavior, not introduced by M3.
+- **The failure sheet's Cancel button is not automatable.** It has no keyboard equivalent, and does
+  not respond to synthetic `CGEvent` clicks (see "Verifying UI work on this machine" in `CLAUDE.md`),
+  so its dismissal path must be click-verified by a human, not an agent.

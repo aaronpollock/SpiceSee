@@ -140,7 +140,7 @@ scripts/dev-tls.sh        generates the test CA + server cert, prints the socat 
 - Consumes: `SpiceError`.
 - Produces: `public struct VVFile: Sendable, Equatable` with `host: String`, `port: UInt16?`, `tlsPort: UInt16?`, `password: String?`, `hostSubject: String?`, `caPEM: String?`, `title: String?`, `deleteAfterConnecting: Bool`; `public static func parse(_ text: String) throws -> VVFile`; `public static func parse(contentsOf: URL) throws -> VVFile`.
 
-- [ ] **Step 1: Write the fixtures**
+- [x] **Step 1: Write the fixtures**
 
 `Tests/SpiceCoreTests/Fixtures/proxmox.vv` — the shape Proxmox emits (one line, escaped CA; the certificate body is a real but throwaway self-signed cert, generated in Task 2's Step 1 and pasted here; until then use the placeholder below and update it in Task 2):
 
@@ -169,7 +169,7 @@ host=10.0.0.4
 port=5900
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 ```swift
 // Tests/SpiceCoreTests/VVFileTests.swift
@@ -248,12 +248,12 @@ private func fixture(_ name: String) throws -> String {
 }
 ```
 
-- [ ] **Step 3: Run to verify they fail**
+- [x] **Step 3: Run to verify they fail**
 
 Run: `swift test --filter VVFileTests`
 Expected: compile error — `VVFile` does not exist.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 ```swift
 // Sources/SpiceCore/VVFile.swift
@@ -354,12 +354,12 @@ Add the error case in `Sources/SpiceCore/SpiceError.swift` — one line in `Kind
 
 (`SpiceError(.vvFile(…))` needs no channel; the existing `init` already defaults it.)
 
-- [ ] **Step 5: Run to verify they pass**
+- [x] **Step 5: Run to verify they pass**
 
 Run: `swift test --filter VVFileTests`
 Expected: 6 tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/SpiceCore/VVFile.swift Sources/SpiceCore/SpiceError.swift \
@@ -382,7 +382,7 @@ git commit -m "feat(core): parse virt-viewer .vv connection files"
 - Consumes: `SpiceError`, Security.framework.
 - Produces: `public enum Certificates` with `static func parsePEM(_ pem: String) throws -> [SecCertificate]`, `static func subjectComponents(of: SecCertificate) throws -> [(attribute: String, value: String)]`, `static func subjectDN(of: SecCertificate) throws -> String`, `static func matches(hostSubject: String, certificate: SecCertificate) throws -> Bool`, `static func parseSubject(_ dn: String) -> [(attribute: String, value: String)]`.
 
-- [ ] **Step 1: Generate the test certificates**
+- [x] **Step 1: Generate the test certificates**
 
 `scripts/dev-tls.sh` — creates a throwaway CA and a server certificate whose subject is Proxmox-shaped, and prints the `socat` line Task 5 uses. Idempotent; writes into a directory given as `$1` (default `.dev-tls`, gitignored).
 
@@ -447,7 +447,7 @@ Expected: `subject=CN=pve1.example.com,O=Proxmox Virtual Environment,OU=PVE Clus
 
 If the Mac's `openssl` is LibreSSL and rejects a flag, use the dev box instead (`ssh aaron@192.168.50.6`, OpenSSL 3.0.13) and `scp` the results back; say which you used.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 ```swift
 // Tests/SpiceCoreTests/CertificatesTests.swift
@@ -523,12 +523,12 @@ private let proxmoxSubject = "OU=PVE Cluster Node,O=Proxmox Virtual Environment,
 }
 ```
 
-- [ ] **Step 3: Run to verify they fail**
+- [x] **Step 3: Run to verify they fail**
 
 Run: `swift test --filter CertificatesTests`
 Expected: compile error — `Certificates` does not exist.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 ```swift
 // Sources/SpiceCore/Certificates.swift
@@ -633,12 +633,12 @@ public enum Certificates {
 
 This references `SpiceError.tls(TLSFailure)` — Task 3 defines it. Implement Task 3's error change **first if the compiler complains**; the two tasks were split for review size, not for build order, so it is fine to land the `Kind` change here and let Task 3 build the rest on it. Say which you did in your report.
 
-- [ ] **Step 5: Run**
+- [x] **Step 5: Run**
 
 Run: `swift test --filter CertificatesTests`
 Expected: 6 tests pass. If `subjectComponents` returns OIDs instead of short names for some entry, extend the map rather than loosening the test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/SpiceCore/Certificates.swift Tests/SpiceCoreTests/CertificatesTests.swift \
@@ -659,7 +659,7 @@ The design's host-subject sheet shows *expected* and *presented* subjects. Today
 **Interfaces:**
 - Produces: `public enum TLSFailure: Sendable, Equatable` with `.handshake(String)`, `.untrusted(String)`, `.badCertificate(String)`, `.subjectMismatch(expected: String, presented: String)`; `SpiceError.Kind.tls(TLSFailure)`; `ConnectFailureKind.hostSubjectMismatch(expected: String, presented: String)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Replace the TLS line of `spiceErrorClassification` in `Tests/SpiceKitTests/SpiceKitBackendTests.swift` and add a case:
 
@@ -687,12 +687,12 @@ to
             == .hostSubjectMismatch(expected: "a", presented: "b"))
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `swift test --filter SpiceKitBackendTests`
 Expected: compile error — `.tls` takes no argument yet.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Sources/SpiceCore/SpiceError.swift`:
 
@@ -749,12 +749,12 @@ Then fix the one call site in `Sources/SpiceSee/SpiceKitBackend.swift`:
             .hostSubjectMismatch(expected: expected, presented: presented, host: endpoint)
 ```
 
-- [ ] **Step 4: Run**
+- [x] **Step 4: Run**
 
 Run: `swift test --filter SpiceKitTests` then `swift test 2>&1 | tail -1`
 Expected: all pass. The app is not built by SPM; it is rebuilt in Task 8.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceCore/SpiceError.swift Sources/SpiceKit/ConnectFailureKind.swift \
@@ -777,7 +777,7 @@ git commit -m "feat(core,kit): TLS failures carry the expected and presented sub
 
 Splitting `verify` out of the `sec_protocol` callback is what makes this testable: the callback does the plumbing, `verify` holds every decision, and the tests drive `verify` directly with the fixture certificates.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```swift
 // Tests/SpiceCoreTests/TLSPolicyTests.swift
@@ -849,12 +849,12 @@ Copy `other-ca.pem` into the fixtures in this task's Step 1 if Task 2 did not:
 cp .dev-tls/other-ca.pem Tests/SpiceCoreTests/Fixtures/other-ca.pem
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `swift test --filter TLSPolicyTests`
 Expected: compile error — `TLSPolicy` does not exist.
 
-- [ ] **Step 3: Implement the policy**
+- [x] **Step 3: Implement the policy**
 
 ```swift
 // Sources/SpiceCore/TLSPolicy.swift
@@ -912,12 +912,12 @@ public struct TLSPolicy: Sendable {
 }
 ```
 
-- [ ] **Step 4: Run the policy tests**
+- [x] **Step 4: Run the policy tests**
 
 Run: `swift test --filter TLSPolicyTests`
 Expected: 6 pass. If `rejectsAChainTheCADidNotSign` comes back `nil` rather than `.untrusted`, `SecTrustSetAnchorCertificatesOnly` is not taking effect — do not weaken the test; that is the bug the whole feature exists to prevent.
 
-- [ ] **Step 5: Wire the policy into the transport**
+- [x] **Step 5: Wire the policy into the transport**
 
 In `Sources/SpiceCore/NWTransport.swift`, replace the `connect` body's parameter list and connection construction:
 
@@ -987,12 +987,12 @@ private actor TLSVerdict {
 
 The `Task { await verdict.record(failure) }` inside a synchronous C callback is a fire-and-forget hop; the `complete(false)` that follows tears the connection down and the `catch` above then awaits `verdict.failure`. If a race shows up in Task 5's live run (a rejected connection reported as `.connect` rather than `.tls`), make `TLSVerdict` a small `final class` guarded by the callback queue's serialisation instead — but only if the live evidence demands it, and record it as a deviation.
 
-- [ ] **Step 6: Build and run everything**
+- [x] **Step 6: Build and run everything**
 
 Run: `swift build && swift test 2>&1 | tail -1`
 Expected: builds; all tests pass. The transport's TLS path is exercised for real in Task 5.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add Sources/SpiceCore/TLSPolicy.swift Sources/SpiceCore/NWTransport.swift Tests/SpiceCoreTests
@@ -1013,7 +1013,7 @@ This is the cross-implementation check: a real OpenSSL server, holding a real ce
 **Interfaces:**
 - Produces: `ConnectionConfig(host:port:tlsPort:password:hostSubject:caPEM:)` with `port`/`tlsPort` optional and at least one required; `ConnectionConfig(vv: VVFile)`; `spicesee-cli vv <file> [seconds out.png]`, and `--tls-port/--ca/--host-subject` on `connect`.
 
-- [ ] **Step 1: Extend `ConnectionConfig`**
+- [x] **Step 1: Extend `ConnectionConfig`**
 
 ```swift
 public struct ConnectionConfig: Sendable {
@@ -1057,7 +1057,7 @@ and in `SpiceSession.connect(_:)`:
 
 Every channel dials the same port and policy, which is what spice-gtk does: the server hands out one TLS port for all channels.
 
-- [ ] **Step 2: Extend the CLI**
+- [x] **Step 2: Extend the CLI**
 
 Rewrite `Sources/spicesee-cli/main.swift`'s usage and add a `vv` subcommand plus TLS flags on `connect`:
 
@@ -1071,7 +1071,7 @@ usage: spicesee-cli connect <host> <port> [password] [--tls-port <p>] [--ca <fil
 
 Keep the existing argument handling style (positional, `usage()` on anything unexpected). `--ca` reads the PEM from a file so a shell never holds a certificate.
 
-- [ ] **Step 3: Stand up the TLS endpoint**
+- [x] **Step 3: Stand up the TLS endpoint**
 
 On the Mac:
 
@@ -1087,7 +1087,7 @@ ssh aaron@192.168.50.6 'nohup socat OPENSSL-LISTEN:5931,cert=/tmp/spicesee-serve
 ssh aaron@192.168.50.6 'ss -lnt | grep 5931 || cat /tmp/socat.log'
 ```
 
-- [ ] **Step 4: Prove the positive case**
+- [x] **Step 4: Prove the positive case**
 
 Write a `.vv` pointing at it (the CA is the one `dev-tls.sh` made):
 
@@ -1113,7 +1113,7 @@ swift run spicesee-cli vv /tmp/dev.vv 5 /tmp/tls.png
 
 Look at the PNG with the Read tool and say what is on screen.
 
-- [ ] **Step 5: Prove both negative cases**
+- [x] **Step 5: Prove both negative cases**
 
 ```bash
 sed 's/CN=pve1.example.com/CN=pve3.example.com/' /tmp/dev.vv > /tmp/wrong-subject.vv
@@ -1130,7 +1130,7 @@ swift run spicesee-cli vv /tmp/wrong-ca.vv             # expect: untrusted, NOT 
 
 Both must fail, and fail with the *right* reason. A wrong-CA file reported as a subject mismatch means the trust evaluation is being skipped — stop and fix it. Quote both outputs.
 
-- [ ] **Step 6: Tear down and document**
+- [x] **Step 6: Tear down and document**
 
 ```bash
 ssh aaron@192.168.50.6 'pkill -f "OPENSSL-LISTEN:5931" && echo stopped'
@@ -1138,7 +1138,7 @@ ssh aaron@192.168.50.6 'pkill -f "OPENSSL-LISTEN:5931" && echo stopped'
 
 Add a `## TLS dev endpoint` section to `docs/dev-server.md`: what `scripts/dev-tls.sh` makes, the `socat` line, the three `spicesee-cli vv` invocations and their expected outcomes, and the note that this proves the verify block against OpenSSL but **not** against a real Proxmox cluster (no ticket flow, no cluster CA).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add Sources/SpiceKit/SpiceSession.swift Sources/spicesee-cli/main.swift docs/dev-server.md
@@ -1159,7 +1159,7 @@ git commit -m "feat(kit,cli): connect from a .vv over TLS; verified against an O
 
 Read the "Migration messages" note in **What cannot be verified** before starting: the layout is from `spice.proto` and no local header confirms it. Parse defensively; never trap; never tear down a working session because a migration message did not parse.
 
-- [ ] **Step 1: Write the failing wire tests**
+- [x] **Step 1: Write the failing wire tests**
 
 ```swift
 // Tests/SpiceWireTests/MigrationMessageTests.swift
@@ -1232,12 +1232,12 @@ private func body(port: UInt32, sport: UInt32, host: String?, subject: String?) 
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `swift test --filter MigrationMessageTests`
 Expected: compile error — `MigrationTarget` does not exist.
 
-- [ ] **Step 3: Implement the wire types**
+- [x] **Step 3: Implement the wire types**
 
 Add to `Sources/SpiceWire/MainMessages.swift`:
 
@@ -1321,12 +1321,12 @@ private extension MainMessage {
 }
 ```
 
-- [ ] **Step 4: Run the wire tests**
+- [x] **Step 4: Run the wire tests**
 
 Run: `swift test --filter MigrationMessageTests`
 Expected: 5 pass.
 
-- [ ] **Step 5: Write the failing session test**
+- [x] **Step 5: Write the failing session test**
 
 ```swift
 // Tests/SpiceKitTests/MigrationSessionTests.swift
@@ -1382,7 +1382,7 @@ import SpiceCore
 
 `MainChannel`'s pump already drops messages that fail to parse (`if let m = try? MainMessage(...)`), which is what makes the second test pass — confirm that is still true rather than assuming it.
 
-- [ ] **Step 6: Implement the session event**
+- [x] **Step 6: Implement the session event**
 
 In `Sources/SpiceKit/SpiceSession.swift`, add `case migrated(MigrationTarget)` to `SessionEvent` and handle both messages in `handleMain`:
 
@@ -1394,12 +1394,12 @@ In `Sources/SpiceKit/SpiceSession.swift`, add `case migrated(MigrationTarget)` t
         case .migrateCancel, .migrateEnd: break
 ```
 
-- [ ] **Step 7: Run**
+- [x] **Step 7: Run**
 
 Run: `swift test --filter MigrationSessionTests` then `swift test 2>&1 | tail -1`
 Expected: 2 new pass; whole suite green.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add Sources/SpiceWire/MainMessages.swift Sources/SpiceKit/SpiceSession.swift \
@@ -1418,7 +1418,7 @@ git commit -m "feat(wire,kit): parse migration targets and surface them as an ev
 **Interfaces:**
 - Produces: `SavedConnection.hostSubject: String?`, `SavedConnection.caPEM: String?`, `SavedConnection.init(vv:)`.
 
-- [ ] **Step 1: Extend the model**
+- [x] **Step 1: Extend the model**
 
 In `Sources/SpiceSee/Models.swift`, add two properties to `SavedConnection` (both `Optional`, so Swift's synthesized `Decodable` treats them as absent in the existing `connections.json` — **do not** add a custom `init(from:)`):
 
@@ -1447,7 +1447,7 @@ extension SavedConnection {
 
 This file imports nothing engine-side today; `VVFile` comes from `SpiceCore`, so add `import SpiceCore` at the top of `Models.swift` **only if** the initialiser lives there. Prefer instead to put `init(vv:)` in `Sources/SpiceSee/VVDocument.swift` (Task 9), which already imports the engine, and keep `Models.swift` engine-free. Do that.
 
-- [ ] **Step 2: Verify the store still loads old files**
+- [x] **Step 2: Verify the store still loads old files**
 
 Write a throwaway check (do not commit it) that the existing on-disk JSON decodes with the new fields absent:
 
@@ -1461,7 +1461,7 @@ print((try? JSONDecoder().decode([A].self, from: Data(old.utf8))) != nil)
 
 The real check is Task 9's build plus launching the app and seeing the existing saved connections still listed. Do that there; note here if you could not.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add Sources/SpiceSee/Models.swift
@@ -1478,7 +1478,7 @@ git commit -m "feat(app): saved connections remember their .vv CA and host-subje
 **Interfaces:**
 - Produces: `struct ConnectionTarget: Sendable` (`host`, `port: UInt16?`, `tlsPort: UInt16?`, `hostSubject: String?`, `caPEM: String?`, `password: String?`); `SessionBackend.connect(_ target: ConnectionTarget) -> AsyncStream<BackendEvent>` replacing the six-argument form; `BackendEvent.migrated` already exists.
 
-- [ ] **Step 1: Replace the connect signature**
+- [x] **Step 1: Replace the connect signature**
 
 In `Sources/SpiceSee/SessionBackend.swift`:
 
@@ -1506,7 +1506,7 @@ protocol SessionBackend: Sendable {
 }
 ```
 
-- [ ] **Step 2: Update `SessionModel`**
+- [x] **Step 2: Update `SessionModel`**
 
 `SessionModel.connect(_ connection: SavedConnection, password: String?)` builds the target:
 
@@ -1524,7 +1524,7 @@ protocol SessionBackend: Sendable {
 
 `acceptMigration(host:port:password:)` currently clears `tlsPort`. A migration target may carry a TLS port and a new cert subject; extend it to `acceptMigration(host:port:tlsPort:certSubject:password:)`, keeping the existing CA (the cluster CA does not change on migration) and replacing `hostSubject` when the message supplied one. The migration sheet calls it with what the offer holds — `MigrationOffer` gains `newTLSPort: UInt16?` and `certSubject: String?`; `MigrationPresenter` passes them through. **`MigrationSheet` itself does not change** — it already binds host and port text fields.
 
-- [ ] **Step 3: Update the real backend**
+- [x] **Step 3: Update the real backend**
 
 `SpiceKitBackend.connect(_ target:)`:
 
@@ -1550,11 +1550,11 @@ Map the new event:
                                                                     certSubject: t.certSubject)))
 ```
 
-- [ ] **Step 4: Update the mock**
+- [x] **Step 4: Update the mock**
 
 `MockSessionBackend.connect(_ target:)` takes the new type; `endpoint` comes from `target.endpoint`. The `certMismatch` scenario should now present plausible subjects in the same shape the real path produces (`OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=pve1.example.com` expected vs `…CN=pve3.example.com` presented) so the sheet is reviewed against realistic strings. The `migrate` scenario's `MigrationOffer` gains the two new fields (`newTLSPort: 5901`, `certSubject: "CN=pve3,O=PVE Cluster Manager CA"`).
 
-- [ ] **Step 5: Build and check every scenario**
+- [x] **Step 5: Build and check every scenario**
 
 ```bash
 xcodegen generate && xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -configuration Debug -destination 'platform=macOS' build 2>&1 | grep -E "^\*\* BUILD"
@@ -1563,7 +1563,7 @@ swift test 2>&1 | tail -1
 
 Then, per `CLAUDE.md`'s mock recipe (`SPICESEE_MOCK=1 <app>/Contents/MacOS/SpiceSee --scenario X --autoconnect`), screenshot and look at `--scenario certMismatch` (both subjects render in the detail box, not empty) and `--scenario migrate` (the sheet appears prefilled). Quit with `osascript`. Report what you saw.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/SpiceSee
@@ -1583,7 +1583,7 @@ The M3 exit criterion. Double-clicking a `.vv` in Finder — which is how Proxmo
 **Interfaces:**
 - Produces: `@MainActor final class VVOpener` with `func open(_ url: URL, store: ConnectionStore, session: SessionModel, settings: AppSettings)`; `SavedConnection.init(vv:name:)`; `AppDelegate: NSObject, NSApplicationDelegate` handling `application(_:open:)`.
 
-- [ ] **Step 1: Write the opener**
+- [x] **Step 1: Write the opener**
 
 ```swift
 // Sources/SpiceSee/VVDocument.swift
@@ -1654,7 +1654,7 @@ final class VVOpener {
     func presentFailure(_ failure: ConnectFailure) { phase = .failed(failure) }
 ```
 
-- [ ] **Step 2: Hook up document opening**
+- [x] **Step 2: Hook up document opening**
 
 `SwiftUI`'s `Window` scene has no document handling, so use an app delegate. In `Sources/SpiceSee/SpiceSeeApp.swift`:
 
@@ -1706,7 +1706,7 @@ In the manager window's `.task`, install the handler and drain anything that arr
 
 with `@State private var opener = VVOpener()` beside the other state. Replace the `Open .vv File…` menu action's `store.importVV(at:)` with the same `opener.open(...)`, and **delete** the stopgap `extension ConnectionStore { func importVV(at:) }` at the bottom of `SpiceSeeApp.swift` — `VVFile` replaces it.
 
-- [ ] **Step 3: Build and test the open path**
+- [x] **Step 3: Build and test the open path**
 
 ```bash
 xcodegen generate && xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -configuration Debug -destination 'platform=macOS' build 2>&1 | grep -E "^\*\* BUILD"
@@ -1728,7 +1728,7 @@ printf '[virt-viewer]\nhost=\n' > /tmp/bad.vv && open -a "<…>/SpiceSee.app" /t
 
 If `open -a` with a file argument does not deliver `application(_:open:)` on this machine, say so and try double-clicking from Finder (`open -R /tmp/dev.vv` to reveal it) — and if neither can be driven from here, hand it to the user with exact steps rather than claiming it works.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Sources/SpiceSee/VVDocument.swift Sources/SpiceSee/SpiceSeeApp.swift Sources/SpiceSee/SessionModel.swift
@@ -1742,7 +1742,7 @@ git commit -m "feat(app): opening a .vv file connects"
 **Files:**
 - Modify: `CLAUDE.md`, `docs/dev-server.md`, this plan (tick the boxes, append execution notes)
 
-- [ ] **Step 1: Full verification**
+- [x] **Step 1: Full verification**
 
 ```bash
 swift test 2>&1 | tail -1
@@ -1753,7 +1753,7 @@ swift build 2>&1 | grep -ci warning
 
 Expected: all tests pass (109 at the start of M3 plus this milestone's), notices exit 0, `BUILD SUCCEEDED`, 0 warnings.
 
-- [ ] **Step 2: Update `CLAUDE.md`**
+- [x] **Step 2: Update `CLAUDE.md`**
 
 Refresh the milestone paragraph: M3 shipped except what the "cannot be verified" list names; add a short **TLS and `.vv`** paragraph carrying the rules a future contributor would otherwise break —
 
@@ -1764,15 +1764,15 @@ Refresh the milestone paragraph: M3 shipped except what the "cannot be verified"
 
 Keep the file's existing voice and length discipline.
 
-- [ ] **Step 3: Update `docs/dev-server.md`**
+- [x] **Step 3: Update `docs/dev-server.md`**
 
 Ensure the `## TLS dev endpoint` section from Task 5 is present and accurate, and add a `## M3 exit check (manual)` section: get a real `.vv` from a Proxmox web UI, double-click it, expect a console; then migrate the VM between nodes and expect the reconnect sheet. State plainly that neither has been exercised here.
 
-- [ ] **Step 4: Tick the plan and append execution notes**
+- [x] **Step 4: Tick the plan and append execution notes**
 
 Change every `- [ ]` to `- [x]` and append `## Execution notes — <date>` listing the deviations ruled during execution, one line each.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add CLAUDE.md docs
@@ -1787,3 +1787,17 @@ git commit -m "docs: M3 shipped — .vv, TLS and migration; refresh CLAUDE.md"
 - **Known gaps, by design:** no Proxmox cluster, so a real `.vv` and real migration messages are unverified — both are listed in "What cannot be verified", carried into `docs/dev-server.md`, and must be repeated in the final report. TLS *is* verified end-to-end against OpenSSL, including both negative cases.
 - **Type consistency:** `VVFile(host:port:tlsPort:password:hostSubject:caPEM:title:deleteAfterConnecting:)`, `Certificates.parsePEM/subjectComponents/subjectDN/matches/parseSubject`, `TLSPolicy(caPEM:hostSubject:)` / `.verify(peerChain:)`, `TLSFailure.handshake/untrusted/badCertificate/subjectMismatch(expected:presented:)`, `ConnectFailureKind.hostSubjectMismatch(expected:presented:)`, `MigrationTarget(host:port:tlsPort:certSubject:)`, `SessionEvent.migrated`, `ConnectionConfig(host:port:tlsPort:password:hostSubject:caPEM:)` and `ConnectionConfig(vv:)`, `ConnectionTarget`, `SavedConnection.init(vv:name:)` — spelled the same in every task that uses them.
 - **Ordering note:** Task 2 references `SpiceError.tls(TLSFailure)`, which Task 3 formally introduces. Whichever lands first must carry the `Kind` change; the task that follows then builds on it. Called out in Task 2's Step 4.
+
+## Execution notes — 2026-08-24
+
+- Task order was swapped to 1, 3, 2, 4, … so `SpiceError.tls(TLSFailure)` existed before Task 2's tests needed it, resolving the plan's own ordering note by landing the type first rather than forward-declaring it.
+- `.vv` size is checked with `stat` (`URL.resourceValues(forKeys: [.fileSizeKey])`) before the file is read, not after — an oversized file never gets a read attempt.
+- `Certificates.subjectComponents` fails closed: an unreadable subject entry throws rather than being dropped, since a silently shortened subject could spuriously match a shorter `host-subject`.
+- The TLS verify block's rejection reason travels out via a synchronous `AsyncStream` yield before `complete(false)`, not the racy actor hop the plan sketched — the yield is guaranteed ordered before the connection can fail, so the reason is always in hand by the time the `catch` reads it.
+- `#available(macOS 12)` guards were dropped; the deployment target is already macOS 14.
+- `spicesee-cli`'s `--ca` (or `--host-subject`) without `--tls-port` is a hard error (exit 2), not silently ignored.
+- Certificate subjects in the failure sheet wrap instead of truncating, so the differing RDN between expected and presented stays visible even for Proxmox's long subjects.
+- `SessionModel`/`SpiceKitBackend` yield `.step(.tls)` only when `target.usesTLS`; a plain TCP target skips the TLS progress step entirely rather than showing and immediately completing it.
+- `sidebarSubtitle` lives in `ConnectionStore.swift`, not `Models.swift`.
+- `ConnectionStore.addImported` persists the imported row and dedupes on host + effective port (`tlsPort ?? port`), refreshing connection material on a match while preserving the user's existing row name; it returns the stored row so the caller connects using the same identity the sidebar shows.
+- Dismissing a file-error sheet restores the phase the session was in before the file error interrupted it (`SessionModel.phaseBeforeFileFailure`), rather than resetting to `.idle`.
