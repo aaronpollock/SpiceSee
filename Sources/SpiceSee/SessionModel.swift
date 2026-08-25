@@ -29,6 +29,10 @@ final class SessionModel {
     /// Mirrors AppSettings.sendLockKeys; SpiceSeeApp keeps it current.
     var sendLockKeys = true
 
+    /// Set only by `presentFailure`, so `dismissFailure` can put back a session the file error
+    /// interrupted. Cleared the moment it is used or made stale by a real connect attempt.
+    private var phaseBeforeFileFailure: Phase?
+
     private var viewportSubscribers: [UUID: (viewportID: Int, continuation: AsyncStream<ViewportEvent>.Continuation)] = [:]
     private let backend: any SessionBackend
     private var pump: Task<Void, Never>?
@@ -71,6 +75,7 @@ final class SessionModel {
         keyboardMapping = KeyboardMapping(commandMapsTo: connection.advanced.commandMapsTo,
                                           optionMapsTo: connection.advanced.optionMapsTo)
         phase = .connecting(completed: [])
+        phaseBeforeFileFailure = nil
         pump?.cancel()
         pump = Task { [backend] in
             let target = ConnectionTarget(host: connection.host,
@@ -105,6 +110,7 @@ final class SessionModel {
             if let name = connection?.name, !name.isEmpty { offer.vmName = name }
             migrationOffer = offer
         case let .failed(failure):
+            phaseBeforeFileFailure = nil   // a real failure ends the session: dismissing must reach .idle
             phase = .failed(failure)
         case .disconnected:
             phase = .idle
@@ -145,10 +151,23 @@ final class SessionModel {
     }
 
     /// Shows a failure that happened before a connection was attempted (an unreadable `.vv`).
-    func presentFailure(_ failure: ConnectFailure) { phase = .failed(failure) }
+    ///
+    /// A file that will not parse is not a session failure, so the phase in effect is remembered and
+    /// dismissing the sheet must not tell the app the session ended — a guest may still be rendering.
+    func presentFailure(_ failure: ConnectFailure) {
+        if case .failed = phase {} else { phaseBeforeFileFailure = phase }
+        phase = .failed(failure)
+    }
 
     /// Dismiss a failure sheet, returning the detail pane to its editable form.
-    func dismissFailure() { if case .failed = phase { phase = .idle } }
+    ///
+    /// Only `presentFailure` records a phase to go back to; a real connect failure has none, so it
+    /// keeps landing in `.idle`.
+    func dismissFailure() {
+        guard case .failed = phase else { return }
+        phase = phaseBeforeFileFailure ?? .idle
+        phaseBeforeFileFailure = nil
+    }
 
     /// Accept the migration offer: reconnect to the host the cluster moved the VM to.
     ///
