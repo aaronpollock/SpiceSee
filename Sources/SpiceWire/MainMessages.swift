@@ -47,6 +47,57 @@ public struct MultiMediaTime: Sendable, Equatable {
     public init(reader r: inout SpiceReader) throws { time = try r.u32() }
 }
 
+/// Where the cluster moved this VM. `spice.proto` gives both a plain and a TLS port; either may be
+/// absent (0, or 0xFFFFFFFF from older servers).
+public struct MigrationTarget: Sendable, Equatable {
+    public var host: String
+    public var port: UInt16?
+    public var tlsPort: UInt16?
+    public var certSubject: String?
+    public init(host: String, port: UInt16?, tlsPort: UInt16?, certSubject: String?) {
+        self.host = host; self.port = port; self.tlsPort = tlsPort; self.certSubject = certSubject
+    }
+
+    /// Longest string we will take from a migration message. Hostnames and subjects are far shorter;
+    /// the cap exists so a bad length cannot make us allocate.
+    static let maxStringBytes = 4096
+
+    /// The six-word header is followed by the pointed-to bytes. Every offset and size is checked
+    /// against the payload before it is used — this message arrives from the server mid-session and
+    /// a bad one must be a caught error, never a trap.
+    init(reader r: inout SpiceReader, body: SpiceReader) throws {
+        let plain = try r.u32(), secure = try r.u32()
+        let hostSize = try r.u32(), hostOffset = try r.u32()
+        let subjectSize = try r.u32(), subjectOffset = try r.u32()
+
+        func string(size: UInt32, offset: UInt32, field: String) throws -> String? {
+            guard size > 0 else { return nil }
+            guard size <= UInt32(Self.maxStringBytes) else {
+                throw WireError.badValue(field: "\(field)_size", value: UInt64(size))
+            }
+            var at = try body.reader(at: offset)
+            let bytes = try at.bytes(Int(size))
+            guard let nul = bytes.firstIndex(of: 0) else {
+                throw WireError.badValue(field: "\(field)_terminator", value: UInt64(size))
+            }
+            return String(decoding: bytes[..<nul], as: UTF8.self)
+        }
+
+        guard let host = try string(size: hostSize, offset: hostOffset, field: "host"), !host.isEmpty else {
+            throw WireError.badValue(field: "migration_host", value: UInt64(hostSize))
+        }
+        self.host = host
+        certSubject = try string(size: subjectSize, offset: subjectOffset, field: "cert_subject")
+        port = Self.port(plain)
+        tlsPort = Self.port(secure)
+    }
+
+    private static func port(_ value: UInt32) -> UInt16? {
+        guard value > 0, value <= UInt32(UInt16.max) else { return nil }
+        return UInt16(value)
+    }
+}
+
 public enum MainMessage: Sendable {
     case `init`(MainInit)
     case channelsList(ChannelsList)
@@ -59,10 +110,15 @@ public enum MainMessage: Sendable {
     case agentConnectedTokens(UInt32)
     case name(String)
     case uuid([UInt8])
+    case migrateBegin(MigrationTarget)
+    case migrateSwitchHost(MigrationTarget)
+    case migrateCancel
+    case migrateEnd
     case other(type: UInt16, payload: [UInt8])
 
     public init(type: UInt16, payload: [UInt8]) throws {
         var r = SpiceReader(payload)
+        let body = SpiceReader(payload)
         switch MainServerMsg(rawValue: type) {
         case .`init`: self = .`init`(try MainInit(reader: &r))
         case .channelsList: self = .channelsList(try ChannelsList(reader: &r))
@@ -77,6 +133,10 @@ public enum MainMessage: Sendable {
             let len = try r.u32()
             self = .name(String(decoding: try r.bytes(Int(min(len, 4096))), as: UTF8.self))
         case .uuid: self = .uuid(try r.bytes(16))
+        case .migrateBegin: self = .migrateBegin(try MigrationTarget(reader: &r, body: body))
+        case .migrateSwitchHost: self = .migrateSwitchHost(try MigrationTarget(reader: &r, body: body))
+        case .migrateCancel: self = .migrateCancel
+        case .migrateEnd: self = .migrateEnd
         default: self = .other(type: type, payload: payload)
         }
     }

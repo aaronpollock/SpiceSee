@@ -48,6 +48,7 @@ public enum SessionEvent: Sendable {
     case agent(connected: Bool)
     case channelFailed(ChannelDescriptor, SpiceError)
     case disconnected(SpiceError?)
+    case migrated(MigrationTarget)
 }
 
 public actor SpiceSession {
@@ -180,6 +181,11 @@ public actor SpiceSession {
             await negotiateMouseMode(supported: mode.supported)
         case .agentConnected, .agentConnectedTokens: cont.yield(.agent(connected: true))
         case .agentDisconnected: cont.yield(.agent(connected: false))
+        case let .migrateSwitchHost(target): cont.yield(.migrated(target))
+        // A begin without a switch means the server is preparing a migration it may still cancel;
+        // the design's prompt belongs on the switch, so log and wait.
+        case let .migrateBegin(target): log.notice("migration announced to \(target.host, privacy: .public)")
+        case .migrateCancel, .migrateEnd: break
         default: break
         }
     }
