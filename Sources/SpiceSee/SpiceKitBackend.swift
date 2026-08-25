@@ -120,6 +120,8 @@ final class SpiceKitBackend: SessionBackend {
                         continuation.yield(.cursor(viewportID: Int(displayID), Self.translate(change)))
                     case let .agent(connected):
                         continuation.yield(.agent(connected ? .connected : .absent))
+                    case let .clipboard(event):
+                        if let mapped = Self.translate(event) { continuation.yield(.clipboard(mapped)) }
                     case let .migrated(t):
                         // The adapter only knows the host it dialled; SessionModel substitutes the
                         // connection's display name, which is what the sheet actually quotes.
@@ -154,6 +156,26 @@ final class SpiceKitBackend: SessionBackend {
     }
 
     func disconnect() async { await live.disconnect() }
+
+    func offerClipboardText() async { await live.session?.offerClipboard([.utf8Text]) }
+
+    func requestClipboardText() async { await live.session?.requestClipboard(.utf8Text) }
+
+    func sendClipboardText(_ text: String) async {
+        await live.session?.sendClipboard(.utf8Text, Array(text.utf8))
+    }
+
+    /// Types other than text are dropped rather than surfaced: the seam above speaks only text, so
+    /// announcing an image offer the app cannot answer would strand the guest waiting.
+    private static func translate(_ e: SpiceKit.ClipboardEvent) -> ClipboardEvent? {
+        switch e {
+        case let .available(on): .available(on)
+        case let .guestOffers(types): types.contains(.utf8Text) ? .guestOffersText : nil
+        case let .guestRequests(type): type == .utf8Text ? .guestRequestsText : nil
+        case let .guestData(type, bytes): type == .utf8Text ? .guestText(String(decoding: bytes, as: UTF8.self)) : nil
+        case .guestReleased: .guestReleased
+        }
+    }
 
     /// The guest's secure attention sequence: LCtrl, LAlt, Delete down, then up in reverse.
     func sendCtrlAltDel() async {
@@ -201,7 +223,7 @@ final class SpiceKitBackend: SessionBackend {
 
 /// Holds the live session so `disconnect()` can reach it without locks.
 private actor LiveSession {
-    private var session: SpiceSession?
+    private(set) var session: SpiceSession?
     func store(_ s: SpiceSession) { session = s }
     func disconnect() async {
         await session?.disconnect()

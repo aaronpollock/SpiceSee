@@ -20,7 +20,9 @@ final class SessionModel {
     // Per-session view state, seeded from the connection's Advanced settings.
     var scaling: ScalingMode = .fit
     var hiDPI = false
-    var clipboardSync = true
+    var clipboardSync = true {
+        didSet { clipboard.enabled = clipboardSync }
+    }
     var muted = false
     var pointerCaptured = false
     var releaseChord: ReleaseChord = .controlOption
@@ -35,6 +37,7 @@ final class SessionModel {
 
     private var viewportSubscribers: [UUID: (viewportID: Int, continuation: AsyncStream<ViewportEvent>.Continuation)] = [:]
     private let backend: any SessionBackend
+    private let clipboard: ClipboardBridge
     private var pump: Task<Void, Never>?
 
     var connection: SavedConnection?
@@ -42,6 +45,7 @@ final class SessionModel {
 
     init(backend: any SessionBackend) {
         self.backend = backend
+        clipboard = ClipboardBridge(backend: backend)
     }
 
     /// Every viewport window gets its OWN stream. One shared stream would split events between
@@ -95,6 +99,9 @@ final class SessionModel {
         case let .connected(viewports):
             self.viewports = viewports
             phase = .connected
+            clipboard.start()
+        case let .clipboard(event):
+            clipboard.handle(event)
         case let .agent(state):
             agent = state          // capture is decided by pointer mode now, not by agent presence
         case let .pointerMode(mode):
@@ -112,10 +119,12 @@ final class SessionModel {
         case let .failed(failure):
             phaseBeforeFileFailure = nil   // a real failure ends the session: dismissing must reach .idle
             phase = .failed(failure)
+            clipboard.stop()
         case .disconnected:
             phase = .idle
             viewports = []
             pointerCaptured = false
+            clipboard.stop()
         }
     }
 
@@ -126,12 +135,14 @@ final class SessionModel {
 
     func cancel() {
         pump?.cancel()
+        clipboard.stop()
         phase = .idle
         Task { [backend] in await backend.disconnect() }
     }
 
     func disconnect() {
         pump?.cancel()
+        clipboard.stop()
         viewports = []
         phase = .idle
         Task { [backend] in await backend.disconnect() }

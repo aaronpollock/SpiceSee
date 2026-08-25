@@ -7,6 +7,9 @@ public enum ClientMessage {
     public static func pong(_ p: Ping) -> [UInt8] { var w = SpiceWriter(); w.u32(p.id); w.u64(p.timestamp); return w.bytes }
     public static func attachChannels() -> [UInt8] { [] }
     public static func mouseModeRequest(_ mode: UInt32) -> [UInt8] { var w = SpiceWriter(); w.u32(mode); return w.bytes }
+    /// How many agent messages the client will accept before the server must wait for a token.
+    public static func agentStart(tokens: UInt32) -> [UInt8] { var w = SpiceWriter(); w.u32(tokens); return w.bytes }
+    public static func agentToken(_ n: UInt32) -> [UInt8] { var w = SpiceWriter(); w.u32(n); return w.bytes }
 }
 
 extension ClientMessage {

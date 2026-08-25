@@ -8,7 +8,7 @@ QEMU or a Lima VM. That is not needed here: there is a real one on the LAN.
 | Host | `192.168.50.6` (Ubuntu server) |
 | Port | `5930` |
 | Ticket | none — connect with an empty password |
-| Guest | Windows, sitting at the installer dialog |
+| Guest | Windows — installed, with guest tools: `agent=1`, `mouse=2` (was the installer dialog at M0) |
 | Hypervisor | quickemu |
 
 Homebrew's QEMU is built without `--enable-spice`, so there is no local fallback; if the Ubuntu box
@@ -374,3 +374,61 @@ quickemu guest this whole document is otherwise about.
 - **The failure sheet's Cancel button is not automatable.** It has no keyboard equivalent, and does
   not respond to synthetic `CGEvent` clicks (see "Verifying UI work on this machine" in `CLAUDE.md`),
   so its dismissal path must be click-verified by a human, not an agent.
+
+## Clipboard (M5) — what the guest can and cannot prove
+
+**The dev guest now runs a vdagent.** It did not at M0 (`agent=0`, Windows sitting at the installer);
+Windows and the guest tools have since been installed, which is also why `mouse=2`:
+
+```
+MAIN_INIT session=1313870989 mouse=2 agent=1 tokens=10 mmtime=48996002
+```
+
+`spicesee-cli clipboard` is the probe — it prints the negotiation, fetches whatever the guest copies,
+and answers the guest's paste requests:
+
+```sh
+swift run spicesee-cli clipboard 192.168.50.6 5930 --send "line one
+line two" --seconds 20
+```
+
+**Verified against the real Windows vdagent, 2026-08-25:**
+
+```
+connected; watching the clipboard for 20.0s
+clipboard sharing negotiated
+offering 26 bytes of text
+```
+
+`clipboard sharing negotiated` is the load-bearing line. Reaching it means the agent accepted
+`MSGC_MAIN_AGENT_START`, our `VD_AGENT_ANNOUNCE_CAPABILITIES` was framed well enough for a real agent
+to parse, and its reply came back and decoded — the whole `MAIN_AGENT_DATA` path, header included.
+
+### The bug the C header flushed out
+
+`VDAgentMessage` is `SPICE_ATTR_PACKED`, so it is **20 bytes**, not the 24 that natural alignment of
+its `uint64 opaque` implies. Transcribing the struct by eye gets this wrong and every field lands
+four bytes out. `Tools/agentref.c` builds each message with the real structs and `VD_AGENT_SET_*`
+macros and prints the bytes; `AgentMessagesTests` pins our encoder against that output:
+
+```sh
+cc -I$(brew --prefix spice-protocol)/include/spice-1 -o /tmp/agentref Tools/agentref.c && /tmp/agentref
+```
+
+### M5 clipboard exit check (manual)
+
+Both remaining checks need someone at the guest's console — the guest only sends `CLIPBOARD_GRAB`
+when a person copies in Windows and `CLIPBOARD_REQUEST` when a person pastes. The guest's display was
+blanked when this was written, and waking it to type blind is not something to do to a running VM.
+
+- [ ] **Guest → host.** Copy text in the guest (Notepad, a browser). The probe above should print
+      `guest grabbed, offering: utf8Text` then the text, with `\r\n` shown as `\n` — the conversion
+      is the point, since Windows copies CRLF and the Mac pasteboard wants LF.
+- [ ] **Host → guest.** With `--send` set, paste in the guest. The probe prints
+      `guest is pasting, wants utf8Text` and the guest receives both lines, with the line break
+      intact rather than as a single run-on line.
+- [ ] **In the app.** ⌘C on the Mac, then paste in the guest; copy in the guest, then ⌘V on the Mac.
+      The toolbar's clipboard toggle turns sharing off, and with it off neither direction moves.
+- [ ] **Note the ⌘ mapping.** ⌘ maps to Super by default, so ⌘V inside the viewport sends **Win+V**
+      (Windows clipboard history), not paste. Paste in the guest with **⌃V**, or set ⌘→Ctrl in the
+      connection's Advanced settings.

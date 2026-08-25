@@ -78,6 +78,10 @@ final class MockSessionBackend: SessionBackend {
     func disconnect() async {}
     func sendCtrlAltDel() async {}
     func sendInput(_ event: InputEvent) {}
+    // No guest to share with; the toggle and its wording still need to be reviewable.
+    func offerClipboardText() async {}
+    func sendClipboardText(_ text: String) async {}
+    func requestClipboardText() async {}
 
     /// A 12×20 black arrow with a white outline — enough to see the overlay in `--mock`.
     private static let arrowCursor: CursorImage = {

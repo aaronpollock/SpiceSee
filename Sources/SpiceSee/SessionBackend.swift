@@ -54,10 +54,26 @@ enum ViewportEvent: Sendable {
     case cursor(CursorChange)
 }
 
+/// Clipboard sharing, narrowed to plain text — the only type SpiceSee exchanges today. The agent
+/// protocol underneath is type-generic, so widening this to images is an adapter change, not a
+/// protocol one.
+enum ClipboardEvent: Sendable, Equatable {
+    /// Whether the guest agent is up and has negotiated clipboard sharing.
+    case available(Bool)
+    /// The guest copied text. Ask for it with `requestClipboardText`.
+    case guestOffersText
+    /// The guest is pasting and wants the host clipboard; answer with `sendClipboardText`.
+    case guestRequestsText
+    /// The guest's answer, with LF line endings.
+    case guestText(String)
+    case guestReleased
+}
+
 enum BackendEvent: Sendable {
     case step(ConnectStep)
     case connected(viewports: [ViewportInfo])
     case agent(AgentState)
+    case clipboard(ClipboardEvent)
     case pointerMode(PointerMode)
     case frame(FrameUpdate)
     case cursor(viewportID: Int, CursorChange)
@@ -92,4 +108,10 @@ protocol SessionBackend: Sendable {
     func sendCtrlAltDel() async
     /// Synchronous on purpose: the backend must preserve order, and a `Task` per event would not.
     func sendInput(_ event: InputEvent)
+    /// Tells the guest the host clipboard holds text it may ask for.
+    func offerClipboardText() async
+    /// Answers `.guestRequestsText`. Line endings are converted to the guest's convention below.
+    func sendClipboardText(_ text: String) async
+    /// Asks for what `.guestOffersText` announced; the answer arrives as `.guestText`.
+    func requestClipboardText() async
 }

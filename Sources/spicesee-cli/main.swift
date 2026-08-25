@@ -8,6 +8,7 @@ func usage() -> Never {
     print("""
     usage: spicesee-cli connect <host> <port> [password] [--tls-port <p>] [--ca <file.pem>] [--host-subject <s>]
            spicesee-cli dump <host> <port> <seconds> <out.png> [password]
+           spicesee-cli clipboard <host> <port> [password] [--send <text>] [--seconds <n>]
            spicesee-cli vv <file.vv> [seconds out.png]
     """)
     exit(2)
@@ -74,6 +75,55 @@ func capture(_ config: ConnectionConfig, seconds: Double, out: URL) async throws
     print("wrote \(frame.width)x\(frame.height) to \(out.path)")
 }
 
+/// Line endings are the whole point of half the clipboard code, so they must be visible in the
+/// output rather than reflowing it.
+func escaped(_ s: String) -> String {
+    s.replacingOccurrences(of: "\r", with: "\\r").replacingOccurrences(of: "\n", with: "\\n")
+}
+
+/// Exercises the agent clipboard against a real guest: prints the negotiation, answers the guest's
+/// paste requests with `text`, and fetches whatever the guest copies. This is how M5 is checked
+/// end to end — the unit tests can only prove the bytes, not that a real vdagent accepts them.
+func clipboardProbe(_ config: ConnectionConfig, seconds: Double, send text: String?) async throws {
+    let session = try await SpiceSession.connect(config)
+    print("connected; watching the clipboard for \(seconds)s")
+    let deadline = Task {
+        try? await Task.sleep(for: .seconds(seconds))
+        await session.disconnect()
+    }
+    defer { deadline.cancel() }
+
+    for await event in session.events {
+        switch event {
+        case let .agent(connected):
+            print("agent \(connected ? "connected" : "gone")")
+        case let .clipboard(.available(on)):
+            print("clipboard sharing \(on ? "negotiated" : "unavailable")")
+            if on, let text {
+                print("offering \(text.utf8.count) bytes of text")
+                await session.offerClipboard([.utf8Text])
+            }
+        case let .clipboard(.guestOffers(types)):
+            print("guest grabbed, offering: \(types.map(String.init(describing:)).joined(separator: " "))")
+            if types.contains(.utf8Text) { await session.requestClipboard(.utf8Text) }
+        case let .clipboard(.guestRequests(type)):
+            print("guest is pasting, wants \(type)")
+            guard let text else { print("  nothing to send (pass --send)"); continue }
+            await session.sendClipboard(.utf8Text, Array(text.utf8))
+            print("  sent \(text.utf8.count) bytes")
+        case let .clipboard(.guestData(type, bytes)):
+            print("guest sent \(bytes.count) bytes of \(type): \"\(escaped(String(decoding: bytes, as: UTF8.self)))\"")
+        case .clipboard(.guestReleased):
+            print("guest released its clipboard")
+        case .disconnected:
+            print("disconnected")
+            return
+        default:
+            break
+        }
+    }
+}
+
 let args = CommandLine.arguments
 guard args.count >= 3 else { usage() }
 
@@ -109,6 +159,18 @@ case "dump":
     let password = args.count > 6 ? args[6] : nil
     do {
         try await capture(ConnectionConfig(host: host, port: port, password: password), seconds: seconds, out: out)
+    } catch {
+        print("error: \(describe(error))"); exit(1)
+    }
+
+case "clipboard":
+    let (positional, flags) = takeFlags(Array(args.dropFirst(2)), ["--send", "--seconds"])
+    guard positional.count >= 2, let port = UInt16(positional[1]) else { usage() }
+    let seconds = flags["--seconds"].flatMap(Double.init) ?? 20
+    do {
+        try await clipboardProbe(ConnectionConfig(host: positional[0], port: port,
+                                                  password: positional.count > 2 ? positional[2] : nil),
+                                 seconds: seconds, send: flags["--send"])
     } catch {
         print("error: \(describe(error))"); exit(1)
     }

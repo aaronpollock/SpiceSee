@@ -72,5 +72,16 @@ public actor MainChannel {
         try await reader.send(type: MainClientMsg.mouseModeRequest.rawValue, payload: ClientMessage.mouseModeRequest(mode))
     }
 
+    /// Opens the agent stream. `tokens` is what the *server* may spend on us; spice-gtk sends `~0`,
+    /// which is how a client says it will not throttle the guest.
+    public func startAgent(tokens: UInt32 = .max) async throws {
+        try await reader.send(type: MainClientMsg.agentStart.rawValue, payload: ClientMessage.agentStart(tokens: tokens))
+    }
+
+    /// One `MAIN_AGENT_DATA`; the caller has already cut the message into token-sized chunks.
+    public func sendAgentData(_ chunk: [UInt8]) async throws {
+        try await reader.send(type: MainClientMsg.agentData.rawValue, payload: chunk)
+    }
+
     public func close() async { loop.cancel(); await transport.close() }
 }

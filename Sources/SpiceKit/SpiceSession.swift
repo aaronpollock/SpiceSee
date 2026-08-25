@@ -40,12 +40,28 @@ public enum GuestInput: Sendable, Equatable {
     case wheel(clicks: Int)
 }
 
+/// Clipboard sharing, in the "by demand" shape the agent protocol uses: whoever copies announces
+/// the types it can produce, and the data crosses only when the other side actually pastes.
+public enum ClipboardEvent: Sendable, Equatable {
+    /// Whether the guest agent is up and has negotiated clipboard sharing.
+    case available(Bool)
+    /// The guest copied something and offers these types. Ask for one with `requestClipboard`.
+    case guestOffers([ClipboardType])
+    /// The guest is pasting and wants the host clipboard; answer with `sendClipboard`.
+    case guestRequests(ClipboardType)
+    /// The guest's answer to `requestClipboard`. Text arrives with LF endings and no terminator.
+    case guestData(ClipboardType, [UInt8])
+    /// The guest dropped ownership of its clipboard.
+    case guestReleased
+}
+
 public enum SessionEvent: Sendable {
     case connected(SessionInfo)
     case canvas(CanvasEvent)
     case pointerMode(PointerMode)
     case cursor(CursorChange, displayID: UInt8)
     case agent(connected: Bool)
+    case clipboard(ClipboardEvent)
     case channelFailed(ChannelDescriptor, SpiceError)
     case disconnected(SpiceError?)
     case migrated(MigrationTarget)
@@ -65,6 +81,7 @@ public actor SpiceSession {
     private var displays: [DisplayChannel] = []
     private var cursors: [CursorChannel] = []
     private var inputs: InputsChannel?
+    private var agent: AgentSession?
     private var tasks: [Task<Void, Never>] = []
     private var closing = false
     /// Set when a channel ended without `disconnect` being called; reported with `.disconnected`.
@@ -165,6 +182,7 @@ public actor SpiceSession {
         }
 
         await negotiateMouseMode(supported: info.mainInit.supportedMouseModes)
+        await startAgent()
 
         // `.disconnected` must come after every pixel and every cursor change, or a consumer that
         // stops on it (the app, and the replay test) loses the tail of the session. Main ending only
@@ -210,8 +228,19 @@ public actor SpiceSession {
             let next: PointerMode = mode.current == SpiceMouseMode.client ? .client : .server
             if next != pointerMode { pointerMode = next; cont.yield(.pointerMode(next)) }
             await negotiateMouseMode(supported: mode.supported)
-        case .agentConnected, .agentConnectedTokens: cont.yield(.agent(connected: true))
-        case .agentDisconnected: cont.yield(.agent(connected: false))
+        case .agentConnected:
+            cont.yield(.agent(connected: true))
+            await connectAgent()
+        case let .agentConnectedTokens(n):
+            cont.yield(.agent(connected: true))
+            await agent?.setTokens(n)
+            await connectAgent()
+        case .agentDisconnected:
+            cont.yield(.agent(connected: false))
+            await agent?.agentDisconnected()
+            cont.yield(.clipboard(.available(false)))
+        case let .agentData(payload): await agent?.receive(payload)
+        case let .agentToken(n): await agent?.credit(n)
         case let .migrateSwitchHost(target): cont.yield(.migrated(target))
         // A begin without a switch means the server is preparing a migration it may still cancel;
         // the design's prompt belongs on the switch, so log and wait.
@@ -219,6 +248,85 @@ public actor SpiceSession {
         case .migrateCancel, .migrateEnd: break
         default: break
         }
+    }
+
+    // MARK: Agent and clipboard
+
+    /// Builds the agent session and starts it if `MAIN_INIT` already reported an agent. The token
+    /// allowance is seeded here whether or not one is connected, because that is where the server
+    /// states it.
+    private func startAgent() async {
+        let session = AgentSession { [main] chunk in try await main.sendAgentData(chunk) }
+        agent = session
+        tasks.append(Task { [cont, weak self] in
+            for await m in session.messages { await self?.handleAgent(m) }
+            _ = cont
+        })
+        await session.setTokens(info.mainInit.agentTokens)
+        if info.mainInit.agentConnected != 0 { await connectAgent() }
+    }
+
+    private func connectAgent() async {
+        guard let agent else { return }
+        do { try await main.startAgent() }
+        catch {
+            log.error("agent start failed: \(String(describing: error))")
+            return
+        }
+        await agent.agentConnected()
+    }
+
+    private func handleAgent(_ e: AgentEvent) async {
+        switch e.message {
+        case .announceCapabilities:
+            cont.yield(.clipboard(.available(e.clipboardReady)))
+        case let .clipboardGrab(selection, types):
+            guard selection == .clipboard else { return }
+            cont.yield(.clipboard(.guestOffers(types)))
+        case let .clipboardRequest(selection, type):
+            guard selection == .clipboard else { return }
+            cont.yield(.clipboard(.guestRequests(type)))
+        case let .clipboard(selection, type, data):
+            guard selection == .clipboard else { return }
+            var payload = data
+            if type == .utf8Text {
+                payload = ClipboardText.trimmingTrailingNULs(payload)
+                if e.guestWantsCRLF { payload = ClipboardText.toLF(payload) }
+            }
+            cont.yield(.clipboard(.guestData(type, payload)))
+        case let .clipboardRelease(selection):
+            guard selection == .clipboard else { return }
+            cont.yield(.clipboard(.guestReleased))
+        case .other:
+            break
+        }
+    }
+
+    /// Tells the guest the host clipboard changed and what it can be had as. The guest asks for one
+    /// of `types` when the user pastes, which arrives as `.guestRequests`.
+    public func offerClipboard(_ types: [ClipboardType]) async {
+        guard let agent, await agent.clipboardReady, !types.isEmpty else { return }
+        await agent.send(.clipboardGrab(.clipboard, types))
+    }
+
+    /// Asks the guest for what it offered in `.guestOffers`; the answer arrives as `.guestData`.
+    public func requestClipboard(_ type: ClipboardType) async {
+        guard let agent, await agent.clipboardReady else { return }
+        await agent.send(.clipboardRequest(.clipboard, type))
+    }
+
+    /// Answers a `.guestRequests`. Text is given in LF and converted to the guest's convention here.
+    public func sendClipboard(_ type: ClipboardType, _ data: [UInt8]) async {
+        guard let agent, await agent.clipboardReady else { return }
+        var payload = data
+        if type == .utf8Text, await agent.guestWantsCRLF { payload = ClipboardText.toCRLF(payload) }
+        await agent.send(.clipboard(.clipboard, type, payload))
+    }
+
+    /// Gives up the host's claim on the guest's clipboard.
+    public func releaseClipboard() async {
+        guard let agent, await agent.clipboardReady else { return }
+        await agent.send(.clipboardRelease(.clipboard))
     }
 
     /// Absolute positioning is what the user wants whenever the server can do it (agent or tablet);
