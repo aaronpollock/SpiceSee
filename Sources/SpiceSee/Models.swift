@@ -12,6 +12,10 @@ struct SavedConnection: Identifiable, Hashable, Codable {
     /// Whether spice-vdagent was present the last time we connected — shown in the detail footer.
     var agentWasPresent: Bool = false
     var advanced = AdvancedSettings()
+    /// From a `.vv`: the certificate subject the server must present, and the CA that signs it.
+    /// Persisted so a saved Proxmox connection still verifies on the next launch.
+    var hostSubject: String?
+    var caPEM: String?
 
     var endpoint: String { "\(host):\(tlsPort ?? port)" }
     var usesTLS: Bool { tlsPort != nil }
