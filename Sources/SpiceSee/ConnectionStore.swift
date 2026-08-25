@@ -108,8 +108,24 @@ extension SavedConnection {
 }
 
 extension ConnectionStore {
+    /// Adds a connection imported from a `.vv`, persisting it so the CA and host-subject are still
+    /// there on the next launch. Proxmox issues a fresh file every time a console is opened, so the
+    /// same VM is matched on host + effective port and its row is updated rather than duplicated.
     func addImported(_ connection: SavedConnection) {
-        connections.append(connection)
-        selection = connection.id
+        let endpointPort = connection.tlsPort ?? connection.port
+        if let i = connections.firstIndex(where: { ($0.tlsPort ?? $0.port) == endpointPort && $0.host == connection.host }) {
+            // Only the fields the file supplies; the id, and anything the user set on the row, stay.
+            connections[i].name = connection.name
+            connections[i].port = connection.port
+            connections[i].tlsPort = connection.tlsPort
+            connections[i].hostSubject = connection.hostSubject
+            connections[i].caPEM = connection.caPEM
+            connections[i].lastConnected = connection.lastConnected
+            selection = connections[i].id
+        } else {
+            connections.append(connection)
+            selection = connection.id
+        }
+        save()
     }
 }
