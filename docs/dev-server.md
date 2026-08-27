@@ -358,7 +358,7 @@ Two things need a real Proxmox cluster, which does not exist here — this is th
 - [ ] **Live migration.** With a console open, migrate that VM to another node in the cluster. Expect
       the reconnect sheet to appear with the new host prefilled, driven by a real
       `MAIN_MIGRATE_BEGIN`/`MAIN_MIGRATE_SWITCH_HOST` pair. This is the one piece of M3 with **no local
-      header confirming the wire layout** — `Sources/CSpiceCodec/vendor/spice/` carries `enums.h` only,
+      header confirming the wire layout** — `Packages/CSpiceCodec/Sources/CSpiceCodec/vendor/spice/` carries `enums.h` only,
       so the message shapes are transcribed from `spice.proto` and parsed defensively. If migration
       fails to reconnect, capture it with `spicerec` first (as in the Ctrl-Alt-Del check above) before
       changing any parsing code.

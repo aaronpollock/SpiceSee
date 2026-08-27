@@ -41,7 +41,7 @@ xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSeeTests -destination 'platf
 swift Tools/make-icons.swift
 ```
 
-Swift 6 language mode with strict concurrency, macOS 14 deployment target, universal (arm64 + x86_64). No locks, no `@unchecked Sendable`.
+Swift 6 language mode with strict concurrency, macOS 14 deployment target, arm64 only. No locks, no `@unchecked Sendable`.
 
 ## Running against a real SPICE server
 
@@ -61,7 +61,7 @@ recording headless and compares pixel-for-pixel, so a regression anywhere in the
 first. **Only commit a golden you have actually looked at.**
 
 `scripts/check-vendored-notices.sh` must exit 0 before any release — it enforces the LGPL record in
-`Sources/CSpiceCodec/VENDORED.md`. Re-run it after touching anything under `vendor/`.
+`Packages/CSpiceCodec/Sources/CSpiceCodec/VENDORED.md`. Re-run it after touching anything under `vendor/`.
 
 ## Running the app without a SPICE server
 
