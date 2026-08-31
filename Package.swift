@@ -17,6 +17,7 @@ let package = Package(
         .target(name: "SpiceCore", dependencies: ["SpiceWire"]),
         .target(name: "SpiceCanvas", dependencies: ["SpiceWire", .product(name: "CSpiceCodec", package: "CSpiceCodec")]),
         .target(name: "SpiceKit", dependencies: ["SpiceCore", "SpiceCanvas"]),
+        .target(name: "SpiceMedia", dependencies: ["SpiceWire"]),
         .executableTarget(name: "spicerec"),
         .executableTarget(name: "spicesee-cli", dependencies: ["SpiceKit", "SpiceCanvas", "SpiceCore", "SpiceWire"]),
         .testTarget(name: "SpiceWireTests", dependencies: ["SpiceWire"]),
@@ -24,6 +25,7 @@ let package = Package(
         .testTarget(name: "SpiceCanvasTests", dependencies: ["SpiceCanvas", .product(name: "CSpiceCodec", package: "CSpiceCodec")]),
         .testTarget(name: "SpiceKitTests", dependencies: ["SpiceKit", "SpiceCore", "SpiceCanvas"],
                     resources: [.copy("Fixtures")]),
+        .testTarget(name: "SpiceMediaTests", dependencies: ["SpiceMedia", "SpiceWire"]),
     ],
     swiftLanguageModes: [.v6]
 )
