@@ -58,7 +58,10 @@ public actor Canvas {
         case let .fill(f):
             let source: PixelSource
             switch f.brush {
-            case .none: throw CanvasError.unsupported("empty brush")
+            // Upstream's draw_brush (canvas_base.c) fills black for BRUSH_TYPE_NONE rather than
+            // rejecting the draw — matching that here keeps `.unsupported` (this project's
+            // corruption alarm) from firing on traffic upstream handles normally.
+            case .none: source = .solid(0)
             case let .solid(color): source = .solid(color)
             case let .pattern(image, pos): source = .pattern(try resolve(image), seed: pos)
             }
@@ -68,14 +71,16 @@ public actor Canvas {
             // Real SPICE scales `sourceArea` onto the *raw* box and only clips to the surface
             // afterwards — clamping the box itself (rather than just bounding the allocation below)
             // would change the scale factor and shift the mask origin for a box that legitimately
-            // overhangs an edge. So geometry always uses `c.base.box`; `validateBox` only guards the
-            // allocation `Tier2.scaled` is about to make.
+            // overhangs an edge. So geometry always uses `c.base.box`; `validateRegion` only guards
+            // the allocations `Tier2.scaled` is about to make (both the box-sized destination and,
+            // separately below, the sourceArea-sized crop).
             guard let dstSurface = surfaces[c.base.surfaceID] else { throw CanvasError.noSurface(c.base.surfaceID) }
-            try validateBox(c.base.box, against: dstSurface)
+            try validateRegion(c.base.box, against: (dstSurface.width, dstSurface.height))
             var src = try resolve(c.source)
             let scaled = c.sourceArea.width != c.base.box.width || c.sourceArea.height != c.base.box.height
             var originBase = SpicePoint(x: c.sourceArea.left, y: c.sourceArea.top)
             if scaled {
+                try validateRegion(c.sourceArea, against: (src.width, src.height))
                 src = Tier2.scaled(src, from: c.sourceArea, toWidth: Int(c.base.box.width), toHeight: Int(c.base.box.height), nearest: c.scaleMode == 1)
                 originBase = SpicePoint(x: 0, y: 0)
             }
@@ -86,18 +91,19 @@ public actor Canvas {
             }
         case let .opaque(o):
             guard let dstSurface = surfaces[o.base.surfaceID] else { throw CanvasError.noSurface(o.base.surfaceID) }
-            try validateBox(o.base.box, against: dstSurface)
+            try validateRegion(o.base.box, against: (dstSurface.width, dstSurface.height))
             var src = try resolve(o.source)
             let scaled = o.sourceArea.width != o.base.box.width || o.sourceArea.height != o.base.box.height
             var originBase = SpicePoint(x: o.sourceArea.left, y: o.sourceArea.top)
             if scaled {
+                try validateRegion(o.sourceArea, against: (src.width, src.height))
                 src = Tier2.scaled(src, from: o.sourceArea, toWidth: Int(o.base.box.width), toHeight: Int(o.base.box.height), nearest: o.scaleMode == 1)
                 originBase = SpicePoint(x: 0, y: 0)
             }
             // Combine source and brush via `rop` in an off-surface scratch, then PUT the result
             // through the mask — DRAW_OPAQUE's two-input combine has no dedicated destination
             // until the mask/clip stage, so it can't be done directly against `s`. Sized off the
-            // raw box, same reasoning as `.copy`/`.blend` above — `validateBox` already bounded it.
+            // raw box, same reasoning as `.copy`/`.blend` above — `validateRegion` already bounded it.
             let temp = Surface(id: .max, width: Int(o.base.box.width), height: Int(o.base.box.height), isPrimary: false)
             let tempRect = SpiceRect(top: 0, left: 0, bottom: o.base.box.height, right: o.base.box.width)
             Tier1.copy(into: temp, rect: tempRect, src: src, srcOrigin: originBase)
@@ -123,9 +129,17 @@ public actor Canvas {
                 let origin = SpicePoint(x: r.left - o.base.box.left, y: r.top - o.base.box.top)
                 Tier2.draw(s, rect: r, source: .image(combined, origin: origin), rop: ROPD.opPut, mask: mask)
             }
-        case let .blackness(b): try forEachClipRect(b.base) { s, r in Tier1.fill(s, rect: r, color: 0) }
-        case let .whiteness(w): try forEachClipRect(w.base) { s, r in Tier1.fill(s, rect: r, color: 0xFFFFFF) }
-        case let .invers(i): try forEachClipRect(i.base) { s, r in Tier1.invert(s, rect: r) }
+        case let .blackness(b):
+            let mask = try resolveMask(b.mask, for: b.base.box)
+            try forEachClipRect(b.base) { s, r in Tier2.draw(s, rect: r, source: .solid(0), rop: ROPD.opPut, mask: mask) }
+        case let .whiteness(w):
+            let mask = try resolveMask(w.mask, for: w.base.box)
+            try forEachClipRect(w.base) { s, r in Tier2.draw(s, rect: r, source: .solid(0xFFFFFF), rop: ROPD.opPut, mask: mask) }
+        case let .invers(i):
+            // opInvers ignores its `source` entirely (ropCombine returns ~dst unconditionally), so
+            // the mask alone gates which pixels flip; uncovered pixels are left untouched.
+            let mask = try resolveMask(i.mask, for: i.base.box)
+            try forEachClipRect(i.base) { s, r in Tier2.draw(s, rect: r, source: .solid(0), rop: ROPD.opInvers, mask: mask) }
         case let .copyBits(c):
             try forEachClipRect(c.base) { s, r in
                 Tier1.copyBits(s, rect: r, from: SpicePoint(x: c.sourcePos.x + (r.left - c.base.box.left), y: c.sourcePos.y + (r.top - c.base.box.top)))
@@ -138,11 +152,12 @@ public actor Canvas {
             }
         case let .rop3(r):
             guard let dstSurface = surfaces[r.base.surfaceID] else { throw CanvasError.noSurface(r.base.surfaceID) }
-            try validateBox(r.base.box, against: dstSurface)
+            try validateRegion(r.base.box, against: (dstSurface.width, dstSurface.height))
             var src = try resolve(r.source)
             let scaled = r.sourceArea.width != r.base.box.width || r.sourceArea.height != r.base.box.height
             var originBase = SpicePoint(x: r.sourceArea.left, y: r.sourceArea.top)
             if scaled {
+                try validateRegion(r.sourceArea, against: (src.width, src.height))
                 src = Tier2.scaled(src, from: r.sourceArea, toWidth: Int(r.base.box.width), toHeight: Int(r.base.box.height), nearest: r.scaleMode == 1)
                 originBase = SpicePoint(x: 0, y: 0)
             }
@@ -159,11 +174,12 @@ public actor Canvas {
             }
         case let .transparent(t):
             guard let dstSurface = surfaces[t.base.surfaceID] else { throw CanvasError.noSurface(t.base.surfaceID) }
-            try validateBox(t.base.box, against: dstSurface)
+            try validateRegion(t.base.box, against: (dstSurface.width, dstSurface.height))
             var src = try resolve(t.source)
             let scaled = t.sourceArea.width != t.base.box.width || t.sourceArea.height != t.base.box.height
             var originBase = SpicePoint(x: t.sourceArea.left, y: t.sourceArea.top)
             if scaled {
+                try validateRegion(t.sourceArea, against: (src.width, src.height))
                 // SpiceTransparent carries no scale_mode field on the wire (unlike COPY/OPAQUE/
                 // ROP3); nearest keeps edges exactly equal to `trueColor` instead of blending a
                 // keyed pixel's colour into its neighbours.
@@ -180,7 +196,7 @@ public actor Canvas {
             // If a desktop replay ever shows a dashed-line artifact, this is the first place to look.
             let source: PixelSource
             switch st.brush {
-            case .none: return
+            case .none: source = .solid(0)   // matches `.fill`/`.opaque`: BRUSH_TYPE_NONE fills black upstream
             case let .solid(color): source = .solid(color)
             case let .pattern(image, pos): source = .pattern(try resolve(image), seed: pos)
             }
@@ -217,7 +233,7 @@ public actor Canvas {
                 }
                 let bpp = t.str.bitsPerPixel, topDown = t.str.flags & StringFlags.topDown != 0
                 for glyph in t.str.glyphs {
-                    guard let box = glyphBox(glyph), (try? validateBox(box, against: dstSurface)) != nil else { continue }
+                    guard let box = glyphBox(glyph), (try? validateRegion(box, against: (dstSurface.width, dstSurface.height))) != nil else { continue }
                     let mask = Tier3.glyphMask(glyph, bpp: bpp, topDown: topDown)
                     for r in rects {
                         guard let glyphRect = box.intersection(r) else { continue }
@@ -232,15 +248,23 @@ public actor Canvas {
         }
     }
 
-    /// A legitimate server always draws into the destination surface, so a box that doesn't overlap
-    /// it at all, or whose area is bigger than the whole surface, is malformed rather than something
-    /// to rescale or clamp onto. This exists to bound an allocation keyed to the box's own size
-    /// (`Tier2.scaled`'s output buffer, `.opaque`'s scratch surface) — geometry itself always uses
-    /// the raw box (see `.copy`/`.blend`/`.opaque` in `applyThrowing`), never a clamped one.
-    private func validateBox(_ box: SpiceRect, against surface: Surface) throws {
-        guard box.intersection(surface.bounds) != nil else { throw CanvasError.unsupported("draw box does not overlap surface") }
-        guard Int(box.width) * Int(box.height) <= surface.width * surface.height else {
-            throw CanvasError.unsupported("draw box exceeds surface area")
+    /// Bounds a rect against a `(width, height)` region before something sizes an allocation
+    /// directly off it — the destination box against the surface it targets, or `sourceArea`
+    /// against the *source* image it crops before `Tier2.scaled` runs (both call sites use this,
+    /// so the "don't overlap at all" / "bigger than the whole region" guard lives once). A rect
+    /// that fails either check is malformed rather than something to rescale or clamp onto.
+    ///
+    /// This bounds exactly the one allocation sized directly off `box`/`sourceArea` — it does
+    /// **not** validate anything else an allocation might be keyed to (an image descriptor's or a
+    /// mask's own decoded width/height, say, which a decoder or `resolveMask` sizes its own output
+    /// buffer from independently of any rect checked here). Geometry for an actual draw always uses
+    /// the raw, unclamped box (see the `.copy`/`.blend`/`.opaque` comments in `applyThrowing`) —
+    /// only allocation sizing goes through here.
+    private func validateRegion(_ box: SpiceRect, against bounds: (width: Int, height: Int)) throws {
+        let boundsRect = SpiceRect(top: 0, left: 0, bottom: Int32(clamping: bounds.height), right: Int32(clamping: bounds.width))
+        guard box.intersection(boundsRect) != nil else { throw CanvasError.unsupported("region does not overlap target") }
+        guard Int(box.width) * Int(box.height) <= bounds.width * bounds.height else {
+            throw CanvasError.unsupported("region exceeds target area")
         }
     }
 
@@ -267,13 +291,21 @@ public actor Canvas {
     /// `pixman_region32_translate(-mask_x + x, …)` at :1996): the mask bitmap's own top-left sits at
     /// `rect.topLeft - mask.pos` in surface coordinates, so a mask pixel for surface point (x, y) is
     /// at bitmap-local `(x - rect.left + mask.pos.x, y - rect.top + mask.pos.y)`.
+    ///
+    /// Each branch below sizes `coverage` from the same dimensions it indexes with, rather than
+    /// from `bitmap.descriptor.width/height` up front: the 1-bit branch reads the raw payload
+    /// against the descriptor's own dimensions, but the decoded-image branch's `resolve(bitmap)`
+    /// can come back a different size than the descriptor claims (`SpiceBitmap.width/height` is a
+    /// separate wire field from `SpiceImageDescriptor.width/height`, unchecked against it) — sizing
+    /// off the descriptor there and indexing off the decoded image trapped out of bounds.
     private func resolveMask(_ mask: SpiceQMask, for rect: SpiceRect) throws -> ResolvedMask? {
         guard let bitmap = mask.bitmap else { return nil }
         let invert = mask.flags & MaskFlags.invers != 0
-        let width = Int(bitmap.descriptor.width), height = Int(bitmap.descriptor.height)
-        var coverage = [UInt8](repeating: 0, count: width * height)
+        let origin = SpicePoint(x: rect.left - mask.pos.x, y: rect.top - mask.pos.y)
 
         if case let .bitmap(b) = bitmap.payload, b.format == .bit1LE || b.format == .bit1BE {
+            let width = Int(bitmap.descriptor.width), height = Int(bitmap.descriptor.height)
+            var coverage = [UInt8](repeating: 0, count: width * height)
             let stride = Int(b.stride)
             let topDown = b.flags & BitmapFlags.topDown != 0
             for y in 0 ..< height {
@@ -286,18 +318,18 @@ public actor Canvas {
                     coverage[y * width + x] = (bit != 0) != invert ? 0xFF : 0
                 }
             }
-        } else {
-            let img = try resolve(bitmap)
-            for y in 0 ..< img.height {
-                for x in 0 ..< img.width {
-                    let nonBlack = img.pixel(x: x, y: y) & 0xFFFFFF != 0
-                    coverage[y * img.width + x] = (nonBlack != invert) ? 0xFF : 0
-                }
-            }
+            return ResolvedMask(width: width, height: height, origin: origin, coverage: coverage)
         }
 
-        let origin = SpicePoint(x: rect.left - mask.pos.x, y: rect.top - mask.pos.y)
-        return ResolvedMask(width: width, height: height, origin: origin, coverage: coverage)
+        let img = try resolve(bitmap)
+        var coverage = [UInt8](repeating: 0, count: img.width * img.height)
+        for y in 0 ..< img.height {
+            for x in 0 ..< img.width {
+                let nonBlack = img.pixel(x: x, y: y) & 0xFFFFFF != 0
+                coverage[y * img.width + x] = (nonBlack != invert) ? 0xFF : 0
+            }
+        }
+        return ResolvedMask(width: img.width, height: img.height, origin: origin, coverage: coverage)
     }
 
     /// Runs `body` for each (surface, clipped rect) and emits one update per rect.

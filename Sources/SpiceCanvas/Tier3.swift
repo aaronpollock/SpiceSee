@@ -60,7 +60,7 @@ enum Tier3 {
     /// that absolute position; `bbox`/clip only restrict which of those pixels actually land, the
     /// same bbox-as-clip-rect role `base.box` already plays via `forEachClipRect` elsewhere in
     /// `Canvas`. Callers are expected to have bounded `glyph.width`/`height` against the
-    /// destination surface (`Canvas.validateBox`) before calling this, the same way `.copy`/
+    /// destination surface (`Canvas.validateRegion`) before calling this, the same way `.copy`/
     /// `.opaque`/`.rop3` bound their own box-sized allocations — this function does not repeat
     /// that check.
     ///
