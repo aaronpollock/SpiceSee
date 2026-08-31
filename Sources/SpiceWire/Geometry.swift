@@ -113,7 +113,7 @@ public struct SpiceString: Sendable, Equatable {
     public init(flags: UInt16, glyphs: [RasterGlyph]) { self.flags = flags; self.glyphs = glyphs }
     public init(reader r: inout SpiceReader) throws {
         let length = try r.u16()
-        flags = try r.u16()
+        flags = UInt16(try r.u8())
         let bpp = flags & StringFlags.rasterA8 != 0 ? 8 : flags & StringFlags.rasterA4 != 0 ? 4 : 1
         glyphs = try (0 ..< length).map { _ in
             let renderPos = try SpicePoint(reader: &r), origin = try SpicePoint(reader: &r)

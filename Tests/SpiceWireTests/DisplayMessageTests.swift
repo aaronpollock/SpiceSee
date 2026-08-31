@@ -95,7 +95,7 @@ private func base(surface: UInt32 = 0) -> SpiceWriter {
     w.u8(0)                                      // back brush none
     w.u16(ROPD.opPut); w.u16(ROPD.opPut)
     w.patchU32(at: strPtr, UInt32(w.bytes.count))
-    w.u16(1); w.u16(StringFlags.rasterA1 | StringFlags.topDown)
+    w.u16(1); w.u8(UInt8(StringFlags.rasterA1 | StringFlags.topDown))
     w.i32(5); w.i32(7); w.i32(0); w.i32(0)       // render_pos (5,7), origin (0,0)
     w.u16(8); w.u16(2)                            // 8×2 → 1 byte/row A1
     w.bytes([0b1010_1010, 0b0101_0101])
@@ -114,6 +114,49 @@ private func base(surface: UInt32 = 0) -> SpiceWriter {
     w.u8(PathFlags.begin); w.u32(0xFFFF_FFFF)    // hostile point count
     #expect(throws: WireError.self) {
         _ = try DisplayMessage(type: DisplayServerMsg.drawStroke.rawValue, payload: w.bytes)
+    }
+}
+
+@Test func strokeRejectsOversizedNumSegments() throws {
+    var w = base()
+    let pathPtr = w.bytes.count; w.u32(0)
+    w.u8(0); w.u8(1); w.u32(0xFF0000); w.u16(ROPD.opPut); w.u16(ROPD.opPut)
+    w.patchU32(at: pathPtr, UInt32(w.bytes.count))
+    w.u32(0xFFFF_FFFF)                           // hostile num_segments
+    #expect(throws: WireError.self) {
+        _ = try DisplayMessage(type: DisplayServerMsg.drawStroke.rawValue, payload: w.bytes)
+    }
+}
+
+@Test func strokeRejectsZeroPathPointer() throws {
+    var w = base()
+    w.u32(0)                                     // path ptr: null
+    #expect(throws: WireError.self) {
+        _ = try DisplayMessage(type: DisplayServerMsg.drawStroke.rawValue, payload: w.bytes)
+    }
+}
+
+@Test func textRejectsZeroStrPointer() throws {
+    var w = base()
+    w.u32(0)                                     // str ptr: null
+    #expect(throws: WireError.self) {
+        _ = try DisplayMessage(type: DisplayServerMsg.drawText.rawValue, payload: w.bytes)
+    }
+}
+
+@Test func textRejectsOversizedGlyphDimensions() throws {
+    var w = base()
+    let strPtr = w.bytes.count; w.u32(0)
+    w.i32(0); w.i32(0); w.i32(0); w.i32(0)       // back_area empty
+    w.u8(1); w.u32(0xFFFFFF)                     // fore solid white
+    w.u8(0)                                      // back brush none
+    w.u16(ROPD.opPut); w.u16(ROPD.opPut)
+    w.patchU32(at: strPtr, UInt32(w.bytes.count))
+    w.u16(1); w.u8(UInt8(StringFlags.rasterA1))
+    w.i32(0); w.i32(0); w.i32(0); w.i32(0)       // render_pos, origin
+    w.u16(0xFFFF); w.u16(0xFFFF)                  // hostile width × height
+    #expect(throws: WireError.self) {
+        _ = try DisplayMessage(type: DisplayServerMsg.drawText.rawValue, payload: w.bytes)
     }
 }
 
