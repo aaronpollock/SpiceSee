@@ -61,27 +61,93 @@ enum Tier2 {
         for y in top ..< bottom {
             for x in left ..< right {
                 if let mask, !mask.covers(x: x, y: y) { continue }
-                let (b, g, r): (UInt8, UInt8, UInt8)
-                switch source {
-                case let .solid(c):
-                    (b, g, r) = (UInt8(c & 0xFF), UInt8((c >> 8) & 0xFF), UInt8((c >> 16) & 0xFF))
-                case let .image(img, origin):
-                    let sx = Int(origin.x) + x - Int(rect.left), sy = Int(origin.y) + y - Int(rect.top)
-                    guard sx >= 0, sx < img.width, sy >= 0, sy < img.height else { continue }
-                    let i = (sy * img.width + sx) * 4
-                    (b, g, r) = (img.pixels[i], img.pixels[i + 1], img.pixels[i + 2])
-                case let .pattern(img, seed):
-                    guard img.width > 0, img.height > 0 else { continue }
-                    let px = ((x - Int(seed.x)) % img.width + img.width) % img.width
-                    let py = ((y - Int(seed.y)) % img.height + img.height) % img.height
-                    let i = (py * img.width + px) * 4
-                    (b, g, r) = (img.pixels[i], img.pixels[i + 1], img.pixels[i + 2])
-                }
+                guard let (b, g, r) = samplePixel(source, x: x, y: y, rect: rect) else { continue }
                 let d = y * dst.stride + x * 4
                 dst.pixels[d] = ropCombine(dst: dst.pixels[d], src: b, rop: rop)
                 dst.pixels[d + 1] = ropCombine(dst: dst.pixels[d + 1], src: g, rop: rop)
                 dst.pixels[d + 2] = ropCombine(dst: dst.pixels[d + 2], src: r, rop: rop)
                 dst.pixels[d + 3] = 0xFF
+            }
+        }
+    }
+
+    /// Samples a `PixelSource` at surface point (x, y) in BGR order; `.image` crops against
+    /// `rect`'s origin the same way `draw` always has. Shared by `draw`, `drawRop3` (for both its
+    /// source bitmap and its brush) and `drawTransparent` so the three don't re-derive `.image`/
+    /// `.pattern` sampling three different ways.
+    private static func samplePixel(_ source: PixelSource, x: Int, y: Int, rect: SpiceRect) -> (UInt8, UInt8, UInt8)? {
+        switch source {
+        case let .solid(c):
+            return (UInt8(c & 0xFF), UInt8((c >> 8) & 0xFF), UInt8((c >> 16) & 0xFF))
+        case let .image(img, origin):
+            let sx = Int(origin.x) + x - Int(rect.left), sy = Int(origin.y) + y - Int(rect.top)
+            guard sx >= 0, sx < img.width, sy >= 0, sy < img.height else { return nil }
+            let i = (sy * img.width + sx) * 4
+            return (img.pixels[i], img.pixels[i + 1], img.pixels[i + 2])
+        case let .pattern(img, seed):
+            guard img.width > 0, img.height > 0 else { return nil }
+            let px = ((x - Int(seed.x)) % img.width + img.width) % img.width
+            let py = ((y - Int(seed.y)) % img.height + img.height) % img.height
+            let i = (py * img.width + px) * 4
+            return (img.pixels[i], img.pixels[i + 1], img.pixels[i + 2])
+        }
+    }
+
+    /// Combines minterms of (p)attern/brush, (s)ource, (d)estination selected by `code`'s bits,
+    /// indexed `(p<<2)|(s<<1)|d` — the standard Windows/GDI ROP3 definition SPICE's DRAW_ROP3
+    /// inherits (canvas_base.c's `do_rop3_with_color`/`do_rop3_with_pattern`, generated per-bit
+    /// from `rop3.h`'s formulas rather than a literal minterm sum, but equivalent to one).
+    static func rop3(_ code: UInt8, p: UInt8, s: UInt8, d: UInt8) -> UInt8 {
+        var r: UInt8 = 0
+        for minterm in 0 ..< 8 where code & (1 << minterm) != 0 {
+            let pm = minterm & 4 != 0 ? p : ~p
+            let sm = minterm & 2 != 0 ? s : ~s
+            let dm = minterm & 1 != 0 ? d : ~d
+            r |= pm & sm & dm
+        }
+        return r
+    }
+
+    /// DRAW_ROP3: combines the source bitmap and the brush (solid or tiled pattern) against the
+    /// current destination pixel via `rop3`, one pass, since the destination is also an input —
+    /// unlike `draw`'s single-source-vs-destination `ropCombine`, this can't be expressed through
+    /// `PixelSource`+`draw` alone. `brush` is only ever `.solid`/`.pattern` in practice (Canvas
+    /// builds it from `SpiceBrush`, which has no image case); `samplePixel`'s `.image` arm is
+    /// dead here but kept so the switch stays total rather than trapping on an unreachable case.
+    static func drawRop3(dst: Surface, rect: SpiceRect, src: DecodedImage, srcOrigin: SpicePoint,
+                         brush: PixelSource, code: UInt8, mask: ResolvedMask?) {
+        let top = max(0, Int(rect.top)), bottom = min(dst.height, Int(rect.bottom))
+        let left = max(0, Int(rect.left)), right = min(dst.width, Int(rect.right))
+        guard top < bottom, left < right else { return }
+        for y in top ..< bottom {
+            for x in left ..< right {
+                if let mask, !mask.covers(x: x, y: y) { continue }
+                guard let (sb, sg, sr) = samplePixel(.image(src, origin: srcOrigin), x: x, y: y, rect: rect) else { continue }
+                guard let (pb, pg, pr) = samplePixel(brush, x: x, y: y, rect: rect) else { continue }
+                let d = y * dst.stride + x * 4
+                dst.pixels[d] = rop3(code, p: pb, s: sb, d: dst.pixels[d])
+                dst.pixels[d + 1] = rop3(code, p: pg, s: sg, d: dst.pixels[d + 1])
+                dst.pixels[d + 2] = rop3(code, p: pr, s: sr, d: dst.pixels[d + 2])
+                dst.pixels[d + 3] = 0xFF
+            }
+        }
+    }
+
+    /// DRAW_TRANSPARENT: copies source pixels whose decoded RGB differs from `key` (0x00RRGGBB),
+    /// skipping the rest. `key` is `true_color`, not `src_color` — canvas_draw_transparent
+    /// (canvas_base.c:2233) only ever reads `transparent->true_color` when deriving the colour it
+    /// keys against; `src_color` goes unused. No mask: `SpiceTransparent` carries no QMask on the
+    /// wire.
+    static func drawTransparent(dst: Surface, rect: SpiceRect, src: DecodedImage, srcOrigin: SpicePoint, key: UInt32) {
+        let top = max(0, Int(rect.top)), bottom = min(dst.height, Int(rect.bottom))
+        let left = max(0, Int(rect.left)), right = min(dst.width, Int(rect.right))
+        guard top < bottom, left < right else { return }
+        for y in top ..< bottom {
+            for x in left ..< right {
+                guard let (b, g, r) = samplePixel(.image(src, origin: srcOrigin), x: x, y: y, rect: rect) else { continue }
+                guard UInt32(r) << 16 | UInt32(g) << 8 | UInt32(b) != key else { continue }
+                let d = y * dst.stride + x * 4
+                dst.pixels[d] = b; dst.pixels[d + 1] = g; dst.pixels[d + 2] = r; dst.pixels[d + 3] = 0xFF
             }
         }
     }

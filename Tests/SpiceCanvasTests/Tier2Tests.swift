@@ -8,6 +8,38 @@ private func surface(_ w: Int, _ h: Int, fill: UInt8) -> Surface {
     return s
 }
 
+// Wire-message builders duplicated from CanvasTests.swift (file-private there) so this file can
+// drive a Canvas end to end for `transparentSkipsKeyedPixels`.
+private func create(_ w: UInt32, _ h: UInt32) -> DisplayMessage {
+    var b = SpiceWriter(); b.u32(0); b.u32(w); b.u32(h); b.u32(32); b.u32(1)
+    return try! DisplayMessage(type: DisplayServerMsg.surfaceCreate.rawValue, payload: b.bytes)
+}
+private func drawBase(_ w: inout SpiceWriter, _ box: SpiceRect) {
+    w.u32(0); w.i32(box.top); w.i32(box.left); w.i32(box.bottom); w.i32(box.right); w.u8(0)
+}
+private func noMask(_ w: inout SpiceWriter) { w.u8(0); w.i32(0); w.i32(0); w.u32(0) }
+private func fill(_ box: SpiceRect, color: UInt32) -> DisplayMessage {
+    var w = SpiceWriter(); drawBase(&w, box); w.u8(1); w.u32(color); w.u16(ROPD.opPut); noMask(&w)
+    return try! DisplayMessage(type: DisplayServerMsg.drawFill.rawValue, payload: w.bytes)
+}
+/// Follows `copyBitmap`'s pattern (drawBase, ptr to a `.bitmap` image, src_area, src_color,
+/// true_color). `src_color` is deliberately a value distinct from `trueColor` — canvas_base.c
+/// (canvas_draw_transparent, canvas_base.c:2233) keys off `true_color` only, never `src_color`,
+/// so a test where the two match couldn't tell a correct implementation from one keying on the
+/// wrong field.
+private func transparentDraw(_ box: SpiceRect, pixels: [UInt8], w pw: UInt32, h ph: UInt32, trueColor: UInt32) -> DisplayMessage {
+    var w = SpiceWriter(); drawBase(&w, box)
+    let ptr = w.bytes.count; w.u32(0)
+    w.i32(0); w.i32(0); w.i32(Int32(ph)); w.i32(Int32(pw))   // source_area
+    w.u32(0x00AA_5511)                                       // src_color: distinct from trueColor
+    w.u32(trueColor)
+    w.patchU32(at: ptr, UInt32(w.bytes.count))
+    w.u64(1); w.u8(ImageType.bitmap.rawValue); w.u8(0); w.u32(pw); w.u32(ph)
+    w.u8(BitmapFormat.bit32.rawValue); w.u8(BitmapFlags.topDown); w.u32(pw); w.u32(ph); w.u32(pw * 4); w.u32(0)
+    w.bytes(pixels)
+    return try! DisplayMessage(type: DisplayServerMsg.drawTransparent.rawValue, payload: w.bytes)
+}
+
 @Test func ropCombineTruthTable() {
     // dst 0b1100, src 0b1010 — every op, from the semantics in canvas_base.c.
     let d: UInt8 = 0b1100, s: UInt8 = 0b1010
@@ -73,4 +105,27 @@ private func surface(_ w: Int, _ h: Int, fill: UInt8) -> Surface {
     #expect(out.width == 4 && out.height == 2)
     #expect(out.pixels[0] < 50)                        // left edge stays near black
     #expect(out.pixels[(4 * 2 - 1) * 4] > 200)         // right edge stays near white
+}
+
+@Test func rop3KnownCodes() {
+    let p: UInt8 = 0xF0, s: UInt8 = 0xCC, d: UInt8 = 0xAA
+    #expect(Tier2.rop3(0xCC, p: p, s: s, d: d) == s)          // SRCCOPY
+    #expect(Tier2.rop3(0xF0, p: p, s: s, d: d) == p)          // PATCOPY
+    #expect(Tier2.rop3(0x55, p: p, s: s, d: d) == ~d)         // DSTINVERT
+    #expect(Tier2.rop3(0x5A, p: p, s: s, d: d) == (p ^ d))    // PATINVERT
+    #expect(Tier2.rop3(0x66, p: p, s: s, d: d) == (s ^ d))    // SRCINVERT
+    #expect(Tier2.rop3(0x00, p: p, s: s, d: d) == 0)          // BLACKNESS
+    #expect(Tier2.rop3(0xFF, p: p, s: s, d: d) == 0xFF)       // WHITENESS
+}
+
+@Test func transparentSkipsKeyedPixels() async throws {
+    let c = Canvas(); await c.apply(create(2, 1))
+    await c.apply(fill(SpiceRect(top: 0, left: 0, bottom: 1, right: 2), color: 0x112233))
+    // 2×1 source: green (the key) and red — only red lands.
+    let src: [UInt8] = [0,255,0,255, 0,0,255,255]
+    await c.apply(transparentDraw(SpiceRect(top: 0, left: 0, bottom: 1, right: 2),
+                                  pixels: src, w: 2, h: 1, trueColor: 0x00FF00))
+    let s = try #require(await c.snapshot(surfaceID: 0))
+    #expect(s.pixel(x: 0, y: 0) & 0xFFFFFF == 0x112233)       // keyed pixel untouched
+    #expect(s.pixel(x: 1, y: 0) & 0xFFFFFF == 0xFF0000)       // red copied
 }

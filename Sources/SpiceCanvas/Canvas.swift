@@ -133,8 +133,44 @@ public actor Canvas {
                 let origin = SpicePoint(x: a.sourceArea.left + (r.left - a.base.box.left), y: a.sourceArea.top + (r.top - a.base.box.top))
                 Tier1.alphaBlend(into: s, rect: r, src: src, srcOrigin: origin, alpha: a.alpha)
             }
-        case let .rop3(r): throw CanvasError.unsupported("rop3 \(r.rop3) (task 5)")
-        case let .transparent(t): _ = t; throw CanvasError.unsupported("transparent (task 5)")
+        case let .rop3(r):
+            guard let dstSurface = surfaces[r.base.surfaceID] else { throw CanvasError.noSurface(r.base.surfaceID) }
+            try validateBox(r.base.box, against: dstSurface)
+            var src = try resolve(r.source)
+            let scaled = r.sourceArea.width != r.base.box.width || r.sourceArea.height != r.base.box.height
+            var originBase = SpicePoint(x: r.sourceArea.left, y: r.sourceArea.top)
+            if scaled {
+                src = Tier2.scaled(src, from: r.sourceArea, toWidth: Int(r.base.box.width), toHeight: Int(r.base.box.height), nearest: r.scaleMode == 1)
+                originBase = SpicePoint(x: 0, y: 0)
+            }
+            let brushSource: PixelSource
+            switch r.brush {
+            case .none: brushSource = .solid(0)
+            case let .solid(color): brushSource = .solid(color)
+            case let .pattern(image, pos): brushSource = .pattern(try resolve(image), seed: pos)
+            }
+            let mask = try resolveMask(r.mask, for: r.base.box)
+            try forEachClipRect(r.base) { s, rect in
+                let origin = SpicePoint(x: originBase.x + (rect.left - r.base.box.left), y: originBase.y + (rect.top - r.base.box.top))
+                Tier2.drawRop3(dst: s, rect: rect, src: src, srcOrigin: origin, brush: brushSource, code: r.rop3, mask: mask)
+            }
+        case let .transparent(t):
+            guard let dstSurface = surfaces[t.base.surfaceID] else { throw CanvasError.noSurface(t.base.surfaceID) }
+            try validateBox(t.base.box, against: dstSurface)
+            var src = try resolve(t.source)
+            let scaled = t.sourceArea.width != t.base.box.width || t.sourceArea.height != t.base.box.height
+            var originBase = SpicePoint(x: t.sourceArea.left, y: t.sourceArea.top)
+            if scaled {
+                // SpiceTransparent carries no scale_mode field on the wire (unlike COPY/OPAQUE/
+                // ROP3); nearest keeps edges exactly equal to `trueColor` instead of blending a
+                // keyed pixel's colour into its neighbours.
+                src = Tier2.scaled(src, from: t.sourceArea, toWidth: Int(t.base.box.width), toHeight: Int(t.base.box.height), nearest: true)
+                originBase = SpicePoint(x: 0, y: 0)
+            }
+            try forEachClipRect(t.base) { s, rect in
+                let origin = SpicePoint(x: originBase.x + (rect.left - t.base.box.left), y: originBase.y + (rect.top - t.base.box.top))
+                Tier2.drawTransparent(dst: s, rect: rect, src: src, srcOrigin: origin, key: t.trueColor & 0xFFFFFF)
+            }
         case .stroke: throw CanvasError.unsupported("stroke (task 6)")
         case .text: throw CanvasError.unsupported("text (task 7)")
         case let .unsupported(type, _):
