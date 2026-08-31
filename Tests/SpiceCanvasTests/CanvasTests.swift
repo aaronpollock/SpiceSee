@@ -119,22 +119,116 @@ private func copyFromCache(_ box: SpiceRect, id: UInt64, w pw: UInt32, h ph: UIn
     #expect(s.pixel(x: 3, y: 0) == 0xFF00_0000)              // surface x=3 (mask-local x=1): untouched
 }
 
-@Test func hostileCopyBoxIsClampedNotAllocated() async throws {
+@Test func hostileCopyBoxIsRejectedNotAllocated() async throws {
     let c = Canvas(); await c.apply(create(4, 4))
     let px: [UInt8] = [0, 0, 255, 255,  0, 255, 0, 255,  255, 0, 0, 255,  255, 255, 255, 255]   // 2×2 BGRA
     var w = SpiceWriter()
     // A box this large would drive Tier2.scaled's allocation into hundreds of exabytes (and
-    // overflow Int outright) if it weren't clamped to the destination surface before sizing anything.
+    // overflow Int outright) if `validateBox` didn't refuse it before anything gets sized.
     drawBase(&w, SpiceRect(top: 0, left: 0, bottom: 2_000_000_000, right: 2_000_000_000))
     let ptr = w.bytes.count; w.u32(0)
     w.i32(0); w.i32(0); w.i32(2); w.i32(2); w.u16(ROPD.opPut); w.u8(1); noMask(&w)   // scaleMode 1 = nearest
     w.patchU32(at: ptr, UInt32(w.bytes.count))
     w.u64(1); w.u8(ImageType.bitmap.rawValue); w.u8(0); w.u32(2); w.u32(2)
     w.u8(BitmapFormat.bit32.rawValue); w.u8(BitmapFlags.topDown); w.u32(2); w.u32(2); w.u32(8); w.u32(0); w.bytes(px)
-    await c.apply(try DisplayMessage(type: DisplayServerMsg.drawCopy.rawValue, payload: w.bytes))
+    await c.apply(try DisplayMessage(type: DisplayServerMsg.drawCopy.rawValue, payload: w.bytes))   // must not crash or hang
     let s = try #require(await c.snapshot(surfaceID: 0))
     #expect(s.width == 4 && s.height == 4)
-    #expect(s.pixel(x: 0, y: 0) == 0xFFFF_0000)              // clamped box still draws the visible corner
+    #expect(s.pixel(x: 0, y: 0) == 0xFF00_0000)              // refused outright, nothing drawn
+    // the canvas keeps working after the refusal
+    await c.apply(fill(SpiceRect(top: 0, left: 0, bottom: 1, right: 1), color: 0x00FF00))
+    #expect(try #require(await c.snapshot(surfaceID: 0)).pixel(x: 0, y: 0) == 0xFF00_FF00)
+}
+
+@Test func overhangingBoxScalesAgainstRawBoxNotClampedBox() async throws {
+    // An 8-wide surface so the (legitimate, non-hostile) 8-wide box stays within validateBox's
+    // area budget despite overhanging. box spans x ∈ [-4, 4) — half of it overhangs the surface's
+    // left edge. A correct implementation scales the 2-wide source onto the raw 8-wide box
+    // (4× nearest-neighbor) and then clips to the visible x ∈ [0, 4), which is entirely the
+    // source's right half (white). Scaling onto the *clamped* (visible-only, 4-wide) box instead
+    // — the bug — halves the scale factor, so x=0,1 would wrongly come out black.
+    let c = Canvas(); await c.apply(create(8, 1))
+    let px: [UInt8] = [0, 0, 0, 255,  255, 255, 255, 255]   // 2×1 BGRA: black, white
+    var w = SpiceWriter()
+    drawBase(&w, SpiceRect(top: 0, left: -4, bottom: 1, right: 4))
+    let ptr = w.bytes.count; w.u32(0)
+    w.i32(0); w.i32(0); w.i32(1); w.i32(2); w.u16(ROPD.opPut); w.u8(1); noMask(&w)   // scaleMode 1 = nearest
+    w.patchU32(at: ptr, UInt32(w.bytes.count))
+    w.u64(1); w.u8(ImageType.bitmap.rawValue); w.u8(0); w.u32(2); w.u32(1)
+    w.u8(BitmapFormat.bit32.rawValue); w.u8(BitmapFlags.topDown); w.u32(2); w.u32(1); w.u32(8); w.u32(0); w.bytes(px)
+    await c.apply(try DisplayMessage(type: DisplayServerMsg.drawCopy.rawValue, payload: w.bytes))
+    let s = try #require(await c.snapshot(surfaceID: 0))
+    for x in 0 ..< 4 { #expect(s.pixel(x: x, y: 0) == 0xFFFF_FFFF, "x=\(x)") }
+}
+
+@Test func overhangingMaskedCopyMatchesEquivalentNonOverhangingDraw() async throws {
+    // A: box spans x ∈ [-2, 2) (overhangs the left edge by 2), mask.pos=(0,0), a 4-wide mask
+    // aligned with the box, coverage [not,not,covered,covered]. The visible surface x ∈ [0, 2)
+    // corresponds to box-local x ∈ [2, 4) — covered — sampling source x ∈ [2, 4) (red, white).
+    // B is the same outcome expressed with no overhang at all: box x ∈ [0, 2), sourceArea shifted
+    // to pick up source x ∈ [2, 4) directly, and mask.pos shifted so the same coverage bits line up.
+    // A correct implementation must render A and B identically; keying the mask origin off a
+    // *clamped* box shifts A's sample point and breaks that equivalence.
+    func maskedOverhangCopy(box: SpiceRect, sourceLeft: Int32, maskPos: SpicePoint) -> DisplayMessage {
+        let px: [UInt8] = [255, 0, 0, 255,  0, 255, 0, 255,  0, 0, 255, 255,  255, 255, 255, 255]  // BGRA: blue,green,red,white (4×1)
+        var w = SpiceWriter()
+        drawBase(&w, box)
+        let ptr = w.bytes.count; w.u32(0)
+        w.i32(0); w.i32(sourceLeft); w.i32(1); w.i32(sourceLeft + box.width); w.u16(ROPD.opPut); w.u8(0)
+        w.u8(0); w.i32(maskPos.x); w.i32(maskPos.y)                      // mask flags=0
+        let maskPtr = w.bytes.count; w.u32(0)
+        w.patchU32(at: ptr, UInt32(w.bytes.count))
+        w.u64(1); w.u8(ImageType.bitmap.rawValue); w.u8(0); w.u32(4); w.u32(1)
+        w.u8(BitmapFormat.bit32.rawValue); w.u8(BitmapFlags.topDown); w.u32(4); w.u32(1); w.u32(16); w.u32(0); w.bytes(px)
+        w.patchU32(at: maskPtr, UInt32(w.bytes.count))
+        w.u64(2); w.u8(ImageType.bitmap.rawValue); w.u8(0); w.u32(4); w.u32(1)
+        w.u8(BitmapFormat.bit1LE.rawValue); w.u8(BitmapFlags.topDown); w.u32(4); w.u32(1); w.u32(1); w.u32(0)
+        w.bytes([0b1100])                                                 // index0,1 unset; index2,3 set
+        return try! DisplayMessage(type: DisplayServerMsg.drawCopy.rawValue, payload: w.bytes)
+    }
+
+    let a = Canvas(); await a.apply(create(4, 1))
+    await a.apply(maskedOverhangCopy(box: SpiceRect(top: 0, left: -2, bottom: 1, right: 2), sourceLeft: 0, maskPos: SpicePoint(x: 0, y: 0)))
+    let b = Canvas(); await b.apply(create(4, 1))
+    await b.apply(maskedOverhangCopy(box: SpiceRect(top: 0, left: 0, bottom: 1, right: 2), sourceLeft: 2, maskPos: SpicePoint(x: 2, y: 0)))
+
+    let sa = try #require(await a.snapshot(surfaceID: 0)), sb = try #require(await b.snapshot(surfaceID: 0))
+    for x in 0 ..< 2 { #expect(sa.pixel(x: x, y: 0) == sb.pixel(x: x, y: 0), "x=\(x)") }
+    #expect(sa.pixel(x: 0, y: 0) == 0xFFFF_0000)   // red: covered, sampling source x=2
+    #expect(sa.pixel(x: 1, y: 0) == 0xFFFF_FFFF)   // white: covered, sampling source x=3
+}
+
+@Test func opaqueInversRolesMatchCanvasBaseC() async throws {
+    // 1×1 source pixel 0xAA, solid brush 0xCC, combined with AND. canvas_base.c:2423 combines with
+    // (ROP_INPUT_BRUSH, ROP_INPUT_SRC): INVERS_SRC inverts the *copied source* (temp), not the
+    // brush, and INVERS_DEST does not apply to this combine at all.
+    func opaqueDraw(rop: UInt16) -> DisplayMessage {
+        var w = SpiceWriter()
+        drawBase(&w, SpiceRect(top: 0, left: 0, bottom: 1, right: 1))
+        let ptr = w.bytes.count; w.u32(0)
+        w.i32(0); w.i32(0); w.i32(1); w.i32(1)              // sourceArea = (0,0,1,1)
+        w.u8(1); w.u32(0x00CC_CCCC)                          // brush: solid 0xCCCCCC
+        w.u16(rop); w.u8(0)                                  // rop, scaleMode
+        noMask(&w)
+        w.patchU32(at: ptr, UInt32(w.bytes.count))
+        w.u64(1); w.u8(ImageType.bitmap.rawValue); w.u8(0); w.u32(1); w.u32(1)
+        w.u8(BitmapFormat.bit32.rawValue); w.u8(BitmapFlags.topDown); w.u32(1); w.u32(1); w.u32(4); w.u32(0)
+        w.bytes([0xAA, 0xAA, 0xAA, 0xFF])
+        return try! DisplayMessage(type: DisplayServerMsg.drawOpaque.rawValue, payload: w.bytes)
+    }
+
+    let base = Canvas(); await base.apply(create(1, 1))
+    await base.apply(opaqueDraw(rop: ROPD.opAnd))
+    let baseline = try #require(await base.snapshot(surfaceID: 0)).pixel(x: 0, y: 0)
+    #expect(baseline == 0xFF88_8888)                         // 0xAA & 0xCC == 0x88 in every channel
+
+    let inversSrc = Canvas(); await inversSrc.apply(create(1, 1))
+    await inversSrc.apply(opaqueDraw(rop: ROPD.opAnd | ROPD.inversSrc))
+    #expect(try #require(await inversSrc.snapshot(surfaceID: 0)).pixel(x: 0, y: 0) == 0xFF44_4444)   // (~0xAA) & 0xCC == 0x44
+
+    let inversDest = Canvas(); await inversDest.apply(create(1, 1))
+    await inversDest.apply(opaqueDraw(rop: ROPD.opAnd | ROPD.inversDest))
+    #expect(try #require(await inversDest.snapshot(surfaceID: 0)).pixel(x: 0, y: 0) == baseline)     // ignored: same as baseline
 }
 
 @Test func pngRoundTrip() throws {
