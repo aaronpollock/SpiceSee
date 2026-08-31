@@ -114,3 +114,40 @@ private enum PNGFixtures {
     #expect(img.pixels[3] == 0x80)                       // alpha from the LZ plane
     #expect(img.pixels[2] > 200 && img.pixels[0] < 50)   // red from the JPEG (tolerance: lossy)
 }
+
+/// `sc_lz_encode_xxxa` always encodes top_down=1, so a payload flag of 0 disagrees with the plane's
+/// own header. Upstream `canvas_get_jpeg_alpha` requires the two agree; a mismatch must be rejected
+/// rather than merged upside down.
+@Test func jpegAlphaRejectsDisagreeingOrientation() throws {
+    let w = 8, h = 8
+    let red = try PNGFixtures.solidJPEG(width: w, height: h, r: 255, g: 0, b: 0)
+    var alphaPixels = [UInt8](repeating: 0, count: w * h * 4)
+    for i in stride(from: 3, to: alphaPixels.count, by: 4) { alphaPixels[i] = 0x80 }
+    var lz = [UInt8](repeating: 0, count: 1 << 16)
+    let n = alphaPixels.withUnsafeBufferPointer { src in lz.withUnsafeMutableBufferPointer { dst in
+        sc_lz_encode_xxxa(src.baseAddress, Int32(w), Int32(h), Int32(w * 4), dst.baseAddress, dst.count) } }
+    #expect(n > 0)
+    let payload = ImagePayload.jpegAlpha(flags: 0, jpegSize: UInt32(red.count), data: red + lz[0 ..< Int(n)])
+    let desc = SpiceImageDescriptor(id: 0, type: .jpegAlpha, flags: 0, width: UInt32(w), height: UInt32(h))
+    var d = ImageDecoder(); var palettes = PaletteCache()
+    #expect(throws: CanvasError.self) {
+        _ = try d.decode(SpiceImage(descriptor: desc, payload: payload), cache: nil, palettes: &palettes)
+    }
+}
+
+/// XXXA is the jpeg-alpha plane's type. An lzRGB payload claiming it is malformed, and must throw —
+/// decoding it would silently yield an opaque black image.
+@Test func lzRGBRejectsAlphaOnlyStream() throws {
+    let w = 4, h = 4
+    var alphaPixels = [UInt8](repeating: 0, count: w * h * 4)
+    for i in stride(from: 3, to: alphaPixels.count, by: 4) { alphaPixels[i] = 0x40 }
+    var lz = [UInt8](repeating: 0, count: 1 << 16)
+    let n = alphaPixels.withUnsafeBufferPointer { src in lz.withUnsafeMutableBufferPointer { dst in
+        sc_lz_encode_xxxa(src.baseAddress, Int32(w), Int32(h), Int32(w * 4), dst.baseAddress, dst.count) } }
+    #expect(n > 0)
+    let image = try img(.lzRGB, w: UInt32(w), h: UInt32(h)) { wr in
+        wr.u32(UInt32(n)); wr.bytes([UInt8](lz[0 ..< Int(n)]))
+    }
+    var d = ImageDecoder(); var palettes = PaletteCache()
+    #expect(throws: CanvasError.self) { _ = try d.decode(image, cache: nil, palettes: &palettes) }
+}
