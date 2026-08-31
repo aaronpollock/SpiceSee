@@ -48,6 +48,9 @@ public actor Canvas {
             if primarySurfaceID == id { primarySurfaceID = nil }
             cont.yield(.surfaceDestroyed(id))
         case .mode, .mark, .reset, .monitorsConfig: break
+        // SpiceSession routes streams to the player before the canvas ever sees them; this arm
+        // exists so a mis-route is inert rather than corrupting.
+        case .streamCreate, .streamData, .streamClip, .streamDestroy, .streamDestroyAll, .streamActivateReport: break
         case .invalAllPixmaps: cache.removeAll()
         case let .invalList(list): list.forEach { cache.remove($0.id) }
         case let .invalPalette(id): palettes.remove(id)

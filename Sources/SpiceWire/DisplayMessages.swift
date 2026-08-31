@@ -153,6 +153,8 @@ public enum DisplayMessage: Sendable {
     case rop3(DrawRop3), transparent(DrawTransparent), stroke(DrawStroke), text(DrawText)
     case invalList([ResourceID]), invalAllPixmaps, invalPalette(UInt64), invalAllPalettes
     case monitorsConfig(MonitorsConfig)
+    case streamCreate(StreamCreate), streamData(StreamData), streamClip(id: UInt32, clip: SpiceClip)
+    case streamDestroy(UInt32), streamDestroyAll, streamActivateReport(StreamActivateReport)
     case unsupported(type: UInt16, payload: [UInt8])
 
     public init(type: UInt16, payload: [UInt8]) throws {
@@ -184,6 +186,13 @@ public enum DisplayMessage: Sendable {
         case .invalPalette: self = .invalPalette(try r.u64())
         case .invalAllPalettes: self = .invalAllPalettes
         case .monitorsConfig: self = .monitorsConfig(try MonitorsConfig(reader: &r))
+        case .streamCreate: self = .streamCreate(try StreamCreate(reader: &r))
+        case .streamData: self = .streamData(try StreamData(reader: &r, sized: false))
+        case .streamDataSized: self = .streamData(try StreamData(reader: &r, sized: true))
+        case .streamClip: self = .streamClip(id: try r.u32(), clip: try SpiceClip(reader: &r))
+        case .streamDestroy: self = .streamDestroy(try r.u32())
+        case .streamDestroyAll: self = .streamDestroyAll
+        case .streamActivateReport: self = .streamActivateReport(try StreamActivateReport(reader: &r))
         default: self = .unsupported(type: type, payload: payload)
         }
     }
