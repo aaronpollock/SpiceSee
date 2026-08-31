@@ -51,4 +51,63 @@ enum Tier3 {
         }
         return ResolvedMask(width: w, height: h, origin: SpicePoint(x: rect.left, y: rect.top), coverage: coverage)
     }
+
+    /// Decodes a glyph's coverage bitmap into a `ResolvedMask` positioned at `render_pos +
+    /// glyph_origin` in *absolute* surface coordinates — independent of the draw's `base.box`,
+    /// unlike every other mask on this milestone. `canvas_raster_glyph_box` (spice-common
+    /// canvas_base.c:1566-1573) adds `glyph_origin` to `render_pos` for both axes, and
+    /// `canvas_draw_text` (spice-common sw_canvas.c:1111-1123) composites the resulting mask at
+    /// that absolute position; `bbox`/clip only restrict which of those pixels actually land, the
+    /// same bbox-as-clip-rect role `base.box` already plays via `forEachClipRect` elsewhere in
+    /// `Canvas`. Callers are expected to have bounded `glyph.width`/`height` against the
+    /// destination surface (`Canvas.validateBox`) before calling this, the same way `.copy`/
+    /// `.opaque`/`.rop3` bound their own box-sized allocations — this function does not repeat
+    /// that check.
+    ///
+    /// A1 unpacks MSB-first, A4 high-nibble-first (canvas_base.c:1628-1665 — the bpp==1 case
+    /// reverses each source byte before packing it LSB-first into the destination, meaning the
+    /// wire byte itself is MSB-first; the bpp==4 case assigns `byte & 0xf0` to the first pixel of
+    /// a pair and `byte << 4` to the second). A4/A8 partial coverage collapses to on/off here
+    /// since `Tier2.draw`'s mask has no graduated-alpha path yet — anti-aliased subpixel text from
+    /// QXL is A1 in practice, so this only affects the untested A4/A8 paths.
+    ///
+    /// Rows are read bottom-up unless `topDown`, matching the QMask bitmap convention used
+    /// elsewhere (`Canvas.resolveMask`'s `topDown ? y : height - 1 - y`). Upstream itself has never
+    /// implemented `SPICE_STRING_FLAGS_RASTER_TOP_DOWN` (canvas_base.c:1618, `//todo: support
+    /// SPICE_STRING_FLAGS_RASTER_TOP_DOWN` — it always assumes bottom-up), so there is no reference
+    /// behaviour to match for the true case; honouring the documented flag is a considered choice,
+    /// not a guess.
+    static func glyphMask(_ glyph: RasterGlyph, bpp: Int, topDown: Bool) -> ResolvedMask {
+        let width = Int(glyph.width), height = Int(glyph.height)
+        guard width > 0, height > 0 else {
+            return ResolvedMask(width: 0, height: 0, origin: glyph.renderPos, coverage: [])
+        }
+        let rowBytes = (width * bpp + 7) / 8
+        var coverage = [UInt8](repeating: 0, count: width * height)
+        for row in 0 ..< height {
+            let dataRow = topDown ? row : height - 1 - row
+            let rowStart = dataRow * rowBytes
+            for x in 0 ..< width {
+                let on: Bool
+                switch bpp {
+                case 1:
+                    let byteIndex = rowStart + x / 8
+                    guard byteIndex < glyph.data.count else { continue }
+                    on = (glyph.data[byteIndex] >> (7 - x % 8)) & 1 != 0
+                case 4:
+                    let byteIndex = rowStart + x / 2
+                    guard byteIndex < glyph.data.count else { continue }
+                    let byte = glyph.data[byteIndex]
+                    on = (x % 2 == 0 ? byte & 0xF0 : byte << 4) != 0
+                default:   // A8
+                    let byteIndex = rowStart + x
+                    guard byteIndex < glyph.data.count else { continue }
+                    on = glyph.data[byteIndex] != 0
+                }
+                if on { coverage[row * width + x] = 0xFF }
+            }
+        }
+        let origin = SpicePoint(x: glyph.renderPos.x + glyph.origin.x, y: glyph.renderPos.y + glyph.origin.y)
+        return ResolvedMask(width: width, height: height, origin: origin, coverage: coverage)
+    }
 }

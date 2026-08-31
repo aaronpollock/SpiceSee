@@ -184,7 +184,46 @@ public actor Canvas {
             try forEachClipRect(st.base) { s, r in
                 Tier2.draw(s, rect: r, source: source, rop: st.foreMode, mask: Tier3.strokeMask(st.path, in: r))
             }
-        case .text: throw CanvasError.unsupported("text (task 7)")
+        case let .text(t):
+            guard let dstSurface = surfaces[t.base.surfaceID] else { throw CanvasError.noSurface(t.base.surfaceID) }
+            let (_, rects) = try clipRects(t.base)
+            // canvas_draw_text (sw_canvas.c:1073-1093) fills back_area with a hardcoded COPY rop,
+            // ignoring back_mode entirely (a comment there calls the field "deprecated"). A
+            // BRUSH_TYPE_NONE back brush combined with a non-PUT rop would still touch the
+            // destination upstream (draw_brush's NONE case runs fill-with-black for any rop other
+            // than a no-op COPY), but no real server pairs a non-empty back_area with a none brush,
+            // so that combination is treated as absent here rather than replicated.
+            if !t.backArea.isEmpty, t.backBrush != .none {
+                let source: PixelSource
+                switch t.backBrush {
+                case .none: source = .solid(0)
+                case let .solid(color): source = .solid(color)
+                case let .pattern(image, pos): source = .pattern(try resolve(image), seed: pos)
+                }
+                for r in rects {
+                    guard let backRect = t.backArea.intersection(r) else { continue }
+                    Tier2.draw(dstSurface, rect: backRect, source: source, rop: ROPD.opPut, mask: nil)
+                }
+            }
+            if t.foreBrush != .none {
+                let source: PixelSource
+                switch t.foreBrush {
+                case .none: source = .solid(0)
+                case let .solid(color): source = .solid(color)
+                case let .pattern(image, pos): source = .pattern(try resolve(image), seed: pos)
+                }
+                let bpp = t.str.bitsPerPixel, topDown = t.str.flags & StringFlags.topDown != 0
+                for glyph in t.str.glyphs {
+                    guard let box = glyphBox(glyph), (try? validateBox(box, against: dstSurface)) != nil else { continue }
+                    let mask = Tier3.glyphMask(glyph, bpp: bpp, topDown: topDown)
+                    for r in rects {
+                        guard let glyphRect = box.intersection(r) else { continue }
+                        Tier2.draw(dstSurface, rect: glyphRect, source: source, rop: t.foreMode, mask: mask)
+                    }
+                }
+            }
+            // One update for the whole string, not one per glyph — base.box bounds it.
+            if let box = t.base.box.intersection(dstSurface.bounds) { emit(dstSurface, box) }
         case let .unsupported(type, _):
             throw CanvasError.unsupported("display message \(type)")
         }
@@ -268,6 +307,33 @@ public actor Canvas {
         case let .rects(list): rects = list.compactMap { $0.intersection(box) }
         }
         for r in rects { body(s, r); emit(s, r) }
+    }
+
+    /// Like `forEachClipRect` but hands back the clipped rects instead of invoking a body and
+    /// emitting per rect — TEXT draws many glyphs against the same clip and must emit exactly once
+    /// for the whole string, not once per glyph or per rect.
+    private func clipRects(_ base: DrawBase) throws -> (Surface, [SpiceRect]) {
+        guard let s = surfaces[base.surfaceID] else { throw CanvasError.noSurface(base.surfaceID) }
+        guard let box = base.box.intersection(s.bounds) else { return (s, []) }
+        switch base.clip {
+        case .none: return (s, [box])
+        case let .rects(list): return (s, list.compactMap { $0.intersection(box) })
+        }
+    }
+
+    /// A glyph's draw box is `render_pos + glyph_origin` sized to `width`×`height` — computed with
+    /// overflow checks since both points are raw, unvalidated wire `Int32`s (`RasterGlyph.width`/
+    /// `.height` are already bounded at parse time, but their sum with an attacker-controlled
+    /// position is not). Returns `nil` on overflow so the caller can skip just this glyph rather
+    /// than trap.
+    private func glyphBox(_ glyph: RasterGlyph) -> SpiceRect? {
+        let (left, o1) = glyph.renderPos.x.addingReportingOverflow(glyph.origin.x)
+        let (top, o2) = glyph.renderPos.y.addingReportingOverflow(glyph.origin.y)
+        guard !o1, !o2 else { return nil }
+        let (right, o3) = left.addingReportingOverflow(Int32(glyph.width))
+        let (bottom, o4) = top.addingReportingOverflow(Int32(glyph.height))
+        guard !o3, !o4 else { return nil }
+        return SpiceRect(top: top, left: left, bottom: bottom, right: right)
     }
 
     private func emit(_ s: Surface, _ r: SpiceRect) {
