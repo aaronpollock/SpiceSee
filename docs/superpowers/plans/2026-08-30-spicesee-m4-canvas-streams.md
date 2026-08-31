@@ -22,7 +22,7 @@ Two deliberate deviations from the spec's ideal, both argued from constraints th
 - Swift 6 language mode, strict concurrency. **No locks, no `@unchecked Sendable`, no `nonisolated(unsafe)`** outside the one pre-existing use in `NWTransport.connect`. This is why frames are `[UInt8]`.
 - `platforms: [.macOS(.v14)]`, arm64. Dependency rule strictly downward: `SpiceWire` ← `SpiceCore`/`SpiceCanvas`/`SpiceMedia` ← `SpiceKit` ← app. `SpiceMedia` imports `SpiceWire` only (plus system frameworks) — it must never import `SpiceCanvas` or `SpiceCore`, and everything in it runs headless under `swift test`.
 - `SpiceWire` is the security boundary: every reader accessor throws, no `!`, no unchecked subscripts, every server-controlled length validated before allocation. A malformed message is a caught error, never a trap. Stream payloads are server-controlled: cap them (`data_size ≤ 1 << 26`, same as images).
-- **There is no full-redraw request in the protocol; an unimplemented draw command is permanent corruption.** The `CanvasEvent.unsupported` event is the corruption alarm — never remove it, and the M4 exit gate is a real Windows/QXL desktop recording replaying with **zero** unsupported events.
+- **There is no full-redraw request in the protocol; an unimplemented draw command is permanent corruption.** The `CanvasEvent.unsupported` event is the corruption alarm — never remove it. **Amended 2026-08-30:** the intended M4 exit gate — a real Windows/QXL desktop recording replaying with zero unsupported events — turned out to be unachievable on this hardware and vacuous as a gate. Neither guest on the dev box emits a single tier-2/3 draw command (Windows 11's QXL driver is WDDM; the Linux guest's X server runs `modesetting`, and `xf86-video-qxl` cannot bind — see `docs/dev-server.md`, "Where tier-2/3 draw commands actually come from"). The recording replays with zero unsupported events *before any M4 work*. Tiers 2-3 are therefore gated by unit tests; the real-traffic fixture is a tier-1 regression canary.
 - Capability gating is load-bearing scope control: `DisplayChannel.clientCaps()` already advertises `sizedStream`, `streamReport`, `multiCodec`, `codecMjpeg`, `codecH264` — which means **today's client invites stream messages it drops on the floor**; M4 makes the advertisement true. Conversely `composite`, `a8Surface`, `lz4`, `codecVp8/9`, `codecH265` are **not** advertised, the server therefore never sends them, and they are out of M4 scope. Do not add capability bits this plan doesn't name.
 - Stream message layouts are transcribed from `spice.proto`; the vendored `enums.h` confirms every constant used here but **no local header confirms the message layouts** (same situation as M3's migration messages). Parse defensively — validate every length against the payload — and treat Task 13's real-server recording as the layout's confirmation. If the recording contradicts a layout, the recording wins.
 - Tests use Swift Testing. Fixtures under `Tests/<Target>Tests/Fixtures/`. Commit after every task, conventional-commit prefixes. **Only commit a golden you have actually looked at** (open the PNG and check it is a plausible Windows desktop / video frame, not garbage).
@@ -49,7 +49,7 @@ Wire integers are little-endian. "ptr" is a `UInt32` offset into the message bod
 All start with the existing `DrawBase` (surface_id u32, box Rect, clip Clip).
 
 ```
-ROP3        (317): src ptr → SpiceImage, src_area Rect, brush Brush, rop3 u8, scale_mode u8, mask QMask
+ROP3        (309): src ptr → SpiceImage, src_area Rect, brush Brush, rop3 u8, scale_mode u8, mask QMask
 TRANSPARENT (312): src ptr → SpiceImage, src_area Rect, src_color u32, true_color u32
 STROKE      (310): path ptr → Path (nonnull), attr LineAttr, brush Brush, fore_mode u16, back_mode u16
 TEXT        (311): str ptr → String (nonnull), back_area Rect, fore_brush Brush, back_brush Brush,
@@ -62,7 +62,7 @@ PathSeg:    flags u8, count u32, then count × PointFix (x FIXED28_4 i32, y FIXE
             (control1, control2, end); non-bezier points are line-to.
 LineAttr:   flags u8; if flags & LINE_FLAGS_STYLED (1<<3): style_nseg u8, style ptr u32
             (style = style_nseg × FIXED28_4 dash lengths — parse, then ignore: QXL sends solid)
-String:     length u16, flags u16, then length × RasterGlyph inline:
+String:     length u16, flags u8, then length × RasterGlyph inline:
 RasterGlyph: render_pos Point(2×i32), glyph_origin Point(2×i32), width u16, height u16,
              data[height × bytesPerRow] where bytesPerRow = (width×bpp + 7)/8
             String flags: RASTER_A1 1<<0, RASTER_A4 1<<1, RASTER_A8 1<<2, RASTER_TOP_DOWN 1<<3
@@ -83,7 +83,7 @@ STREAM_DATA       (123): id u32, multi_media_time u32, data_size u32, data[data_
 STREAM_CLIP       (124): id u32, clip Clip
 STREAM_DESTROY    (125): id u32
 STREAM_DESTROY_ALL(126): (empty)
-STREAM_DATA_SIZED (315): id u32, multi_media_time u32, width u32, height u32, dest Rect,
+STREAM_DATA_SIZED (316): id u32, multi_media_time u32, width u32, height u32, dest Rect,
                          data_size u32, data[data_size]
 STREAM_ACTIVATE_REPORT (319): stream_id u32, unique_id u32, max_window_size u32, timeout_ms u32
 ```
@@ -268,7 +268,7 @@ git commit -m "test(kit): record installed Windows/QXL desktop fixture with draw
   - `public struct SpiceLineAttr: Sendable, Equatable { public var flags: UInt8 }` (styled dash array parsed and discarded)
   - `public enum StringFlags { public static let rasterA1: UInt16 = 1, rasterA4: UInt16 = 2, rasterA8: UInt16 = 4, topDown: UInt16 = 8 }`
   - `public struct RasterGlyph: Sendable, Equatable { public var renderPos: SpicePoint; public var origin: SpicePoint; public var width, height: UInt16; public var data: [UInt8] }`
-  - `public struct SpiceString: Sendable, Equatable { public var flags: UInt16; public var glyphs: [RasterGlyph] }`
+  - `public struct SpiceString: Sendable, Equatable { public var flags: UInt16; public var glyphs: [RasterGlyph] }  // `flags` is read as u8 from the wire and widened; see the corrected table above`
   - `public struct DrawRop3: Sendable, Equatable { public var base: DrawBase; public var source: SpiceImage?; public var sourceArea: SpiceRect; public var brush: SpiceBrush; public var rop3: UInt8; public var scaleMode: UInt8; public var mask: SpiceQMask }`
   - `public struct DrawTransparent: Sendable, Equatable { public var base: DrawBase; public var source: SpiceImage?; public var sourceArea: SpiceRect; public var srcColor: UInt32; public var trueColor: UInt32 }`
   - `public struct DrawStroke: Sendable, Equatable { public var base: DrawBase; public var path: SpicePath; public var attr: SpiceLineAttr; public var brush: SpiceBrush; public var foreMode: UInt16; public var backMode: UInt16 }`
@@ -1005,6 +1005,15 @@ git commit -m "feat(canvas): TEXT glyph blits"
 ---
 
 ### Task 8: The desktop replay goes strict — zero unsupported, reviewed golden
+
+> **Amended 2026-08-30 — read before implementing.** This task was written believing the
+> `win-desktop` recording exercised tiers 2-3. It does not: the whole capture is 126 `DRAW_COPY`
+> and nothing else, so "zero unsupported" is already true at the branch point and cannot
+> discriminate. Implement this task as a **tier-1 regression golden** over real traffic — the
+> zero-unsupported assertion stays (it is still a genuine corruption alarm for the copy path,
+> and cheap), but it must be documented in the test as such, NOT as the milestone's
+> draw-correctness gate. Tiers 2-3 are proven by Tasks 4-7's unit tests. `expectClose` is still
+> produced here for Task 14. Do not claim in the commit message that this gates tiers 2-3.
 
 **Files:**
 - Modify: `Tests/SpiceKitTests/ReplayTests.swift`
