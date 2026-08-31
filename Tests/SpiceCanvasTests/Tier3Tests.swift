@@ -94,12 +94,16 @@ private func textDraw(glyphData: [UInt8], w gw: UInt16, h gh: UInt16, at renderP
 }
 
 @Test func a1GlyphMaskIsMSBFirst() {
+    // 0b1100_0000 is deliberately asymmetric under bit-reversal: MSB-first lights the two
+    // LEFTMOST pixels, LSB-first would light the two rightmost. The obvious choice here,
+    // 0b1000_0001, is a bit-palindrome and passes whichever order the decoder uses.
     let g = RasterGlyph(renderPos: SpicePoint(x: 4, y: 2), origin: SpicePoint(x: 0, y: 0),
-                        width: 8, height: 1, data: [0b1000_0001])
+                        width: 8, height: 1, data: [0b1100_0000])
     let m = Tier3.glyphMask(g, bpp: 1, topDown: true)
-    #expect(m.covers(x: 4, y: 2))          // bit 7 → leftmost pixel
-    #expect(m.covers(x: 11, y: 2))         // bit 0 → rightmost
-    #expect(!m.covers(x: 5, y: 2))
+    #expect(m.covers(x: 4, y: 2))           // bit 7 → leftmost pixel
+    #expect(m.covers(x: 5, y: 2))           // bit 6
+    #expect(!m.covers(x: 10, y: 2))         // set only if the decoder were LSB-first
+    #expect(!m.covers(x: 11, y: 2))
 }
 
 @Test func a4GlyphHighNibbleFirst() {
