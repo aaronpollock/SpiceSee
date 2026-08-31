@@ -17,22 +17,35 @@ public struct ImageDecoder: ~Copyable {
     public mutating func clearGLZWindow() { sc_glz_window_clear(glzWindow) }
 
     /// `cache` may be nil in unit tests; FROM_CACHE then throws.
-    public mutating func decode(_ image: SpiceImage, cache: ImageCache?) throws -> DecodedImage {
+    public mutating func decode(_ image: SpiceImage, cache: ImageCache?, palettes: inout PaletteCache) throws -> DecodedImage {
         let w = Int(image.descriptor.width), h = Int(image.descriptor.height)
         switch image.payload {
         case .fromCache, .fromCacheLossless:
             guard let c = cache?[image.descriptor.id] else { throw CanvasError.cacheMiss(image.descriptor.id) }
             return c
-        case let .bitmap(b): return try Self.decodeBitmap(b)
+        case let .bitmap(b): return try decodeBitmap(b, palettes: &palettes)
         case let .quic(data): return try decodeQuic(data, w, h)
         case let .lzRGB(data): return try decodeLZ(data, palette: nil, w, h)
-        case let .lzPlt(_, palette, _, data): return try decodeLZ(data, palette: palette, w, h)
+        case let .lzPlt(flags, palette, paletteID, data):
+            let pal = try Self.resolvePalette(flags: flags, palette: palette, paletteID: paletteID, palettes: &palettes)
+            return try decodeLZ(data, palette: pal, w, h)
         case let .glzRGB(data): return try decodeGLZ(data)
         case let .zlibGlzRGB(data): return try decodeGLZ(try Self.inflate(data))
         case let .jpeg(data): return try Self.decodeJPEG(data, w, h)
-        case .jpegAlpha, .lz4: throw CanvasError.unsupported("image type \(image.descriptor.type)")
+        case let .jpegAlpha(flags, jpegSize, data): return try decodeJPEGAlpha(flags: flags, jpegSize: jpegSize, data: data, w, h)
+        case .lz4: throw CanvasError.unsupported("image type \(image.descriptor.type)")
         case .surface: throw CanvasError.unsupported("surface-as-image is resolved by Canvas")
         }
+    }
+
+    /// Resolves a bitmap/lzPlt palette against `palettes`, storing an inline one flagged `PAL_CACHE_ME`.
+    private static func resolvePalette(flags: UInt8, palette: SpicePalette?, paletteID: UInt64?, palettes: inout PaletteCache) throws -> SpicePalette? {
+        if flags & BitmapFlags.palFromCache != 0 {
+            guard let id = paletteID, let cached = palettes[id] else { throw CanvasError.cacheMiss(paletteID ?? 0) }
+            return cached
+        }
+        if flags & BitmapFlags.palCacheMe != 0, let p = palette { palettes.store(p) }
+        return palette
     }
 
     private func decodeQuic(_ data: [UInt8], _ w: Int, _ h: Int) throws -> DecodedImage {
@@ -89,11 +102,12 @@ public struct ImageDecoder: ~Copyable {
         return out
     }
 
-    static func decodeBitmap(_ b: SpiceBitmap) throws -> DecodedImage {
+    mutating func decodeBitmap(_ b: SpiceBitmap, palettes: inout PaletteCache) throws -> DecodedImage {
         let w = Int(b.width), h = Int(b.height), stride = Int(b.stride)
         var out = [UInt8](repeating: 0xFF, count: w * h * 4)
         let topDown = b.flags & BitmapFlags.topDown != 0
-        let pal = b.palette?.entries ?? []
+        let resolved = try Self.resolvePalette(flags: b.flags, palette: b.palette, paletteID: b.paletteID, palettes: &palettes)
+        let pal = resolved?.entries ?? []
         func palette(_ i: Int) throws -> UInt32 { guard i < pal.count else { throw CanvasError.decode("palette index") }; return pal[i] }
         for y in 0 ..< h {
             let srcRow = (topDown ? y : h - 1 - y) * stride
@@ -147,5 +161,23 @@ public struct ImageDecoder: ~Copyable {
         guard ok else { throw CanvasError.decode("jpeg context") }
         for i in stride(from: 3, to: out.count, by: 4) { out[i] = 0xFF }
         return DecodedImage(width: w, height: h, pixels: out, hasAlpha: false)
+    }
+
+    /// `data` is `jpegSize` bytes of JPEG followed by an LZ XXXA (alpha-only) plane. The alpha plane
+    /// is decoded into a scratch buffer and flipped there — flipping after merging into the JPEG
+    /// image would corrupt rows, since the merge only touches byte 3 of each pixel.
+    private func decodeJPEGAlpha(flags: UInt8, jpegSize: UInt32, data: [UInt8], _ w: Int, _ h: Int) throws -> DecodedImage {
+        guard Int(jpegSize) <= data.count else { throw CanvasError.decode("jpeg-alpha size") }
+        var img = try Self.decodeJPEG(Array(data[0 ..< Int(jpegSize)]), w, h)
+        let alphaData = Array(data[Int(jpegSize)...])
+        var ow: Int32 = 0, oh: Int32 = 0, type = SC_IMAGE_INVALID, lzTopDown: Int32 = 1
+        let ok = alphaData.withUnsafeBufferPointer { d in sc_lz_begin(lz, d.baseAddress, alphaData.count, nil, 0, &ow, &oh, &type, &lzTopDown) }
+        guard ok == 0, type == SC_IMAGE_XXXA, Int(ow) == w, Int(oh) == h else { throw CanvasError.decode("jpeg-alpha plane header") }
+        var scratch = [UInt8](repeating: 0, count: w * h * 4)
+        guard scratch.withUnsafeMutableBufferPointer({ sc_lz_decode(lz, $0.baseAddress) }) == 0 else { throw CanvasError.decode("jpeg-alpha plane") }
+        if flags & 1 == 0 { scratch = Self.flipRows(scratch, width: w, height: h) }
+        for i in stride(from: 3, to: scratch.count, by: 4) { img.pixels[i] = scratch[i] }
+        img.hasAlpha = true
+        return img
     }
 }

@@ -15,6 +15,7 @@ public actor Canvas {
     private let cont: AsyncStream<CanvasEvent>.Continuation
     private var surfaces: [UInt32: Surface] = [:]
     private var cache = ImageCache()
+    private var palettes = PaletteCache()
     private var decoder = ImageDecoder()
     private let log = Logger(subsystem: "com.spicesee", category: "canvas")
     public private(set) var primarySurfaceID: UInt32?
@@ -49,7 +50,8 @@ public actor Canvas {
         case .mode, .mark, .reset, .monitorsConfig: break
         case .invalAllPixmaps: cache.removeAll()
         case let .invalList(list): list.forEach { cache.remove($0.id) }
-        case .invalPalette, .invalAllPalettes: break
+        case let .invalPalette(id): palettes.remove(id)
+        case .invalAllPalettes: palettes.removeAll()
         case let .fill(f):
             guard case let .solid(color) = f.brush else { throw CanvasError.unsupported("pattern brush") }
             try forEachClipRect(f.base) { s, r in Tier1.fill(s, rect: r, color: color) }
@@ -96,7 +98,7 @@ public actor Canvas {
             guard let s = surfaces[id] else { throw CanvasError.noSurface(id) }
             return s.snapshot()
         }
-        let img = try decoder.decode(image, cache: cache)
+        let img = try decoder.decode(image, cache: cache, palettes: &palettes)
         if image.descriptor.flags & (ImageFlags.cacheMe | ImageFlags.cacheReplaceMe) != 0 { cache.store(img, id: image.descriptor.id) }
         return img
     }

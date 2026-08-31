@@ -8,6 +8,7 @@ public enum BitmapFlags { public static let palCacheMe: UInt8 = 1, palFromCache:
 
 public struct SpicePalette: Sendable, Equatable {
     public var id: UInt64, entries: [UInt32]
+    public init(id: UInt64, entries: [UInt32]) { self.id = id; self.entries = entries }
     public init(reader r: inout SpiceReader) throws {
         id = try r.u64()
         let n = try r.u16()
@@ -18,6 +19,9 @@ public struct SpicePalette: Sendable, Equatable {
 
 public struct SpiceImageDescriptor: Sendable, Equatable {
     public var id: UInt64, type: ImageType, flags: UInt8, width: UInt32, height: UInt32
+    public init(id: UInt64, type: ImageType, flags: UInt8, width: UInt32, height: UInt32) {
+        self.id = id; self.type = type; self.flags = flags; self.width = width; self.height = height
+    }
     public init(reader r: inout SpiceReader) throws {
         id = try r.u64()
         let t = try r.u8()
@@ -30,6 +34,11 @@ public struct SpiceImageDescriptor: Sendable, Equatable {
 public struct SpiceBitmap: Sendable, Equatable {
     public var format: BitmapFormat, flags: UInt8, width: UInt32, height: UInt32, stride: UInt32
     public var palette: SpicePalette?, paletteID: UInt64?, data: [UInt8]
+    public init(format: BitmapFormat, flags: UInt8, width: UInt32, height: UInt32, stride: UInt32,
+                palette: SpicePalette?, paletteID: UInt64?, data: [UInt8]) {
+        self.format = format; self.flags = flags; self.width = width; self.height = height; self.stride = stride
+        self.palette = palette; self.paletteID = paletteID; self.data = data
+    }
 }
 
 public enum ImagePayload: Sendable, Equatable {
@@ -46,6 +55,10 @@ public enum ImagePayload: Sendable, Equatable {
 public struct SpiceImage: Sendable, Equatable {
     public var descriptor: SpiceImageDescriptor
     public var payload: ImagePayload
+
+    public init(descriptor: SpiceImageDescriptor, payload: ImagePayload) {
+        self.descriptor = descriptor; self.payload = payload
+    }
 
     public static func at(pointer: UInt32, base: SpiceReader) throws -> SpiceImage? {
         if pointer == 0 { return nil }
