@@ -31,6 +31,13 @@ final class SessionModel {
     /// Mirrors AppSettings.sendLockKeys; SpiceSeeApp keeps it current.
     var sendLockKeys = true
 
+    /// How long after the channels come up to wait for a primary surface before opening a
+    /// placeholder viewport anyway. A guest with a blanked console sends no surface until it
+    /// gets input, and it can only get input through a window — without this, that guest is
+    /// an unfailable, uncancellable spinner.
+    var displayGraceSeconds: Double = 2
+    private var graceTask: Task<Void, Never>?
+
     /// Set only by `presentFailure`, so `dismissFailure` can put back a session the file error
     /// interrupted. Cleared the moment it is used or made stale by a real connect attempt.
     private var phaseBeforeFileFailure: Phase?
@@ -80,6 +87,7 @@ final class SessionModel {
                                           optionMapsTo: connection.advanced.optionMapsTo)
         phase = .connecting(completed: [])
         phaseBeforeFileFailure = nil
+        graceTask?.cancel()
         pump?.cancel()
         pump = Task { [backend] in
             let target = ConnectionTarget(host: connection.host,
@@ -97,7 +105,9 @@ final class SessionModel {
         switch event {
         case let .step(step):
             if case let .connecting(done) = phase { phase = .connecting(completed: done.union([step])) }
+            if step == .channels { startGracePeriod() }
         case let .connected(viewports):
+            graceTask?.cancel()
             self.viewports = viewports
             phase = .connected
             clipboard.start()
@@ -122,11 +132,13 @@ final class SessionModel {
             if let name = connection?.name, !name.isEmpty { offer.vmName = name }
             migrationOffer = offer
         case let .failed(failure):
+            graceTask?.cancel()
             phaseBeforeFileFailure = nil   // a real failure ends the session: dismissing must reach .idle
             phase = .failed(failure)
             clipboard.stop()
             for v in viewports { publish(.streamDestroyed(nil), to: v.id) }
         case .disconnected:
+            graceTask?.cancel()
             phase = .idle
             for v in viewports { publish(.streamDestroyed(nil), to: v.id) }
             viewports = []
@@ -147,7 +159,18 @@ final class SessionModel {
         Task { [backend] in await backend.disconnect() }
     }
 
+    private func startGracePeriod() {
+        graceTask?.cancel()
+        graceTask = Task { [weak self] in
+            guard let seconds = self?.displayGraceSeconds else { return }
+            try? await Task.sleep(for: .seconds(seconds))
+            guard let self, !Task.isCancelled, case .connecting = self.phase else { return }
+            self.apply(.connected(viewports: [ViewportInfo(id: 0, index: 0, total: 1, width: 1280, height: 800)]))
+        }
+    }
+
     func disconnect() {
+        graceTask?.cancel()
         pump?.cancel()
         clipboard.stop()
         viewports = []
