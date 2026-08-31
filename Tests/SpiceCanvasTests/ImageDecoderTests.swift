@@ -151,3 +151,16 @@ private enum PNGFixtures {
     var d = ImageDecoder(); var palettes = PaletteCache()
     #expect(throws: CanvasError.self) { _ = try d.decode(image, cache: nil, palettes: &palettes) }
 }
+
+/// `stride` is server-controlled and independent of `width`. Every branch of `decodeBitmap` indexes
+/// up to `width × bytesPerPixel` into each row, so a stride too small for the format lets the last
+/// row's slice run past `data`. The wire only guarantees `data.count == stride × height`, which a
+/// hostile server satisfies trivially by shrinking stride.
+@Test func bitmapStrideTooSmallForWidthIsRejected() throws {
+    let w = 8, h = 4, stride = 4          // bit32 needs w*4 = 32 bytes per row, not 4
+    let b = SpiceBitmap(format: .bit32, flags: BitmapFlags.topDown, width: UInt32(w), height: UInt32(h),
+                        stride: UInt32(stride), palette: nil, paletteID: nil,
+                        data: [UInt8](repeating: 0, count: stride * h))
+    var d = ImageDecoder(); var palettes = PaletteCache()
+    #expect(throws: CanvasError.self) { _ = try d.decodeBitmap(b, palettes: &palettes) }
+}

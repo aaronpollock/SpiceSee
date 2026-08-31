@@ -105,8 +105,30 @@ public struct ImageDecoder: ~Copyable {
         return out
     }
 
+    /// Minimum bytes a row of `format` occupies at `width` pixels. `stride` is server-controlled and
+    /// independent of `width`, so it must be checked against this before any row is indexed.
+    private static func rowBytes(_ format: BitmapFormat, width w: Int) -> Int {
+        switch format {
+        case .bit32, .rgba: return w * 4
+        case .bit24: return w * 3
+        case .bit16: return w * 2
+        case .bit8, .bit8A: return w
+        case .bit4LE, .bit4BE: return (w + 1) / 2
+        case .bit1LE, .bit1BE: return (w + 7) / 8
+        }
+    }
+
     mutating func decodeBitmap(_ b: SpiceBitmap, palettes: inout PaletteCache) throws -> DecodedImage {
         let w = Int(b.width), h = Int(b.height), stride = Int(b.stride)
+        // Each branch below indexes up to `rowBytes` into every row. The wire only promises
+        // `data.count == stride * height`, which a hostile server satisfies by shrinking `stride`
+        // below what `width` needs — so the last row's slice would run past `data` and trap.
+        guard w >= 0, h >= 0, stride >= Self.rowBytes(b.format, width: w) else {
+            throw CanvasError.decode("bitmap stride \(stride) too small for \(w)px \(b.format)")
+        }
+        guard h == 0 || b.data.count >= (h - 1) * stride + Self.rowBytes(b.format, width: w) else {
+            throw CanvasError.decode("bitmap data shorter than stride × height")
+        }
         var out = [UInt8](repeating: 0xFF, count: w * h * 4)
         let topDown = b.flags & BitmapFlags.topDown != 0
         let resolved = try Self.resolvePalette(flags: b.flags, palette: b.palette, paletteID: b.paletteID, palettes: &palettes)
