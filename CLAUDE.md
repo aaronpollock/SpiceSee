@@ -140,7 +140,7 @@ The dev guest is now in **client** mouse mode (USB tablet), so server-mode captu
 
 ## Licensing constraint (affects distribution)
 
-The SPICE image codecs (`quic.c`, `lz.c`, GLZ decoder) are LGPL-2.1+ and unavoidable — the server defaults to `auto_glz` with no client opt-out. Plan task 13 vendors them into `CSpiceCodec`, which **must** build as a dynamic framework embedded in the bundle, with `com.apple.security.cs.disable-library-validation` so a user can substitute their own build (LGPL §6(b)). This rules out the Mac App Store; distribution is Developer ID + notarized DMG + Homebrew cask. The acknowledgements window carries the written offer and must keep doing so.
+The SPICE image codecs (`quic.c`, `lz.c`, GLZ decoder) are LGPL-2.1+ and unavoidable — the server defaults to `auto_glz` with no client opt-out. Plan task 13 vendors them into `CSpiceCodec`, which **must** build as a dynamic framework embedded in the bundle, with `com.apple.security.cs.disable-library-validation` so a user can substitute their own build (LGPL §6(b)). This rules out the Mac App Store — the one hard constraint the licence imposes. Everything else about distribution is a choice, not a requirement: because it ships direct, Gatekeeper (not the LGPL) makes Developer ID signing and notarization necessary, and the chosen artifact is a **notarized DMG** hosted at https://somecoolthings.com/spicesee, with Sparkle for updates (M7). A Homebrew cask was considered and **declined** — it asks nothing of the build and would only be a second front door to the same file. The acknowledgements window carries the written offer and must keep doing so.
 
 ## Conventions
 
