@@ -30,6 +30,7 @@ public actor ChannelReader {
     }
 
     public func send(type: UInt16, payload: [UInt8]) async throws {
+        log.debug("\(self.channel.type.rawValue)/\(self.channel.id): send type \(type) size \(payload.count)")
         try await sink.write(ClientMessage.frame(type: type, payload: payload, mini: miniHeader, serial: serial))
         serial += 1
     }
@@ -47,6 +48,7 @@ public actor ChannelReader {
                     return
                 }
                 let payload = try await source.read(exactly: Int(header.size))
+                log.debug("\(self.channel.type.rawValue)/\(self.channel.id): recv type \(header.type) size \(header.size)")
                 // Every message the server sends counts against its ack window, including the ones
                 // consumed below — counting only what we forward drifts by one per ping until the
                 // window is exhausted and the server stops sending on this channel.
