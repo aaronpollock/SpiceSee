@@ -99,6 +99,44 @@ private func copyFromCache(_ box: SpiceRect, id: UInt64, w pw: UInt32, h ph: UIn
     #expect(s.pixel(x: 0, y: 0) & 0xFFFFFF == 0)       // white XOR white = black
 }
 
+@Test func maskOriginAccountsForNonZeroBoxOrigin() async throws {
+    // box.left == 2, mask.pos == (0,0): the mask's own origin sits at the box's origin, not the
+    // surface's, so a correct reader must offset the mask index by the box's left/top, not by
+    // mask.pos alone.
+    let c = Canvas(); await c.apply(create(4, 1))
+    var w = SpiceWriter()
+    drawBase(&w, SpiceRect(top: 0, left: 2, bottom: 1, right: 4))
+    w.u8(1); w.u32(0xFFFFFF); w.u16(ROPD.opPut)
+    w.u8(0); w.i32(0); w.i32(0)                              // mask flags=0, pos=(0,0)
+    let ptr = w.bytes.count; w.u32(0)
+    w.patchU32(at: ptr, UInt32(w.bytes.count))
+    w.u64(0); w.u8(ImageType.bitmap.rawValue); w.u8(0); w.u32(2); w.u32(1)
+    w.u8(BitmapFormat.bit1LE.rawValue); w.u8(BitmapFlags.topDown); w.u32(2); w.u32(1); w.u32(1); w.u32(0)
+    w.bytes([0x01])                                          // mask-local x=0 covered, x=1 not
+    await c.apply(try DisplayMessage(type: DisplayServerMsg.drawFill.rawValue, payload: w.bytes))
+    let s = try #require(await c.snapshot(surfaceID: 0))
+    #expect(s.pixel(x: 2, y: 0) == 0xFFFF_FFFF)              // surface x=2 (mask-local x=0): covered
+    #expect(s.pixel(x: 3, y: 0) == 0xFF00_0000)              // surface x=3 (mask-local x=1): untouched
+}
+
+@Test func hostileCopyBoxIsClampedNotAllocated() async throws {
+    let c = Canvas(); await c.apply(create(4, 4))
+    let px: [UInt8] = [0, 0, 255, 255,  0, 255, 0, 255,  255, 0, 0, 255,  255, 255, 255, 255]   // 2×2 BGRA
+    var w = SpiceWriter()
+    // A box this large would drive Tier2.scaled's allocation into hundreds of exabytes (and
+    // overflow Int outright) if it weren't clamped to the destination surface before sizing anything.
+    drawBase(&w, SpiceRect(top: 0, left: 0, bottom: 2_000_000_000, right: 2_000_000_000))
+    let ptr = w.bytes.count; w.u32(0)
+    w.i32(0); w.i32(0); w.i32(2); w.i32(2); w.u16(ROPD.opPut); w.u8(1); noMask(&w)   // scaleMode 1 = nearest
+    w.patchU32(at: ptr, UInt32(w.bytes.count))
+    w.u64(1); w.u8(ImageType.bitmap.rawValue); w.u8(0); w.u32(2); w.u32(2)
+    w.u8(BitmapFormat.bit32.rawValue); w.u8(BitmapFlags.topDown); w.u32(2); w.u32(2); w.u32(8); w.u32(0); w.bytes(px)
+    await c.apply(try DisplayMessage(type: DisplayServerMsg.drawCopy.rawValue, payload: w.bytes))
+    let s = try #require(await c.snapshot(surfaceID: 0))
+    #expect(s.width == 4 && s.height == 4)
+    #expect(s.pixel(x: 0, y: 0) == 0xFFFF_0000)              // clamped box still draws the visible corner
+}
+
 @Test func pngRoundTrip() throws {
     let img = DecodedImage(width: 2, height: 1, pixels: [0, 0, 255, 255, 0, 255, 0, 255], hasAlpha: false)
     let back = try PNG.decode(try PNG.encode(img))

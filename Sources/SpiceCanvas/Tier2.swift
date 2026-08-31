@@ -20,6 +20,12 @@ struct ResolvedMask {   // 8-bit coverage, 0 = skip, else apply
 
 enum Tier2 {
     static func ropCombine(dst: UInt8, src: UInt8, rop: UInt16) -> UInt8 {
+        // BLACKNESS/WHITENESS/INVERS are unconditional in canvas_base.c (canvas_base.c:307-312):
+        // INVERS_DEST and INVERS_RES do not apply to them, so they return before either is honoured.
+        if rop & ROPD.opBlackness != 0 { return 0 }
+        if rop & ROPD.opWhiteness != 0 { return 0xFF }
+        if rop & ROPD.opInvers != 0 { return ~dst }
+
         // INVERS_SRC and INVERS_BRUSH both invert the incoming value; the caller passes whichever
         // pixel stream the command names, so one flag check covers both.
         let s = rop & (ROPD.inversSrc | ROPD.inversBrush) != 0 ? ~src : src
@@ -29,9 +35,6 @@ enum Tier2 {
         else if rop & ROPD.opOr != 0 { r = d | s }
         else if rop & ROPD.opAnd != 0 { r = d & s }
         else if rop & ROPD.opXor != 0 { r = d ^ s }
-        else if rop & ROPD.opBlackness != 0 { r = 0 }
-        else if rop & ROPD.opWhiteness != 0 { r = 0xFF }
-        else if rop & ROPD.opInvers != 0 { r = ~d }
         else { r = s }
         if rop & ROPD.inversRes != 0 { r = ~r }
         return r

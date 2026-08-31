@@ -62,16 +62,21 @@ public actor Canvas {
             let mask = try resolveMask(f.mask, for: f.base.box)
             try forEachClipRect(f.base) { s, r in Tier2.draw(s, rect: r, source: source, rop: f.rop, mask: mask) }
         case let .copy(c), let .blend(c):
+            // `box` clamps the server-controlled box to the destination surface before it can size
+            // any allocation (Tier2.scaled's `out` buffer): an unclamped box is how a hostile
+            // 60000×60000 draw would try to allocate tens of GB, or overflow `w*h*4` outright.
+            guard let dstSurface = surfaces[c.base.surfaceID] else { throw CanvasError.noSurface(c.base.surfaceID) }
+            guard let box = c.base.box.intersection(dstSurface.bounds) else { break }
             var src = try resolve(c.source)
-            let scaled = c.sourceArea.width != c.base.box.width || c.sourceArea.height != c.base.box.height
+            let scaled = c.sourceArea.width != box.width || c.sourceArea.height != box.height
             var originBase = SpicePoint(x: c.sourceArea.left, y: c.sourceArea.top)
             if scaled {
-                src = Tier2.scaled(src, from: c.sourceArea, toWidth: Int(c.base.box.width), toHeight: Int(c.base.box.height), nearest: c.scaleMode == 1)
+                src = Tier2.scaled(src, from: c.sourceArea, toWidth: Int(box.width), toHeight: Int(box.height), nearest: c.scaleMode == 1)
                 originBase = SpicePoint(x: 0, y: 0)
             }
-            let mask = try resolveMask(c.mask, for: c.base.box)
+            let mask = try resolveMask(c.mask, for: box)
             try forEachClipRect(c.base) { s, r in
-                let origin = SpicePoint(x: originBase.x + (r.left - c.base.box.left), y: originBase.y + (r.top - c.base.box.top))
+                let origin = SpicePoint(x: originBase.x + (r.left - box.left), y: originBase.y + (r.top - box.top))
                 Tier2.draw(s, rect: r, source: .image(src, origin: origin), rop: c.rop, mask: mask)
             }
         case let .opaque(o):
@@ -97,7 +102,15 @@ public actor Canvas {
             case let .pattern(image, pos):
                 brushSource = .pattern(try resolve(image), seed: SpicePoint(x: pos.x - box.left, y: pos.y - box.top))
             }
-            Tier2.draw(temp, rect: tempRect, source: brushSource, rop: o.rop, mask: nil)
+            // canvas_base.c:2423 combines with (ROP_INPUT_BRUSH, ROP_INPUT_SRC): INVERS_BRUSH
+            // inverts the brush (our `source`/src-param below), INVERS_SRC inverts `temp` (the
+            // already-copied bitmap — our dst-param), and INVERS_DEST does not apply at all. Our
+            // `ropCombine` inverts the src-param for INVERS_SRC|INVERS_BRUSH and the dst-param for
+            // INVERS_DEST, so INVERS_SRC is remapped onto INVERS_DEST here and the original
+            // INVERS_DEST is dropped; INVERS_BRUSH already targets the right operand untouched.
+            var brushRop = o.rop & ~(ROPD.inversSrc | ROPD.inversDest)
+            if o.rop & ROPD.inversSrc != 0 { brushRop |= ROPD.inversDest }
+            Tier2.draw(temp, rect: tempRect, source: brushSource, rop: brushRop, mask: nil)
             let combined = temp.snapshot()
             let mask = try resolveMask(o.mask, for: box)
             try forEachClipRect(o.base) { s, r in
@@ -140,18 +153,46 @@ public actor Canvas {
 
     /// Decodes the mask bitmap (nil when the command carries no mask) and thresholds it to 8-bit
     /// coverage: any non-black pixel covers, inverted when `MaskFlags.invers` is set.
+    ///
+    /// Real QMask bitmaps are 1-bit and carry no palette (`canvas_get_bitmap_mask` never consults
+    /// one), so a 1-bit payload is thresholded directly here rather than through `resolve` →
+    /// `decodeBitmap`, which would look the bit up in an empty palette and throw.
+    ///
+    /// `origin` is `rect.topLeft - mask.pos`, not `mask.pos` itself (canvas_base.c:1927-1939, the
+    /// `pixman_region32_translate(-mask_x + x, …)` at :1996): the mask bitmap's own top-left sits at
+    /// `rect.topLeft - mask.pos` in surface coordinates, so a mask pixel for surface point (x, y) is
+    /// at bitmap-local `(x - rect.left + mask.pos.x, y - rect.top + mask.pos.y)`.
     private func resolveMask(_ mask: SpiceQMask, for rect: SpiceRect) throws -> ResolvedMask? {
         guard let bitmap = mask.bitmap else { return nil }
-        let img = try resolve(bitmap)
         let invert = mask.flags & MaskFlags.invers != 0
-        var coverage = [UInt8](repeating: 0, count: img.width * img.height)
-        for y in 0 ..< img.height {
-            for x in 0 ..< img.width {
-                let nonBlack = img.pixel(x: x, y: y) & 0xFFFFFF != 0
-                coverage[y * img.width + x] = (nonBlack != invert) ? 0xFF : 0
+        let width = Int(bitmap.descriptor.width), height = Int(bitmap.descriptor.height)
+        var coverage = [UInt8](repeating: 0, count: width * height)
+
+        if case let .bitmap(b) = bitmap.payload, b.format == .bit1LE || b.format == .bit1BE {
+            let stride = Int(b.stride)
+            let topDown = b.flags & BitmapFlags.topDown != 0
+            for y in 0 ..< height {
+                let srcRow = (topDown ? y : height - 1 - y) * stride
+                for x in 0 ..< width {
+                    let byteIndex = srcRow + x / 8
+                    guard byteIndex >= 0, byteIndex < b.data.count else { continue }
+                    let byte = b.data[byteIndex]
+                    let bit = b.format == .bit1BE ? (byte >> (7 - x % 8)) & 1 : (byte >> (x % 8)) & 1
+                    coverage[y * width + x] = (bit != 0) != invert ? 0xFF : 0
+                }
+            }
+        } else {
+            let img = try resolve(bitmap)
+            for y in 0 ..< img.height {
+                for x in 0 ..< img.width {
+                    let nonBlack = img.pixel(x: x, y: y) & 0xFFFFFF != 0
+                    coverage[y * img.width + x] = (nonBlack != invert) ? 0xFF : 0
+                }
             }
         }
-        return ResolvedMask(width: img.width, height: img.height, origin: mask.pos, coverage: coverage)
+
+        let origin = SpicePoint(x: rect.left - mask.pos.x, y: rect.top - mask.pos.y)
+        return ResolvedMask(width: width, height: height, origin: origin, coverage: coverage)
     }
 
     /// Runs `body` for each (surface, clipped rect) and emits one update per rect.

@@ -21,6 +21,11 @@ private func surface(_ w: Int, _ h: Int, fill: UInt8) -> Surface {
     #expect(Tier2.ropCombine(dst: d, src: s, rop: ROPD.opPut | ROPD.inversSrc) == ~s)
     #expect(Tier2.ropCombine(dst: d, src: s, rop: ROPD.opAnd | ROPD.inversDest) == (~d & s))
     #expect(Tier2.ropCombine(dst: d, src: s, rop: ROPD.opOr | ROPD.inversRes) == ~(d | s))
+    // BLACKNESS/WHITENESS/INVERS are unconditional (canvas_base.c:307-312): INVERS_RES and
+    // INVERS_DEST must not perturb them.
+    #expect(Tier2.ropCombine(dst: d, src: s, rop: ROPD.opBlackness | ROPD.inversRes) == 0)
+    #expect(Tier2.ropCombine(dst: d, src: s, rop: ROPD.opWhiteness | ROPD.inversDest) == 0xFF)
+    #expect(Tier2.ropCombine(dst: d, src: s, rop: ROPD.opInvers | ROPD.inversDest) == ~d)
 }
 
 @Test func solidFillWithXor() {
@@ -56,4 +61,16 @@ private func surface(_ w: Int, _ h: Int, fill: UInt8) -> Surface {
     let out = Tier2.scaled(src, from: SpiceRect(top: 0, left: 0, bottom: 1, right: 2),
                            toWidth: 4, toHeight: 1, nearest: true)
     #expect(out.pixels[0] == 1 && out.pixels[4] == 1 && out.pixels[8] == 9 && out.pixels[12] == 9)
+}
+
+@Test func scaledInterpolatedProducesPlausibleOutput() {
+    // scaleMode 0 (INTERPOLATE) is the wire default, so this is the more likely path in real
+    // traffic — a smoke test on dimensions and endpoint colour is enough; ropCombineTruthTable-style
+    // exactness isn't the point here.
+    let src = DecodedImage(width: 2, height: 1, pixels: [0,0,0,255, 255,255,255,255], hasAlpha: false)
+    let out = Tier2.scaled(src, from: SpiceRect(top: 0, left: 0, bottom: 1, right: 2),
+                           toWidth: 4, toHeight: 2, nearest: false)
+    #expect(out.width == 4 && out.height == 2)
+    #expect(out.pixels[0] < 50)                        // left edge stays near black
+    #expect(out.pixels[(4 * 2 - 1) * 4] > 200)         // right edge stays near white
 }
