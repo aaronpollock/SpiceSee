@@ -429,6 +429,20 @@ region streams, with no rate heuristic to satisfy. The Windows guest's original 
 
     -spice disable-ticketing=on,port=5930,addr=
 
+**Build Release for the smoothness checks, not Debug.** The tier-2/3 kernels are per-pixel Swift
+scanline loops (`Tier2.draw` calls `ropCombine` per channel, pattern tiling does two modulos per
+pixel, stroke and glyph masks are per-pixel); at `-Onone` none of it inlines or vectorizes. The
+pre-M4 path is mostly memcpy/vImage and barely cares, so a Debug build penalises the new code far
+more than the old and biases the very comparison these checks are making. The corruption check
+below is about pixels rather than timing, so Debug is fine there — and `assert()` survives in
+Debug, which Release strips.
+
+```sh
+xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -configuration Release -destination 'platform=macOS' build
+BUILT_PRODUCTS_DIR=$(xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -configuration Release -showBuildSettings | grep ' BUILT_PRODUCTS_DIR' | awk '{print $3}')
+"$BUILT_PRODUCTS_DIR/SpiceSee.app/Contents/MacOS/SpiceSee"
+```
+
 - [ ] **Video plays as well as it did before M4.** Play a full-screen YouTube HD video in the guest
       through SpiceSee. Bar: **indistinguishable from the pre-M4 draw path — zero lag, zero
       choppiness, no tearing at the stream's edges**, and a window resize mid-video stays clean.
