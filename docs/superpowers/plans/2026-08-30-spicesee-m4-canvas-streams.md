@@ -145,7 +145,7 @@ CLAUDE.md                                   MODIFY  architecture paragraph: M4 s
 
 ---
 
-### Task 1:1 Record the installed Windows/QXL desktop and inventory what it draws
+### Task 1: Record the installed Windows/QXL desktop and inventory what it draws
 
 The whole milestone is aimed at "Windows/QXL guest with no corruption", so the first artifact is a recording of the *installed* guest (QXL driver, real desktop) that exercises tier-2/3 commands. This fixture is the ground truth every later task renders against; its golden is written in Task 8, once rendering is complete. Streaming stays **off** for this recording — check for `STREAM_CREATE` before promoting, per `docs/dev-server.md`.
 
@@ -251,7 +251,7 @@ git commit -m "test(kit): record installed Windows/QXL desktop fixture with draw
 
 ---
 
-### Task 2:2 Wire parsing for ROP3, TRANSPARENT, STROKE, TEXT
+### Task 2: Wire parsing for ROP3, TRANSPARENT, STROKE, TEXT
 
 **Files:**
 - Modify: `Sources/SpiceWire/Geometry.swift`
@@ -459,7 +459,7 @@ git commit -m "feat(wire): parse ROP3, TRANSPARENT, STROKE and TEXT draw command
 
 ---
 
-### Task 3:3 Palette cache and JPEG-alpha
+### Task 3: Palette cache and JPEG-alpha
 
 Two decoder gaps that are silent corruption on palettized/translucent images: `palFromCache` bitmaps decode against a nil palette today, and `jpegAlpha` throws unsupported.
 
@@ -549,7 +549,7 @@ git commit -m "feat(canvas): palette cache and JPEG-alpha decode"
 
 ---
 
-### Task 4:4 Tier 2 — ROP combine, brushes, masks, scaled blits
+### Task 4: Tier 2 — ROP combine, brushes, masks, scaled blits
 
 The core of "no corruption": every `fill`/`copy`/`blend`/`opaque` that today silently draws as PUT (the `.unsupported("… → drawn as PUT")` shims in `Canvas.applyThrowing`) renders correctly instead.
 
@@ -762,7 +762,7 @@ git commit -m "feat(canvas): tier-2 kernels — ROPs, pattern brushes, masks, sc
 
 ---
 
-### Task 5:5 ROP3 and TRANSPARENT
+### Task 5: ROP3 and TRANSPARENT
 
 **Files:**
 - Modify: `Sources/SpiceCanvas/Tier2.swift` (rop3 kernel), `Sources/SpiceCanvas/Canvas.swift`
@@ -833,7 +833,7 @@ git commit -m "feat(canvas): ROP3 and TRANSPARENT draws"
 
 ---
 
-### Task 6:6 Tier 3 — STROKE
+### Task 6: Tier 3 — STROKE
 
 CoreGraphics rasterizes the path into an 8-bit coverage mask; the brush lands through Tier2. CoreGraphics is used for *rasterization only* (design spec §4) — no CGBlendMode.
 
@@ -936,7 +936,7 @@ git commit -m "feat(canvas): tier-3 STROKE via CGPath coverage masks"
 
 ---
 
-### Task 7:7 TEXT — glyph mask blits
+### Task 7: TEXT — glyph mask blits
 
 `TEXT` carries glyph bitmaps, not fonts: each glyph is an alpha mask blitted with the fore brush; `back_area` (when non-empty) fills with the back brush first.
 
@@ -1004,7 +1004,7 @@ git commit -m "feat(canvas): TEXT glyph blits"
 
 ---
 
-### Task 8:8 The desktop replay goes strict — zero unsupported, reviewed golden
+### Task 8: The desktop replay goes strict — zero unsupported, reviewed golden
 
 > **Amended 2026-08-30 — read before implementing.** This task was written believing the
 > `win-desktop` recording exercised tiers 2-3. It does not: the whole capture is 126 `DRAW_COPY`
@@ -1102,7 +1102,7 @@ git commit -m "test(kit): Windows/QXL desktop replay gate — zero unsupported, 
 
 ---
 
-### Task 9:9 Wire parsing for stream messages + STREAM_REPORT encoder
+### Task 9: Wire parsing for stream messages + STREAM_REPORT encoder
 
 **Files:**
 - Create: `Sources/SpiceWire/StreamMessages.swift`
@@ -1220,7 +1220,7 @@ git commit -m "feat(wire): stream messages and STREAM_REPORT encoder"
 
 ---
 
-### Task 10:10 SpiceMedia target with VideoDecoder (MJPEG + H.264)
+### Task 10: SpiceMedia target with VideoDecoder (MJPEG + H.264)
 
 One `VTDecompressionSession` path for both codecs, per the spec's codec table. Synchronous decode (no async flag) keeps everything inside the owning actor — no Sendable gymnastics.
 
@@ -1337,7 +1337,7 @@ git commit -m "feat(media): SpiceMedia target — VideoToolbox decoder for MJPEG
 
 ---
 
-### Task 11:11 StreamPlayer actor — state, mm clock, drops, reports
+### Task 11: StreamPlayer actor — state, mm clock, drops, reports
 
 **Files:**
 - Create: `Sources/SpiceMedia/StreamPlayer.swift`
@@ -1483,7 +1483,7 @@ git commit -m "feat(media): StreamPlayer — stream state, mm-time pacing, repor
 
 ---
 
-### Task 12:12 SpiceKit wiring — routing, report send, session events
+### Task 12: SpiceKit wiring — routing, report send, session events
 
 **Files:**
 - Modify: `Package.swift` (SpiceKit deps += SpiceMedia; SpiceKitTests deps += SpiceMedia), `Sources/SpiceCore/DisplayChannel.swift`, `Sources/SpiceKit/SpiceSession.swift`
@@ -1617,7 +1617,7 @@ git commit -m "feat(kit): route stream messages to StreamPlayer, send STREAM_REP
 
 ---
 
-### Task 13:13 App — seam events and Metal stream compositing
+### Task 13: App — seam events and Metal stream compositing
 
 The sanctioned view changes: `GuestSurfaceView` composites stream layers; `SessionModel` routes two new event cases. Everything else is adapter work in `SpiceKitBackend`.
 
@@ -1795,7 +1795,23 @@ git commit -m "feat(app): composite video stream layers over the guest surface"
 
 ---
 
-### Task 14:14 Real-server MJPEG — fixture, replay, live smoothness check, docs
+### Task 14: Real-server MJPEG — fixture, replay, live smoothness check, docs
+
+> **Status 2026-08-31 — Steps 1-4 and 7 are BLOCKED, not skipped.** The LAN dev box
+> (192.168.50.6) went completely offline during this milestone's execution — no ping, ssh and both
+> SPICE ports closed — so `streaming-video` was never enabled, no streaming session was recorded,
+> and `win-video.s2c.bin`, `winVideoReplayDecodesStreams` and its golden do not exist. The stream
+> wire layouts remain **verified against `spice.proto` field-by-field but never confirmed against
+> bytes from a real server**, which is exactly what this task was supposed to provide.
+>
+> Steps 5-6 are done: the manual exit check is in `docs/dev-server.md` and the close-out is in
+> `CLAUDE.md`.
+>
+> When the box returns, prefer recording from the **Linux Mint guest on port 5931** over the Windows
+> guest: it exists purely for these tests and is expendable, whereas restarting the Windows guest
+> interrupts real work. `streaming-video=all` streams any animating region regardless of guest OS,
+> so a dragged window is enough to produce `STREAM_CREATE`.
+
 
 The self-consistency breaker: real spice-server MJPEG streams, recorded and replayed, plus the by-eye quality gate. Also the milestone's documentation close-out.
 
