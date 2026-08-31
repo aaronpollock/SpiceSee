@@ -89,6 +89,16 @@ private func copyFromCache(_ box: SpiceRect, id: UInt64, w pw: UInt32, h ph: UIn
     #expect(s.pixel(x: 1, y: 1) == 0xFF00_00FF)
 }
 
+@Test func fillWithXorRopInverts() async throws {
+    let c = Canvas(); await c.apply(create(2, 2))
+    await c.apply(fill(SpiceRect(top: 0, left: 0, bottom: 2, right: 2), color: 0xFFFFFF))
+    var w = SpiceWriter(); drawBase(&w, SpiceRect(top: 0, left: 0, bottom: 2, right: 2))
+    w.u8(1); w.u32(0xFFFFFF); w.u16(ROPD.opXor); noMask(&w)
+    await c.apply(try DisplayMessage(type: DisplayServerMsg.drawFill.rawValue, payload: w.bytes))
+    let s = try #require(await c.snapshot(surfaceID: 0))
+    #expect(s.pixel(x: 0, y: 0) & 0xFFFFFF == 0)       // white XOR white = black
+}
+
 @Test func pngRoundTrip() throws {
     let img = DecodedImage(width: 2, height: 1, pixels: [0, 0, 255, 255, 0, 255, 0, 255], hasAlpha: false)
     let back = try PNG.decode(try PNG.encode(img))
