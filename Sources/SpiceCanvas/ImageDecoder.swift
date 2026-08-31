@@ -64,7 +64,10 @@ public struct ImageDecoder: ~Copyable {
         let entries = palette?.entries ?? []
         let ok = data.withUnsafeBufferPointer { d in entries.withUnsafeBufferPointer { p in
             sc_lz_begin(lz, d.baseAddress, data.count, p.baseAddress, Int32(entries.count), &ow, &oh, &type, &topDown) } }
-        guard ok == 0, Int(ow) == w, Int(oh) == h else { throw CanvasError.decode("lz header") }
+        // XXXA is alpha-only (jpeg-alpha's plane); an lzRGB/lzPlt payload claiming it is malformed —
+        // upstream's canvas_get_lz treats this as unreachable, and decoding it here would silently
+        // produce an opaque black image instead of throwing.
+        guard ok == 0, type != SC_IMAGE_XXXA, Int(ow) == w, Int(oh) == h else { throw CanvasError.decode("lz header") }
         var out = [UInt8](repeating: 0, count: w * h * 4)
         guard out.withUnsafeMutableBufferPointer({ sc_lz_decode(lz, $0.baseAddress) }) == 0 else { throw CanvasError.decode("lz") }
         if topDown == 0 { out = Self.flipRows(out, width: w, height: h) }
@@ -172,7 +175,11 @@ public struct ImageDecoder: ~Copyable {
         let alphaData = Array(data[Int(jpegSize)...])
         var ow: Int32 = 0, oh: Int32 = 0, type = SC_IMAGE_INVALID, lzTopDown: Int32 = 1
         let ok = alphaData.withUnsafeBufferPointer { d in sc_lz_begin(lz, d.baseAddress, alphaData.count, nil, 0, &ow, &oh, &type, &lzTopDown) }
-        guard ok == 0, type == SC_IMAGE_XXXA, Int(ow) == w, Int(oh) == h else { throw CanvasError.decode("jpeg-alpha plane header") }
+        // Upstream (canvas_base.c) additionally requires the jpeg-alpha flags and the alpha plane's
+        // own LZ header agree on orientation; a mismatch is rejected rather than trusted, since
+        // trusting the wrong one would merge an upside-down alpha channel silently.
+        guard ok == 0, type == SC_IMAGE_XXXA, Int(ow) == w, Int(oh) == h,
+              (lzTopDown != 0) == (flags & 1 != 0) else { throw CanvasError.decode("jpeg-alpha plane header") }
         var scratch = [UInt8](repeating: 0, count: w * h * 4)
         guard scratch.withUnsafeMutableBufferPointer({ sc_lz_decode(lz, $0.baseAddress) }) == 0 else { throw CanvasError.decode("jpeg-alpha plane") }
         if flags & 1 == 0 { scratch = Self.flipRows(scratch, width: w, height: h) }
