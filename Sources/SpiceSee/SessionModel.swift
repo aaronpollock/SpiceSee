@@ -87,7 +87,8 @@ final class SessionModel {
                                           tlsPort: connection.tlsPort,
                                           hostSubject: connection.hostSubject,
                                           caPEM: connection.caPEM,
-                                          password: password)
+                                          password: password,
+                                          proxy: connection.proxy)
             for await event in backend.connect(target) { apply(event) }
         }
     }

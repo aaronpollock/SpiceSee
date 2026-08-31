@@ -52,7 +52,8 @@ final class SpiceKitBackend: SessionBackend {
                 do {
                     session = try await SpiceSession.connect(ConnectionConfig(
                         host: target.host, port: target.port, tlsPort: target.tlsPort,
-                        password: target.password, hostSubject: target.hostSubject, caPEM: target.caPEM))
+                        password: target.password, hostSubject: target.hostSubject, caPEM: target.caPEM,
+                        proxy: try target.proxy.map { try HTTPConnectProxy(parsing: $0) }))
                 } catch let error as SpiceError {
                     log.error("connect failed: \(String(describing: error))")
                     continuation.yield(.failed(Self.failure(for: error, endpoint: endpoint)))

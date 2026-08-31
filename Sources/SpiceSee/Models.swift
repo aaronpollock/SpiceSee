@@ -29,6 +29,9 @@ struct SavedConnection: Identifiable, Hashable, Codable {
     /// Persisted so a saved Proxmox connection still verifies on the next launch.
     var hostSubject: String?
     var caPEM: String?
+    /// From a `.vv`: the pveproxy endpoint (`host:port`) every channel must CONNECT through.
+    /// Optional for the same store-compatibility reason as `nameIsCustom`.
+    var proxy: String?
 
     var endpoint: String { "\(host):\(tlsPort ?? port)" }
     var usesTLS: Bool { tlsPort != nil }

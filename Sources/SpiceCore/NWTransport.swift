@@ -7,7 +7,8 @@ public actor NWTransport: Transport {
 
     private init(connection: NWConnection) { self.connection = connection }
 
-    public static func connect(host: String, port: UInt16, tls: TLSPolicy? = nil) async throws -> NWTransport {
+    public static func connect(host: String, port: UInt16, tls: TLSPolicy? = nil,
+                               proxy: HTTPConnectProxy? = nil) async throws -> NWTransport {
         guard let p = NWEndpoint.Port(rawValue: port) else { throw SpiceError(.connect, underlying: "bad port") }
         // The verify block can only answer yes/no, so the *reason* it said no has to reach the
         // continuation another way. A stream continuation is Sendable and its `yield` is synchronous:
@@ -27,6 +28,19 @@ public actor NWTransport: Transport {
             parameters = NWParameters(tls: options, tcp: .init())
         } else {
             parameters = .tcp
+        }
+
+        // Proxmox consoles are reachable only through pveproxy: the dialled host is an opaque
+        // token the proxy decodes, so it goes into the CONNECT target verbatim and never near DNS.
+        if let proxy {
+            guard let proxyPort = NWEndpoint.Port(rawValue: proxy.port) else {
+                throw SpiceError(.connect, underlying: "bad proxy port")
+            }
+            let context = NWParameters.PrivacyContext(description: "com.spicesee.proxy")
+            context.proxyConfigurations = [
+                ProxyConfiguration(httpCONNECTProxy: .hostPort(host: NWEndpoint.Host(proxy.host),
+                                                               port: proxyPort), tlsOptions: nil)]
+            parameters.setPrivacyContext(context)
         }
 
         let c = NWConnection(host: NWEndpoint.Host(host), port: p, using: parameters)

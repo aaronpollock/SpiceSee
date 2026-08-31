@@ -111,6 +111,9 @@ struct ConnectionTarget: Sendable {
     var hostSubject: String?
     var caPEM: String?
     var password: String?
+    /// The pveproxy endpoint (`host:port`) to CONNECT through — the Proxmox `host` above is an
+    /// opaque token only that proxy can route.
+    var proxy: String?
 
     /// "pve1.lan:61000" — the TLS port when there is one, matching `SavedConnection.endpoint`.
     var endpoint: String { "\(host):\(tlsPort ?? port ?? 0)" }

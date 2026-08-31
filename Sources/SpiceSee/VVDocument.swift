@@ -11,6 +11,7 @@ extension SavedConnection {
         self.init(name: name, nameIsCustom: vv.title != nil, host: vv.host, port: vv.port ?? 0, tlsPort: vv.tlsPort)
         hostSubject = vv.hostSubject
         caPEM = vv.caPEM
+        proxy = vv.proxy.map { "\($0.host):\($0.port)" }
         savePasswordInKeychain = false
     }
 }

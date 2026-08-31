@@ -11,16 +11,17 @@ public struct ConnectionConfig: Sendable {
     public var password: String?
     public var hostSubject: String?
     public var caPEM: String?
+    public var proxy: HTTPConnectProxy?
 
     public init(host: String, port: UInt16? = nil, tlsPort: UInt16? = nil, password: String? = nil,
-                hostSubject: String? = nil, caPEM: String? = nil) {
+                hostSubject: String? = nil, caPEM: String? = nil, proxy: HTTPConnectProxy? = nil) {
         self.host = host; self.port = port; self.tlsPort = tlsPort; self.password = password
-        self.hostSubject = hostSubject; self.caPEM = caPEM
+        self.hostSubject = hostSubject; self.caPEM = caPEM; self.proxy = proxy
     }
 
     public init(vv: VVFile) {
         self.init(host: vv.host, port: vv.port, tlsPort: vv.tlsPort, password: vv.password,
-                  hostSubject: vv.hostSubject, caPEM: vv.caPEM)
+                  hostSubject: vv.hostSubject, caPEM: vv.caPEM, proxy: vv.proxy)
     }
 
     /// TLS wins when the file offers both: a Proxmox `.vv` carries `tls-port` precisely because the
@@ -102,7 +103,7 @@ public actor SpiceSession {
             throw SpiceError(.connect, underlying: "no port")
         }
         return try await connect(password: config.password) { _ in
-            try await NWTransport.connect(host: config.host, port: port, tls: policy)
+            try await NWTransport.connect(host: config.host, port: port, tls: policy, proxy: config.proxy)
         }
     }
 

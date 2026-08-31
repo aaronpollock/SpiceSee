@@ -10,11 +10,12 @@ private func fixture(_ name: String) throws -> String {
 
 @Test func parsesAProxmoxFile() throws {
     let vv = try VVFile.parse(try fixture("proxmox.vv"))
-    #expect(vv.host == "192.168.1.10")
+    #expect(vv.host == "pvespiceproxy:6a95f870:100:pve1.example.com::ead7168f3d5414a5eedb4b3f5e3a01217873825e")
     #expect(vv.port == nil)                    // port=0 means "no plain port"
     #expect(vv.tlsPort == 61000)
     #expect(vv.password == "Zm9vYmFyLXRpY2tldA==")
     #expect(vv.hostSubject == "OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=pve1.example.com")
+    #expect(vv.proxy == HTTPConnectProxy(host: "pve1.example.com", port: 3128))
     #expect(vv.deleteAfterConnecting)
     #expect(vv.title == "VM 100 - win11 (Press %s to release the cursor)")
     let ca = try #require(vv.caPEM)
@@ -49,7 +50,6 @@ private func fixture(_ name: String) throws -> String {
     [virt-viewer]
     host=h
     port=1
-    proxy=http://p:3128
     versions=x
     """)
     #expect(vv.host == "h" && vv.port == 1)
@@ -89,4 +89,33 @@ private func fixture(_ name: String) throws -> String {
     try text.write(to: valid, atomically: true, encoding: .utf8)
     defer { try? FileManager.default.removeItem(at: valid) }
     #expect(try VVFile.parse(contentsOf: valid) == VVFile.parse(text))
+}
+
+// MARK: - proxy
+
+@Test func parsesTheProxyKey() throws {
+    let vv = try VVFile.parse("[virt-viewer]\nhost=pvespiceproxy:aa:1:n::bb\ntls-port=61000\nproxy=http://pve1.example.com:3128")
+    #expect(vv.proxy == HTTPConnectProxy(host: "pve1.example.com", port: 3128))
+}
+
+@Test func proxyPortDefaultsTo3128AndSchemeToHTTP() throws {
+    #expect(try VVFile.parse("[virt-viewer]\nhost=h\nport=1\nproxy=http://p.example").proxy
+            == HTTPConnectProxy(host: "p.example", port: 3128))
+    #expect(try VVFile.parse("[virt-viewer]\nhost=h\nport=1\nproxy=p.example:8080").proxy
+            == HTTPConnectProxy(host: "p.example", port: 8080))
+}
+
+@Test func emptyProxyMeansNone() throws {
+    #expect(try VVFile.parse("[virt-viewer]\nhost=h\nport=1\nproxy=").proxy == nil)
+}
+
+/// A proxy we cannot speak must fail the file, not be dropped: dropping it would dial the
+/// pvespiceproxy token as a hostname and report a misleading "nothing is listening".
+@Test func unsupportedProxySchemeIsRejected() {
+    #expect(throws: SpiceError.self) {
+        try VVFile.parse("[virt-viewer]\nhost=h\nport=1\nproxy=socks5://p.example:1080")
+    }
+    #expect(throws: SpiceError.self) {
+        try VVFile.parse("[virt-viewer]\nhost=h\nport=1\nproxy=http://p.example:notaport")
+    }
 }
