@@ -122,10 +122,11 @@ USB tablet) for this recording, so `remote-viewer` never grabs the pointer and s
 ```sh
 # here
 swift run spicerec 5901 192.168.50.6 5930 recordings/win-input
-# on the Ubuntu box — MACIP is this Mac's address as seen from the box. On the LAN that is
-# 192.168.50.38 (ipconfig getifaddr en0). The 192.168.4.3 this file used to give is a VPN
-# address; on 2026-08-30 it was stale and the box could not ping it, so a recording made
-# against it captured zero bytes. Check which path the box reaches the Mac on before recording.
+# on the Ubuntu box — MACIP is this Mac's address as seen from the box, and it FLIPS between
+# the LAN address (ipconfig getifaddr en0) and the VPN address 192.168.4.3 depending on which
+# network the Mac is on that day: 2026-08-30 the VPN was stale (a recording against it captured
+# zero bytes) and the LAN 192.168.50.38 worked; 2026-08-31 the Mac was on a different subnet and
+# only 192.168.4.3 worked. Always test first: ssh in and `nc -vz <candidate> 5901`.
 ssh aaron@192.168.50.6 'cat > /tmp/drive.sh' <<'EOF'
 #!/bin/sh
 remote-viewer spice://MACIP:5901 &
@@ -457,11 +458,26 @@ BUILT_PRODUCTS_DIR=$(xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -co
       `log stream --predicate 'subsystem == "com.spicesee"' --level info` and confirm reports are
       sent and no canvas `unsupported` lines appear.
 
-If a fixture can be recorded while streaming is on, promote the display capture to
-`Tests/SpiceKitTests/Fixtures/win-video.s2c.bin` and add the replay test the M4 plan's Task 14
-describes — that would give the stream wire layouts their first confirmation against real bytes.
-The layouts are currently transcribed from `spice.proto` and verified field-by-field against it,
-but no real server has ever sent them to this client.
+**Done 2026-08-31: the fixture exists.** `Tests/SpiceKitTests/Fixtures/mint-video.s2c.bin` is the
+Mint guest's display channel recorded with `streaming-video=all` while a maximized terminal ran
+`yes` — 2 `STREAM_CREATE`, 260 `STREAM_DATA`, every frame MJPEG-decoded by
+`mintVideoReplayDecodesStreams` (`ReplayTests.swift`), which pins one decoded frame against
+`mint-video-frame.golden.png`. That is the stream wire layouts' first confirmation against real
+server bytes. Two findings from making it: spice-server tiles a scrolling terminal into small
+per-text-row streams (the golden frame is a text fragment on purpose — a single large stream needs
+a real video player, which is what the live check above exercises), and the Mac's reachable
+address had flipped back to the VPN one (see the recording recipe note) — check before recording.
+
+**The Mint guest was left running with `streaming-video=all` on 2026-08-31** so the exit-check
+items above can be run without re-doing the setup. Its pre-change command line is saved on the box
+at `/tmp/mint-original-cmdline.txt` (streaming variant: `/tmp/mint-streaming-cmdline.txt`). To
+restore after the exit check:
+
+```sh
+ssh aaron@192.168.50.6 'cd /home/aaron/vms/mint && echo system_powerdown | socat - UNIX-CONNECT:linuxmint-22-cinnamon/linuxmint-22-cinnamon-monitor.socket'
+# wait for the qemu process to exit (the guest ACPI-shutdowns cleanly; allow ~60s), then:
+ssh aaron@192.168.50.6 'cd /home/aaron/vms/mint && setsid nohup bash /tmp/mint-original-cmdline.txt </dev/null >/tmp/mint-qemu.log 2>&1 &'
+```
 
 ## Known issues (not fixed, out of M3's scope)
 

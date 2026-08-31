@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import SpiceWire
 import SpiceCanvas
+import SpiceMedia
 @testable import SpiceCore
 
 /// Replays the display channel recorded from the Windows-installer guest (task 12) through the whole
@@ -77,4 +78,68 @@ func expectClose(_ got: DecodedImage, _ want: DecodedImage, maxChannelDelta: Int
     }
     let fraction = Double(mismatches) / Double(got.width * got.height)
     #expect(fraction <= maxMismatchFraction, "\(mismatches) pixels differ (\(fraction))", sourceLocation: sourceLocation)
+}
+
+/// Replays a real spice-server MJPEG streaming session (Linux Mint guest, `streaming-video=all`,
+/// a terminal scrolling `find /`). This is the first real-traffic confirmation of the stream wire
+/// layouts, which are otherwise transcribed from `spice.proto`: STREAM_CREATE/DATA must parse out
+/// of a live capture and decode into frames of the advertised size. Stream messages route to the
+/// player and draws to the canvas exactly as `SpiceSession` splits them; no `setMMTime` is called,
+/// so nothing drops and the replay is deterministic (the player treats an unknown clock as on
+/// time). The golden compares with tolerance — JPEG decode is not bit-exact across OS releases.
+@Test func mintVideoReplayDecodesStreams() async throws {
+    let url = try #require(Bundle.module.url(forResource: "mint-video.s2c", withExtension: "bin", subdirectory: "Fixtures"))
+    let t = InMemoryTransport(input: [UInt8](try Data(contentsOf: url)))
+    let channel = try await DisplayChannel.open(transport: t, connectionID: 0, id: 0, password: nil)
+    let canvas = Canvas()
+    let player = StreamPlayer()
+    let unsupportedCollector = Task {
+        var unsupported: [String] = []
+        for await e in canvas.events { if case let .unsupported(what) = e { unsupported.append(what) } }
+        return unsupported
+    }
+    let frameCollector = Task {
+        var frames: [SpiceMedia.StreamFrame] = []
+        var reports = 0
+        for await e in player.events {
+            switch e {
+            case let .frame(f): frames.append(f)
+            case .report: reports += 1
+            case .destroyed, .allDestroyed: break
+            }
+        }
+        return (frames, reports)
+    }
+    var creates = 0, datas = 0
+    for await m in channel.messages {
+        switch m {
+        case let .streamCreate(c): creates += 1; await player.handle(create: c)
+        case let .streamData(d): datas += 1; await player.handle(data: d)
+        case let .streamClip(id, clip): await player.handle(clipChange: id, clip: clip)
+        case let .streamDestroy(id): await player.handle(destroy: id)
+        case .streamDestroyAll: await player.handleDestroyAll()
+        case let .streamActivateReport(a): await player.handle(activateReport: a)
+        default: await canvas.apply(m)
+        }
+    }
+    await canvas.finish()
+    await player.finish()
+    let unsupported = await unsupportedCollector.value
+    let (frames, _) = await frameCollector.value
+    print("mint-video: \(creates) STREAM_CREATE, \(datas) STREAM_DATA, \(frames.count) decoded frames")
+    #expect(creates > 0, "the recording was made with streaming-video=all; no STREAM_CREATE means the flag did not take")
+    #expect(!frames.isEmpty, "streams present but none decoded")
+    #expect(unsupported == [])
+
+    let big = try #require(frames.max { $0.width * $0.height < $1.width * $1.height })
+    let img = DecodedImage(width: big.width, height: big.height, pixels: big.pixels, hasAlpha: false)
+    let goldenURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        .appendingPathComponent("Fixtures/mint-video-frame.golden.png")
+    if !FileManager.default.fileExists(atPath: goldenURL.path) {
+        try PNG.encode(img).write(to: goldenURL)
+        Issue.record("golden written to \(goldenURL.path) — review it visually, then re-run")
+        return
+    }
+    let golden = try PNG.decode(try Data(contentsOf: goldenURL))
+    expectClose(img, golden, maxChannelDelta: 4, maxMismatchFraction: 0.002)
 }
