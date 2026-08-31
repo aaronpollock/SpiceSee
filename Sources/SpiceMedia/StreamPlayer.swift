@@ -72,6 +72,12 @@ public actor StreamPlayer {
     private let log = Logger(subsystem: "com.spicesee", category: "stream")
     private var loggedUnsupportedCodecs = Set<VideoCodecType>()
 
+    /// Test-only visibility into whether the decoder was actually invoked — `internal`, never
+    /// `public`, reachable from tests only via `@testable import`. Exists because frame-count
+    /// alone can't tell "dropped before decode" from "decoded, threw, counted as a drop": both
+    /// yield zero frames. This makes that distinction observable.
+    private(set) var decodeAttempts: UInt32 = 0
+
     public init() {
         (events, cont) = AsyncStream.makeStream(of: StreamPlayerEvent.self, bufferingPolicy: .unbounded)
     }
@@ -132,53 +138,49 @@ public actor StreamPlayer {
         if let sized = data.sized { state.dest = sized.dest }
 
         let now = serverNow()
-        let isLate: Bool
-        if let now {
-            isLate = Int64(now) - Int64(data.mmTime) > maxLatenessMs
-        } else {
-            isLate = false   // base unknown: assume on time
+        let isLate = now.map { Int64($0) - Int64(data.mmTime) > maxLatenessMs } ?? false   // base unknown: assume on time
+
+        // Late is classified and counted without ever touching the decoder — that's the whole
+        // point of dropping before decode.
+        guard !isLate else {
+            recordArrival(state: state, mmTime: data.mmTime, dropped: true, now: now)
+            return
         }
 
-        recordArrival(state: state, mmTime: data.mmTime, dropped: isLate, now: now)
-        guard !isLate else { return }
-
-        // Stamped onto the event, not queried back: dest/clip are read here, before decode can
-        // yield to another task, so a later STREAM_CLIP cannot retroactively change what this
-        // frame reports.
+        // Stamped onto the event, not queried back: dest/clip are read here, before decode, so a
+        // later STREAM_CLIP cannot retroactively change what this frame reports.
         let dest = state.dest, clip = state.clip, surfaceID = state.surfaceID, streamID = data.id
         let flip = state.codec == .mjpeg && state.flags & StreamFlags.topDown == 0
 
+        // Every arrival is classified exactly once — late / decode-failed / success — and recorded
+        // exactly once with that final classification. An earlier version counted this arrival as
+        // a success optimistically, ahead of decode, then corrected the window on failure; when
+        // that correction landed on an already-closed (reset-to-zero) window, `UInt32` underflow
+        // on `frames -= 1` trapped the process. Decode first, classify once, record once.
+        decodeAttempts += 1
+        var frame: StreamFrame?
         do {
             var decoded = try state.decoder.decode(data.data)
             if flip { decoded.pixels = Self.flipRows(decoded.pixels, width: decoded.width, height: decoded.height) }
-            cont.yield(.frame(StreamFrame(streamID: streamID, surfaceID: surfaceID, dest: dest, clip: clip,
-                                           width: decoded.width, height: decoded.height, pixels: decoded.pixels)))
+            frame = StreamFrame(streamID: streamID, surfaceID: surfaceID, dest: dest, clip: clip,
+                                 width: decoded.width, height: decoded.height, pixels: decoded.pixels)
         } catch {
             log.error("stream \(streamID, privacy: .public): decode failed: \(String(describing: error), privacy: .public)")
-            markDrop(state: state, mmTime: data.mmTime, now: now)
         }
+
+        recordArrival(state: state, mmTime: data.mmTime, dropped: frame == nil, now: now)
+        if let frame { cont.yield(.frame(frame)) }
     }
 
     /// Counts an arrival into the stream's report window (if reporting is active), emitting and
-    /// resetting the window when it fills or times out. `dropped` here is the pre-decode pacing
-    /// drop; a post-decode failure is folded in separately via `markDrop`.
+    /// resetting the window when it fills or times out. Called exactly once per arrival, with its
+    /// final classification — never optimistically ahead of decode.
     private func recordArrival(state: StreamState, mmTime: UInt32, dropped: Bool, now: UInt32?) {
         guard var window = state.report else { return }
         window = closeWindowIfTimedOut(window, state: state)
         if window.firstMM == nil { window.firstMM = mmTime }
         window.lastMM = mmTime
         if dropped { window.drops += 1 } else { window.frames += 1 }
-        state.report = window
-        emitIfWindowFull(state: state, lastMMTime: mmTime, now: now)
-    }
-
-    /// A frame counted as decoded in `recordArrival` that then fails to decode is retroactively a
-    /// drop, not a frame — this corrects the counts recorded just above without double-counting
-    /// the arrival itself.
-    private func markDrop(state: StreamState, mmTime: UInt32, now: UInt32?) {
-        guard var window = state.report else { return }
-        window.frames -= 1
-        window.drops += 1
         state.report = window
         emitIfWindowFull(state: state, lastMMTime: mmTime, now: now)
     }

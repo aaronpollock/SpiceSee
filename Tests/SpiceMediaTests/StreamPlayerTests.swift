@@ -28,6 +28,10 @@ private func mjpegCreate(id: UInt32 = 1, flags: UInt8 = StreamFlags.topDown, des
     // so garbage data here must NOT produce a decode error.
     await p.handle(data: StreamData(id: 1, mmTime: 5_000, data: [0xFF], sized: nil))
     await p.handle(data: StreamData(id: 1, mmTime: 10_000, data: try jpegFrame(width: 64, height: 48, r: 1, g: 1, b: 1), sized: nil))
+    // Frame count alone can't tell "dropped before decode" from "decoded, threw, counted as a
+    // drop" — both yield zero frames from the late message. `decodeAttempts` makes the claim in
+    // this test's name falsifiable: exactly one decode (the on-time frame), never two.
+    #expect(await p.decodeAttempts == 1)
     await p.finish()
     var frames = 0
     for await e in p.events { if case .frame = e { frames += 1 } }
@@ -87,10 +91,35 @@ private func mjpegCreate(id: UInt32 = 1, flags: UInt8 = StreamFlags.topDown, des
                                dest: SpiceRect(top: 0, left: 0, bottom: 48, right: 64), clip: .none)
     await p.handle(create: create)
     await p.handle(data: StreamData(id: 7, mmTime: 0, data: [0xDE, 0xAD, 0xBE, 0xEF], sized: nil))
+    // Proves Ruling 4 all the way down: no decoder was ever built for the ignored stream, so
+    // nothing was ever asked to decode this data.
+    #expect(await p.decodeAttempts == 0)
     await p.finish()
     var frames = 0
     for await e in p.events { if case .frame = e { frames += 1 } }
     #expect(frames == 0)
+}
+
+/// Regression for a `UInt32` underflow that trapped the process: an earlier version counted an
+/// arrival as a decoded "frame" *before* decode ran, then corrected the report window to a "drop"
+/// if decode failed. With `maxWindowSize: 1`, that optimistic count alone was enough to fill and
+/// reset the window before the correction arrived — landing `frames -= 1` on an already-reset,
+/// empty window, which traps on `UInt32`. The fix classifies each arrival exactly once, after
+/// decode is known to have succeeded or failed, so no correction is ever needed.
+@Test func malformedFrameWithSingleFrameWindowDoesNotTrap() async throws {
+    let p = StreamPlayer()
+    await p.handle(create: mjpegCreate())
+    await p.handle(activateReport: StreamActivateReport(streamID: 1, uniqueID: 1, maxWindowSize: 1, timeoutMs: 60_000))
+    await p.handle(data: StreamData(id: 1, mmTime: 0, data: [0xDE, 0xAD, 0xBE, 0xEF], sized: nil))  // not late, fails to decode
+    await p.finish()
+    var reports: [StreamReport] = [], frames = 0
+    for await e in p.events {
+        if case let .report(r) = e { reports.append(r) }
+        if case .frame = e { frames += 1 }
+    }
+    #expect(frames == 0)
+    #expect(reports.count == 1)
+    #expect(reports[0].numFrames == 0 && reports[0].numDrops == 1)
 }
 
 /// `flags & StreamFlags.topDown == 0` must flip rows before emit — checked with a two-tone frame
