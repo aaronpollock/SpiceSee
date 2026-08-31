@@ -57,6 +57,8 @@ struct MetalSurfaceView: NSViewRepresentable {
                     switch event {
                     case let .frame(update): view.apply(update)
                     case let .cursor(change): view.apply(change)
+                    case let .stream(update): view.apply(streamUpdate: update)
+                    case let .streamDestroyed(id): view.removeStream(id)
                     }
                 }
             }
@@ -168,6 +170,9 @@ final class GuestSurfaceView: NSView {
         guard update.surfaceWidth > 0, update.surfaceHeight > 0 else { return }
         if texture?.width != update.surfaceWidth || texture?.height != update.surfaceHeight {
             texture = makeTexture(width: update.surfaceWidth, height: update.surfaceHeight)
+            // A mode change invalidates stream geometry, and the server destroys and recreates
+            // streams around it anyway.
+            streams.removeAll()
         }
         guard let texture,
               update.width > 0, update.height > 0, update.x >= 0, update.y >= 0,
@@ -234,6 +239,43 @@ final class GuestSurfaceView: NSView {
         return texture
     }
 
+    // MARK: Stream layers
+
+    private final class StreamLayer {
+        var texture: MTLTexture?
+        var dest = CGRect.zero
+        var clip: [CGRect]?          // guest coords; nil = whole dest
+        let order: Int               // creation order = z-order, oldest underneath
+        init(order: Int) { self.order = order }
+    }
+    private var streams: [UInt32: StreamLayer] = [:]
+    private var streamOrder = 0
+
+    func apply(streamUpdate u: StreamFrameUpdate) {
+        let layer = streams[u.streamID] ?? {
+            let l = StreamLayer(order: streamOrder); streamOrder += 1; streams[u.streamID] = l; return l
+        }()
+        if layer.texture?.width != u.width || layer.texture?.height != u.height {
+            layer.texture = makeTexture(width: u.width, height: u.height)
+        }
+        guard let tex = layer.texture, u.width > 0, u.height > 0,
+              u.pixels.count >= u.width * u.height * 4
+        else { return }
+        u.pixels.withUnsafeBytes { buf in
+            guard let base = buf.baseAddress else { return }
+            tex.replace(region: MTLRegionMake2D(0, 0, u.width, u.height), mipmapLevel: 0,
+                        withBytes: base, bytesPerRow: u.width * 4)
+        }
+        layer.dest = CGRect(x: CGFloat(u.dest.x), y: CGFloat(u.dest.y), width: CGFloat(u.dest.width), height: CGFloat(u.dest.height))
+        layer.clip = u.clip.map { $0.map { CGRect(x: CGFloat($0.x), y: CGFloat($0.y), width: CGFloat($0.width), height: CGFloat($0.height)) } }
+        setNeedsPresent()
+    }
+
+    func removeStream(_ id: UInt32?) {
+        if let id { streams[id] = nil } else { streams.removeAll() }
+        setNeedsPresent()
+    }
+
     // MARK: Presentation
 
     /// Coalesces every change since the last refresh into one present. The link runs only while
@@ -280,6 +322,35 @@ final class GuestSurfaceView: NSView {
         encoder.setFragmentTexture(texture, index: 0)
         encoder.setFragmentSamplerState(sampler, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+
+        // Stream layers: video is composited here, never drawn into the surface (design spec §4).
+        // Scissor rects are in drawable (device) pixels; clamp against the drawable and skip empty
+        // rects — an out-of-bounds MTLScissorRect is API misuse, not a soft clip.
+        let scale = backingScale
+        let drawableBounds = CGRect(origin: .zero, size: metalLayer.drawableSize)
+        for layer in streams.values.sorted(by: { $0.order < $1.order }) {
+            guard let streamTexture = layer.texture else { continue }
+            let viewRect = t.viewRect(forGuest: layer.dest)
+            var placement = Self.clipSpace(viewRect, in: bounds.size)
+            let clips = layer.clip ?? [layer.dest]
+            for clipRect in clips {
+                let v = t.viewRect(forGuest: clipRect)
+                let dev = CGRect(x: v.origin.x * scale, y: v.origin.y * scale,
+                                 width: v.width * scale, height: v.height * scale)
+                    .intersection(drawableBounds)
+                guard dev.width >= 1, dev.height >= 1 else { continue }
+                encoder.setScissorRect(MTLScissorRect(x: Int(dev.minX), y: Int(dev.minY),
+                                                      width: Int(dev.width), height: Int(dev.height)))
+                encoder.setRenderPipelineState(pipeline)
+                encoder.setVertexBytes(&placement, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
+                encoder.setFragmentTexture(streamTexture, index: 0)
+                encoder.setFragmentSamplerState(sampler, index: 0)
+                encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+            }
+        }
+        // Reset the scissor before the cursor overlay draws, or it clips to the last stream's rect.
+        encoder.setScissorRect(MTLScissorRect(x: 0, y: 0, width: Int(metalLayer.drawableSize.width),
+                                              height: Int(metalLayer.drawableSize.height)))
 
         // The shape is never smoothed: a cursor is authored at guest resolution and reads as mush
         // under a linear filter.

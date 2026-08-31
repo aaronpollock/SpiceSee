@@ -24,13 +24,6 @@ enum Tier1 {
         }
     }
 
-    static func invert(_ dst: Surface, rect: SpiceRect) {
-        for y in Int(rect.top) ..< Int(rect.bottom) {
-            var i = y * dst.stride + Int(rect.left) * 4
-            for _ in 0 ..< Int(rect.width) { dst.pixels[i] = ~dst.pixels[i]; dst.pixels[i + 1] = ~dst.pixels[i + 1]; dst.pixels[i + 2] = ~dst.pixels[i + 2]; i += 4 }
-        }
-    }
-
     /// Straight-alpha "over" with a constant multiplier (0...255).
     static func alphaBlend(into dst: Surface, rect: SpiceRect, src: DecodedImage, srcOrigin: SpicePoint, alpha: UInt8) {
         for y in 0 ..< Int(rect.height) {

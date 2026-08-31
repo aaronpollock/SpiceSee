@@ -37,6 +37,8 @@ int      sc_lz_begin(sc_lz *, const uint8_t *data, size_t len, const uint32_t *p
 /* out must hold width*height*4 bytes; written as RGB32 (or RGBA when type is RGBA). */
 int      sc_lz_decode(sc_lz *, uint8_t *out);
 int      sc_lz_encode_rgb32(const uint8_t *pixels, int width, int height, int stride, uint8_t *out, size_t out_cap);
+/* Test helper: encodes a 32bpp buffer as an XXXA (alpha-only) plane, byte 3 of each pixel. */
+int      sc_lz_encode_xxxa(const uint8_t *pixels, int width, int height, int stride, uint8_t *out, size_t out_cap);
 
 /* ---- GLZ ---- */
 typedef struct sc_glz_window sc_glz_window;

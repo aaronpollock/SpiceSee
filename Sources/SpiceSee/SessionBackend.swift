@@ -48,10 +48,27 @@ enum CursorChange: Sendable, Equatable {
     case moved(x: Int, y: Int)        // server mode only
 }
 
+/// A rectangle in guest pixels, the seam's own geometry type — no SPICE type crosses into the views.
+struct GuestRect: Sendable, Equatable { var x, y, width, height: Int }
+
+/// One decoded video frame for a stream layer, in guest pixels. `dest` is where it composites;
+/// `clip` (nil = whole `dest`) is intersected in the view. Pixels are `width`×`height` BGRA.
+struct StreamFrameUpdate: Sendable {
+    var viewportID: Int
+    var streamID: UInt32
+    var dest: GuestRect
+    var clip: [GuestRect]?
+    var width: Int, height: Int
+    var pixels: [UInt8]
+}
+
 /// What one viewport window consumes: pixels and the pointer drawn over them.
 enum ViewportEvent: Sendable {
     case frame(FrameUpdate)
     case cursor(CursorChange)
+    case stream(StreamFrameUpdate)
+    /// nil streamID = all streams for this viewport (DESTROY_ALL, or the session ending).
+    case streamDestroyed(UInt32?)
 }
 
 /// Clipboard sharing, narrowed to plain text — the only type SpiceSee exchanges today. The agent
@@ -77,6 +94,9 @@ enum BackendEvent: Sendable {
     case pointerMode(PointerMode)
     case frame(FrameUpdate)
     case cursor(viewportID: Int, CursorChange)
+    case streamFrame(StreamFrameUpdate)
+    /// nil streamID = all streams for this viewport (DESTROY_ALL).
+    case streamDestroyed(viewportID: Int, streamID: UInt32?)
     case migrated(MigrationOffer)
     case failed(ConnectFailure)
     case disconnected

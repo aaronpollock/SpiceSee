@@ -55,3 +55,17 @@ private func bitmapMessage() -> [UInt8] {
     #expect(a.intersection(b) == SpiceRect(top: 5, left: 5, bottom: 10, right: 10))
     #expect(a.intersection(SpiceRect(top: 50, left: 50, bottom: 60, right: 60)) == nil)
 }
+
+@Test func rectRejectsOverflowingWidth() throws {
+    var w = SpiceWriter()
+    w.i32(0); w.i32(Int32.min); w.i32(0); w.i32(Int32.max)   // top, left, bottom, right — right - left overflows
+    var r = SpiceReader(w.bytes)
+    #expect(throws: WireError.self) { _ = try SpiceRect(reader: &r) }
+}
+
+@Test func rectRejectsOverflowingHeight() throws {
+    var w = SpiceWriter()
+    w.i32(Int32.min); w.i32(0); w.i32(Int32.max); w.i32(0)   // top, left, bottom, right — bottom - top overflows
+    var r = SpiceReader(w.bytes)
+    #expect(throws: WireError.self) { _ = try SpiceRect(reader: &r) }
+}

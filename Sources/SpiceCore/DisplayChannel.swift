@@ -49,4 +49,8 @@ public actor DisplayChannel {
     /// Only the socket is closed; the pump drains what the reader already received, so nothing
     /// the server sent before the close is lost.
     public func close() async { loop.cancel(); await transport.close() }
+
+    public func send(streamReport r: StreamReport) async throws {
+        try await reader.send(type: DisplayClientMsg.streamReport.rawValue, payload: ClientMessage.streamReport(r))
+    }
 }

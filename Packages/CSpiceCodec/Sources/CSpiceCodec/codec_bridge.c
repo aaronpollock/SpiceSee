@@ -181,7 +181,11 @@ int sc_lz_decode(sc_lz *z, uint8_t *out)
 {
     if (!z || !out) return -1;
     SC_GUARD(env);
-    LzImageType to = z->type == LZ_IMAGE_TYPE_RGBA ? LZ_IMAGE_TYPE_RGBA : LZ_IMAGE_TYPE_RGB32;
+    /* RGBA and XXXA only round-trip to themselves (lz_decode errors on any other requested
+       type for them); everything else upconverts to RGB32. */
+    LzImageType to = z->type == LZ_IMAGE_TYPE_RGBA ? LZ_IMAGE_TYPE_RGBA
+                    : z->type == LZ_IMAGE_TYPE_XXXA ? LZ_IMAGE_TYPE_XXXA
+                    : LZ_IMAGE_TYPE_RGB32;
     lz_decode(z->ctx, to, out);
     SC_UNGUARD();
     return 0;
@@ -196,6 +200,23 @@ int sc_lz_encode_rgb32(const uint8_t *px, int w, int h, int stride, uint8_t *out
     {
         SC_GUARD(env);
         n = lz_encode(z->ctx, LZ_IMAGE_TYPE_RGB32, w, h, 1 /* top_down */,
+                      (uint8_t *)(uintptr_t)px, (unsigned)h, stride, out, (unsigned)cap);
+        SC_UNGUARD();
+    }
+    sc_lz_destroy(z);
+    return n > 0 ? n : -1;
+}
+
+/* Test-only: encodes the alpha plane of jpeg-alpha images, mirroring sc_lz_encode_rgb32. */
+int sc_lz_encode_xxxa(const uint8_t *px, int w, int h, int stride, uint8_t *out, size_t cap)
+{
+    if (!px || !out || w <= 0 || h <= 0) return -1;
+    sc_lz *z = sc_lz_create();
+    if (!z) return -1;
+    int n;
+    {
+        SC_GUARD(env);
+        n = lz_encode(z->ctx, LZ_IMAGE_TYPE_XXXA, w, h, 1 /* top_down */,
                       (uint8_t *)(uintptr_t)px, (unsigned)h, stride, out, (unsigned)cap);
         SC_UNGUARD();
     }

@@ -22,7 +22,7 @@ Two deliberate deviations from the spec's ideal, both argued from constraints th
 - Swift 6 language mode, strict concurrency. **No locks, no `@unchecked Sendable`, no `nonisolated(unsafe)`** outside the one pre-existing use in `NWTransport.connect`. This is why frames are `[UInt8]`.
 - `platforms: [.macOS(.v14)]`, arm64. Dependency rule strictly downward: `SpiceWire` ← `SpiceCore`/`SpiceCanvas`/`SpiceMedia` ← `SpiceKit` ← app. `SpiceMedia` imports `SpiceWire` only (plus system frameworks) — it must never import `SpiceCanvas` or `SpiceCore`, and everything in it runs headless under `swift test`.
 - `SpiceWire` is the security boundary: every reader accessor throws, no `!`, no unchecked subscripts, every server-controlled length validated before allocation. A malformed message is a caught error, never a trap. Stream payloads are server-controlled: cap them (`data_size ≤ 1 << 26`, same as images).
-- **There is no full-redraw request in the protocol; an unimplemented draw command is permanent corruption.** The `CanvasEvent.unsupported` event is the corruption alarm — never remove it, and the M4 exit gate is a real Windows/QXL desktop recording replaying with **zero** unsupported events.
+- **There is no full-redraw request in the protocol; an unimplemented draw command is permanent corruption.** The `CanvasEvent.unsupported` event is the corruption alarm — never remove it. **Amended 2026-08-30:** the intended M4 exit gate — a real Windows/QXL desktop recording replaying with zero unsupported events — turned out to be unachievable on this hardware and vacuous as a gate. Neither guest on the dev box emits a single tier-2/3 draw command (Windows 11's QXL driver is WDDM; the Linux guest's X server runs `modesetting`, and `xf86-video-qxl` cannot bind — see `docs/dev-server.md`, "Where tier-2/3 draw commands actually come from"). The recording replays with zero unsupported events *before any M4 work*. Tiers 2-3 are therefore gated by unit tests; the real-traffic fixture is a tier-1 regression canary.
 - Capability gating is load-bearing scope control: `DisplayChannel.clientCaps()` already advertises `sizedStream`, `streamReport`, `multiCodec`, `codecMjpeg`, `codecH264` — which means **today's client invites stream messages it drops on the floor**; M4 makes the advertisement true. Conversely `composite`, `a8Surface`, `lz4`, `codecVp8/9`, `codecH265` are **not** advertised, the server therefore never sends them, and they are out of M4 scope. Do not add capability bits this plan doesn't name.
 - Stream message layouts are transcribed from `spice.proto`; the vendored `enums.h` confirms every constant used here but **no local header confirms the message layouts** (same situation as M3's migration messages). Parse defensively — validate every length against the payload — and treat Task 13's real-server recording as the layout's confirmation. If the recording contradicts a layout, the recording wins.
 - Tests use Swift Testing. Fixtures under `Tests/<Target>Tests/Fixtures/`. Commit after every task, conventional-commit prefixes. **Only commit a golden you have actually looked at** (open the PNG and check it is a plausible Windows desktop / video frame, not garbage).
@@ -49,7 +49,7 @@ Wire integers are little-endian. "ptr" is a `UInt32` offset into the message bod
 All start with the existing `DrawBase` (surface_id u32, box Rect, clip Clip).
 
 ```
-ROP3        (317): src ptr → SpiceImage, src_area Rect, brush Brush, rop3 u8, scale_mode u8, mask QMask
+ROP3        (309): src ptr → SpiceImage, src_area Rect, brush Brush, rop3 u8, scale_mode u8, mask QMask
 TRANSPARENT (312): src ptr → SpiceImage, src_area Rect, src_color u32, true_color u32
 STROKE      (310): path ptr → Path (nonnull), attr LineAttr, brush Brush, fore_mode u16, back_mode u16
 TEXT        (311): str ptr → String (nonnull), back_area Rect, fore_brush Brush, back_brush Brush,
@@ -62,7 +62,7 @@ PathSeg:    flags u8, count u32, then count × PointFix (x FIXED28_4 i32, y FIXE
             (control1, control2, end); non-bezier points are line-to.
 LineAttr:   flags u8; if flags & LINE_FLAGS_STYLED (1<<3): style_nseg u8, style ptr u32
             (style = style_nseg × FIXED28_4 dash lengths — parse, then ignore: QXL sends solid)
-String:     length u16, flags u16, then length × RasterGlyph inline:
+String:     length u16, flags u8, then length × RasterGlyph inline:
 RasterGlyph: render_pos Point(2×i32), glyph_origin Point(2×i32), width u16, height u16,
              data[height × bytesPerRow] where bytesPerRow = (width×bpp + 7)/8
             String flags: RASTER_A1 1<<0, RASTER_A4 1<<1, RASTER_A8 1<<2, RASTER_TOP_DOWN 1<<3
@@ -83,7 +83,7 @@ STREAM_DATA       (123): id u32, multi_media_time u32, data_size u32, data[data_
 STREAM_CLIP       (124): id u32, clip Clip
 STREAM_DESTROY    (125): id u32
 STREAM_DESTROY_ALL(126): (empty)
-STREAM_DATA_SIZED (315): id u32, multi_media_time u32, width u32, height u32, dest Rect,
+STREAM_DATA_SIZED (316): id u32, multi_media_time u32, width u32, height u32, dest Rect,
                          data_size u32, data[data_size]
 STREAM_ACTIVATE_REPORT (319): stream_id u32, unique_id u32, max_window_size u32, timeout_ms u32
 ```
@@ -157,7 +157,7 @@ The whole milestone is aimed at "Windows/QXL guest with no corruption", so the f
 **Interfaces:**
 - Produces: the `win-desktop.s2c.bin` fixture and `winDesktopReplayCompletes` test that Tasks 4–8 run against. Task 8 replaces the lenient assertion with the strict golden gate.
 
-- [ ] **Step 1: Confirm the dev server is up and the guest is at a desktop**
+- [x] **Step 1: Confirm the dev server is up and the guest is at a desktop**
 
 ```bash
 scripts/dev-server.sh
@@ -166,7 +166,7 @@ swift run spicesee-cli dump 192.168.50.6 5930 5 /private/tmp/claude-501/-Users-a
 
 Look at the PNG. It must show a Windows desktop (not the installer, not a lock screen). If it shows a lock screen, ask the user to unlock the guest — do not guess at credentials.
 
-- [ ] **Step 2: Record a desktop session with driven activity**
+- [x] **Step 2: Record a desktop session with driven activity**
 
 The xdotool recipe from `docs/dev-server.md` (`### Recording input`), adapted to generate tier-2/3 traffic: right-click menus (TRANSPARENT/alpha), window drags (COPY_BITS, ROPs), text selection (INVERS/XOR). Guest is in client mouse mode, so absolute positioning works unfocused.
 
@@ -195,7 +195,7 @@ ssh aaron@192.168.50.6 "timeout 45 xvfb-run -a -s '-screen 0 1280x1024x24' sh /t
 wait
 ```
 
-- [ ] **Step 3: Verify the recording has draws and no streams, promote it**
+- [x] **Step 3: Verify the recording has draws and no streams, promote it**
 
 ```bash
 ls -la recordings/win-desktop/
@@ -207,7 +207,7 @@ cp recordings/win-desktop/<display-conn>.s2c.bin Tests/SpiceKitTests/Fixtures/wi
 
 The raw recording directory stays gitignored, as with the existing fixtures.
 
-- [ ] **Step 4: Write the inventory replay test**
+- [x] **Step 4: Write the inventory replay test**
 
 Append to `Tests/SpiceKitTests/ReplayTests.swift`:
 
@@ -234,7 +234,7 @@ Append to `Tests/SpiceKitTests/ReplayTests.swift`:
 }
 ```
 
-- [ ] **Step 5: Run it and record the inventory**
+- [x] **Step 5: Run it and record the inventory**
 
 ```bash
 swift test --filter winDesktopReplayCompletes 2>&1 | grep -E "unsupported|passed|failed"
@@ -242,7 +242,7 @@ swift test --filter winDesktopReplayCompletes 2>&1 | grep -E "unsupported|passed
 
 Expected: PASS, with a printed tally (e.g. `display message 317`, `copy rop/mask/scale → drawn as PUT`, …). Paste the tally into the commit message and into `docs/dev-server.md` next to the fixture description — it is the evidence for what Tasks 2–7 must cover. If the tally is empty, the recording didn't exercise QXL drawing; redo Step 2 with more activity before proceeding.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Tests/SpiceKitTests/Fixtures/win-desktop.s2c.bin Tests/SpiceKitTests/ReplayTests.swift docs/dev-server.md
@@ -268,14 +268,14 @@ git commit -m "test(kit): record installed Windows/QXL desktop fixture with draw
   - `public struct SpiceLineAttr: Sendable, Equatable { public var flags: UInt8 }` (styled dash array parsed and discarded)
   - `public enum StringFlags { public static let rasterA1: UInt16 = 1, rasterA4: UInt16 = 2, rasterA8: UInt16 = 4, topDown: UInt16 = 8 }`
   - `public struct RasterGlyph: Sendable, Equatable { public var renderPos: SpicePoint; public var origin: SpicePoint; public var width, height: UInt16; public var data: [UInt8] }`
-  - `public struct SpiceString: Sendable, Equatable { public var flags: UInt16; public var glyphs: [RasterGlyph] }`
+  - `public struct SpiceString: Sendable, Equatable { public var flags: UInt16; public var glyphs: [RasterGlyph] }  // `flags` is read as u8 from the wire and widened; see the corrected table above`
   - `public struct DrawRop3: Sendable, Equatable { public var base: DrawBase; public var source: SpiceImage?; public var sourceArea: SpiceRect; public var brush: SpiceBrush; public var rop3: UInt8; public var scaleMode: UInt8; public var mask: SpiceQMask }`
   - `public struct DrawTransparent: Sendable, Equatable { public var base: DrawBase; public var source: SpiceImage?; public var sourceArea: SpiceRect; public var srcColor: UInt32; public var trueColor: UInt32 }`
   - `public struct DrawStroke: Sendable, Equatable { public var base: DrawBase; public var path: SpicePath; public var attr: SpiceLineAttr; public var brush: SpiceBrush; public var foreMode: UInt16; public var backMode: UInt16 }`
   - `public struct DrawText: Sendable, Equatable { public var base: DrawBase; public var str: SpiceString; public var backArea: SpiceRect; public var foreBrush: SpiceBrush; public var backBrush: SpiceBrush; public var foreMode: UInt16; public var backMode: UInt16 }`
   - `DisplayMessage` cases `.rop3(DrawRop3)`, `.transparent(DrawTransparent)`, `.stroke(DrawStroke)`, `.text(DrawText)`
 
-- [ ] **Step 1: Write failing parse tests**
+- [x] **Step 1: Write failing parse tests**
 
 Append to `Tests/SpiceWireTests/DisplayMessageTests.swift` (the `base()` helper exists at the top of the file):
 
@@ -355,11 +355,11 @@ Append to `Tests/SpiceWireTests/DisplayMessageTests.swift` (the `base()` helper 
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter DisplayMessageTests` — expected: compile errors (`PathFlags`, `.transparent` etc. undefined).
 
-- [ ] **Step 3: Implement the types and parsing**
+- [x] **Step 3: Implement the types and parsing**
 
 In `Geometry.swift`, after `SpiceBrush`:
 
@@ -433,11 +433,11 @@ public struct SpiceString: Sendable, Equatable {
 
 In `DisplayMessages.swift`, the four structs (shapes given under Interfaces; each `init(reader:body:)` follows the exact field order in the protocol reference, resolving `path`/`str` pointers with `body.reader(at:)` and throwing `WireError.badValue(field: "path", value: 0)` when the nonnull pointer is 0), the four enum cases, and the four `switch` arms replacing `default` fall-through for types 310/311/312/317.
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `swift test --filter DisplayMessageTests` — expected: all PASS, including the pre-existing tests.
 
-- [ ] **Step 5: Handle the new cases in Canvas (compile fix only)**
+- [x] **Step 5: Handle the new cases in Canvas (compile fix only)**
 
 `Canvas.applyThrowing` must stay exhaustive. Add a temporary arm so the package builds; Tasks 5–7 replace it:
 
@@ -450,7 +450,7 @@ case .text: throw CanvasError.unsupported("text (task 7)")
 
 Run: `swift build && swift test` — expected: everything passes (the desktop replay still prints its tally; the tally strings change from `display message 317` to `rop3 …`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/SpiceWire/Geometry.swift Sources/SpiceWire/DisplayMessages.swift Sources/SpiceCanvas/Canvas.swift Tests/SpiceWireTests/DisplayMessageTests.swift
@@ -472,7 +472,7 @@ Two decoder gaps that are silent corruption on palettized/translucent images: `p
 **Interfaces:**
 - Produces: `public struct PaletteCache: Sendable { subscript(id: UInt64) -> SpicePalette?; mutating func store(_:); mutating func remove(_ id: UInt64); mutating func removeAll() }`; `ImageDecoder.decode(_:cache:palettes:)` gains the palette parameter (`inout PaletteCache`); `sc_lz_encode_xxxa` in the bridge (test helper).
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 In `Tests/SpiceCanvasTests/ImageDecoderTests.swift` (follow the file's existing builder style):
 
@@ -523,11 +523,11 @@ In `Tests/SpiceCanvasTests/ImageDecoderTests.swift` (follow the file's existing 
 
 `PNGFixtures.solidJPEG` is a ~10-line test helper using `CGContext` + `CGImageDestination` with type `public.jpeg`; put it in the test file. Note `SpiceImageDescriptor`/`SpiceBitmap`/`SpiceImage` need memberwise inits usable from tests — they are `public struct`s whose fields are public; add `public init(...)` memberwise initializers where missing (wire structs currently only have `init(reader:)`).
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter ImageDecoderTests` — expected: compile errors (no `PaletteCache`, no `decodeBitmap(_:palettes:)`, no `sc_lz_encode_xxxa`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `PaletteCache.swift` mirrors `ImageCache` (a `[UInt64: SpicePalette]` dictionary, same four members). In `ImageDecoder`:
 
@@ -536,11 +536,11 @@ Run: `swift test --filter ImageDecoderTests` — expected: compile errors (no `P
 - Bridge: `sc_lz_encode_xxxa(const uint8_t *pixels, int width, int height, int stride, uint8_t *out, size_t cap)` — same shape as the existing `sc_lz_encode_rgb32` but with `LZ_IMAGE_TYPE_XXXA`. Test-only, mirrors the existing encoder precedent.
 - `Canvas`: hold `private var palettes = PaletteCache()`, pass it to `decoder.decode`, and wire `case let .invalPalette(id): palettes.remove(id)` and `case .invalAllPalettes: palettes.removeAll()` (both currently `break`).
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `swift test --filter ImageDecoderTests && swift test` — expected: PASS, no regressions.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceCanvas Packages/CSpiceCodec Tests/SpiceCanvasTests/ImageDecoderTests.swift
@@ -581,7 +581,7 @@ enum Tier2 {
 
 `Canvas` gains `resolveMask(_ mask: SpiceQMask, for rect: SpiceRect) throws -> ResolvedMask?` (nil when `mask.bitmap == nil`) — decode the mask image through the normal `resolve` path, threshold any non-black pixel to coverage 255, invert when `mask.flags & MaskFlags.invers != 0`.
 
-- [ ] **Step 1: Write failing kernel tests**
+- [x] **Step 1: Write failing kernel tests**
 
 `Tests/SpiceCanvasTests/Tier2Tests.swift` (Surface is internal: `@testable import SpiceCanvas`):
 
@@ -647,11 +647,11 @@ private func surface(_ w: Int, _ h: Int, fill: UInt8) -> Surface {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `swift test --filter Tier2Tests` — expected: compile errors.
 
-- [ ] **Step 3: Implement `Tier2.swift`**
+- [x] **Step 3: Implement `Tier2.swift`**
 
 ```swift
 import Accelerate
@@ -724,11 +724,11 @@ enum Tier2 {
 
 Fast path: when `mask == nil && rop == ROPD.opPut`, `.image` delegates to `Tier1.copy` and `.solid` to `Tier1.fill` — tier 2 must not slow the 95% case down.
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `swift test --filter Tier2Tests` — expected: PASS.
 
-- [ ] **Step 5: Route Canvas through Tier2 and delete the PUT shims**
+- [x] **Step 5: Route Canvas through Tier2 and delete the PUT shims**
 
 In `Canvas.applyThrowing`:
 
@@ -753,7 +753,7 @@ Add a `CanvasTests` case proving routing end-to-end (builder helpers exist in th
 
 Run: `swift test` — expected: PASS; the desktop replay tally shrinks (rop/mask/scale shims gone).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/SpiceCanvas Tests/SpiceCanvasTests
@@ -772,7 +772,7 @@ git commit -m "feat(canvas): tier-2 kernels — ROPs, pattern brushes, masks, sc
 - Consumes: Task 2's `.rop3`/`.transparent` cases, Task 4's `PixelSource`/mask machinery.
 - Produces: `Tier2.rop3(_ code: UInt8, p: UInt8, s: UInt8, d: UInt8) -> UInt8` and Canvas handling for both commands (replacing Task 2's temporary throws).
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 @Test func rop3KnownCodes() {
@@ -801,9 +801,9 @@ git commit -m "feat(canvas): tier-2 kernels — ROPs, pattern brushes, masks, sc
 
 `transparentDraw` is a builder helper following `copyBitmap`'s pattern (drawBase, ptr to a `.bitmap` image, src_area, src_color = trueColor, true_color).
 
-- [ ] **Step 2: Run to verify failure** — `swift test --filter "rop3KnownCodes|transparentSkipsKeyedPixels"`: compile error / unsupported throw.
+- [x] **Step 2: Run to verify failure** — `swift test --filter "rop3KnownCodes|transparentSkipsKeyedPixels"`: compile error / unsupported throw.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```swift
 static func rop3(_ code: UInt8, p: UInt8, s: UInt8, d: UInt8) -> UInt8 {
@@ -822,9 +822,9 @@ Canvas `.rop3`: resolve source (scaled if needed, same as copy), resolve brush p
 
 Canvas `.transparent`: resolve source; copy pixels whose decoded RGB (`pixel & 0xFFFFFF`) ≠ `trueColor & 0xFFFFFF`, skip the rest. Clip handling identical to `.copy`.
 
-- [ ] **Step 4: Run to verify pass** — `swift test`: PASS.
+- [x] **Step 4: Run to verify pass** — `swift test`: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceCanvas Tests/SpiceCanvasTests
@@ -846,7 +846,7 @@ CoreGraphics rasterizes the path into an 8-bit coverage mask; the brush lands th
 - Consumes: `SpicePath`, `FixedPoint`, `PathFlags`, `DrawStroke`; Task 4's `Tier2.draw`/`ResolvedMask`.
 - Produces: `Tier3.strokeMask(_ path: SpicePath, in rect: SpiceRect) -> ResolvedMask` (coverage for the path stroked at 1px within `rect`), and Canvas `.stroke` handling.
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```swift
 import Testing
@@ -876,9 +876,9 @@ import SpiceWire
 
 Note the first bezier point is the current-point move-to start; triples after it are (c1, c2, end). A segment without BEZIER draws line-tos from point 0. CLOSE closes the subpath.
 
-- [ ] **Step 2: Run to verify failure** — compile error.
+- [x] **Step 2: Run to verify failure** — compile error.
 
-- [ ] **Step 3: Implement `Tier3.strokeMask`**
+- [x] **Step 3: Implement `Tier3.strokeMask`**
 
 ```swift
 import CoreGraphics
@@ -925,9 +925,9 @@ enum Tier3 {
 
 Canvas `.stroke` (replacing Task 2's throw): for each clip rect, `strokeMask` over the *clipped* rect, then `Tier2.draw` with the stroke's brush as `PixelSource` and `foreMode` as the rop, mask = the stroke coverage. `brush == .none` → nothing to draw (skip). `back_mode`/styled dashes are parsed and ignored — QXL strokes solid; if the desktop replay ever shows dashed artifacts, that is the first place to look.
 
-- [ ] **Step 4: Run to verify pass** — `swift test --filter Tier3Tests && swift test`: PASS.
+- [x] **Step 4: Run to verify pass** — `swift test --filter Tier3Tests && swift test`: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceCanvas Tests/SpiceCanvasTests/Tier3Tests.swift
@@ -948,7 +948,7 @@ git commit -m "feat(canvas): tier-3 STROKE via CGPath coverage masks"
 - Consumes: `SpiceString`, `RasterGlyph`, `StringFlags`, Task 4's `Tier2.draw`.
 - Produces: `Tier3.glyphMask(_ glyph: RasterGlyph, bpp: Int, topDown: Bool) -> ResolvedMask` (origin = renderPos), and Canvas `.text` handling.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 @Test func a1GlyphMaskIsMSBFirst() {
@@ -985,17 +985,17 @@ git commit -m "feat(canvas): tier-3 STROKE via CGPath coverage masks"
 
 `textDraw` builds the wire message with `SpiceWriter` following Task 2's `drawTextParsesGlyphs` layout.
 
-- [ ] **Step 2: Run to verify failure.**
+- [x] **Step 2: Run to verify failure.**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `glyphMask`: decode A1 (MSB-first), A4 (high nibble first), A8 (bytes) into `coverage`, rows flipped when `!topDown`; `origin` = `renderPos`. Threshold at != 0 (A4/A8 partial coverage collapses to on/off for now — anti-aliased subpixel text from QXL is A1 in practice; note it in a comment).
 
 Canvas `.text`: if `backArea` non-empty and `backBrush != .none`, `Tier2.draw` the back brush over `backArea ∩ clip` with `backMode`. Then per glyph, per clip rect: `Tier2.draw(source: foreBrush-as-PixelSource, rop: foreMode, mask: glyphMask ∩ effective rect)`. The draw rect for a glyph is `(renderPos, renderPos + (width, height)) ∩ clip ∩ surface bounds`; emit one update per glyph is wasteful — emit one update for `base.box` after all glyphs land (the box bounds the string).
 
-- [ ] **Step 4: Run to verify pass** — `swift test`: PASS.
+- [x] **Step 4: Run to verify pass** — `swift test`: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceCanvas Tests/SpiceCanvasTests/Tier3Tests.swift
@@ -1006,6 +1006,15 @@ git commit -m "feat(canvas): TEXT glyph blits"
 
 ### Task 8: The desktop replay goes strict — zero unsupported, reviewed golden
 
+> **Amended 2026-08-30 — read before implementing.** This task was written believing the
+> `win-desktop` recording exercised tiers 2-3. It does not: the whole capture is 126 `DRAW_COPY`
+> and nothing else, so "zero unsupported" is already true at the branch point and cannot
+> discriminate. Implement this task as a **tier-1 regression golden** over real traffic — the
+> zero-unsupported assertion stays (it is still a genuine corruption alarm for the copy path,
+> and cheap), but it must be documented in the test as such, NOT as the milestone's
+> draw-correctness gate. Tiers 2-3 are proven by Tasks 4-7's unit tests. `expectClose` is still
+> produced here for Task 14. Do not claim in the commit message that this gates tiers 2-3.
+
 **Files:**
 - Modify: `Tests/SpiceKitTests/ReplayTests.swift`
 - Create: `Tests/SpiceKitTests/Fixtures/win-desktop.golden.png` (generated, then **reviewed by eye**)
@@ -1014,7 +1023,7 @@ git commit -m "feat(canvas): TEXT glyph blits"
 - Consumes: everything from Tasks 2–7.
 - Produces: the M4 draw-correctness gate, plus `expectClose` used again by Task 13.
 
-- [ ] **Step 1: Tighten the test**
+- [x] **Step 1: Tighten the test**
 
 Replace `winDesktopReplayCompletes` with:
 
@@ -1067,7 +1076,7 @@ func expectClose(_ got: DecodedImage, _ want: DecodedImage, maxChannelDelta: Int
 
 If the recorded session includes JPEG images (it can, if the server chose lossy for some region — the tally from Task 1 tells you), use `maxChannelDelta: 3, maxMismatchFraction: 0.001` instead of exact, and say so in the commit message.
 
-- [ ] **Step 2: Run, review, re-run**
+- [x] **Step 2: Run, review, re-run**
 
 ```bash
 swift test --filter winDesktopReplayMatchesGolden      # first run writes the golden
@@ -1082,9 +1091,9 @@ swift test --filter winDesktopReplayMatchesGolden      # second run compares
 
 Expected: PASS with zero unsupported. If unsupported is non-empty, the tally names the missing command — implement it before this task is done (that is the point of the gate).
 
-- [ ] **Step 3: Full suite** — `swift test`: PASS (the old `winDisplayReplayMatchesGolden` must still pass byte-exact: tier-1 traffic must be untouched by the routing changes).
+- [x] **Step 3: Full suite** — `swift test`: PASS (the old `winDisplayReplayMatchesGolden` must still pass byte-exact: tier-1 traffic must be untouched by the routing changes).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Tests/SpiceKitTests
@@ -1134,7 +1143,7 @@ public static func streamReport(_ r: StreamReport) -> [UInt8]
 
 `sized` as an optional tuple keeps one `StreamData` type for both data messages — the player treats a sized frame as "this frame also moves/resizes the stream". Tuples aren't `Equatable` in older modes but are in Swift 6 for ≤6 elements of Equatable; if the compiler disagrees, make it a small struct `SizedInfo`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -1194,15 +1203,15 @@ import Testing
 }
 ```
 
-- [ ] **Step 2: Run to verify failure.**
+- [x] **Step 2: Run to verify failure.**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `StreamMessages.swift` per the protocol reference; `data_size` capped at `1 << 26` like images (a hostile size throws before allocation). The `DisplayMessage.init` arms replace `default` for types 122–126, 315, 319. A destroyed-codec byte outside `VideoCodecType` throws `WireError.badValue(field: "codec_type", …)` — an unknown codec must fail the *parse* so the channel logs and drops it (existing pump behaviour), not reach the player. `Canvas.applyThrowing` gets one combined arm: `case .streamCreate, .streamData, .streamClip, .streamDestroy, .streamDestroyAll, .streamActivateReport: break` — with the comment that `SpiceSession` routes streams to the player before the canvas ever sees them; the arm exists so a mis-route is inert rather than corrupting.
 
-- [ ] **Step 4: Run to verify pass** — `swift test`: PASS.
+- [x] **Step 4: Run to verify pass** — `swift test`: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceWire Sources/SpiceCanvas/Canvas.swift Tests/SpiceWireTests/StreamMessageTests.swift
@@ -1241,7 +1250,7 @@ public struct VideoDecoder: ~Copyable {
 }
 ```
 
-- [ ] **Step 1: Package.swift**
+- [x] **Step 1: Package.swift**
 
 Add to targets (and `SpiceKit` deps in Task 12 — not yet):
 
@@ -1250,7 +1259,7 @@ Add to targets (and `SpiceKit` deps in Task 12 — not yet):
 .testTarget(name: "SpiceMediaTests", dependencies: ["SpiceMedia", "SpiceWire"]),
 ```
 
-- [ ] **Step 2: Write failing tests**
+- [x] **Step 2: Write failing tests**
 
 ```swift
 import Testing
@@ -1305,9 +1314,9 @@ private func jpegFrame(width: Int, height: Int, r: UInt8, g: UInt8, b: UInt8) th
 
 `H264TestEncoder` (test-only, in the test file): `VTCompressionSession` (codec `.h264`, realtime, all-intra via `kVTCompressionPropertyKey_MaxKeyFrameInterval = 1`), encode N BGRA gradient frames; for each sample buffer, pull SPS/PPS from the format description (`CMVideoFormatDescriptionGetH264ParameterSetAtIndex`) and emit Annex-B: `[00 00 00 01]+SPS + [00 00 00 01]+PPS + per-NAL [00 00 00 01]+payload` (AVCC lengths from the block buffer converted). ~60 lines; it is the inverse of the decoder's converter, which is exactly why the test is labelled self-consistent.
 
-- [ ] **Step 3: Run to verify failure** — `swift test --filter VideoDecoderTests`: compile errors.
+- [x] **Step 3: Run to verify failure** — `swift test --filter VideoDecoderTests`: compile errors.
 
-- [ ] **Step 4: Implement `VideoDecoder`**
+- [x] **Step 4: Implement `VideoDecoder`**
 
 Key mechanics (implementer writes the full ~200 lines):
 
@@ -1317,9 +1326,9 @@ Key mechanics (implementer writes the full ~200 lines):
 - `deinit`: `VTDecompressionSessionInvalidate`.
 - Errors carry the `OSStatus`; no `fatalError`, no `!` on server-derived data.
 
-- [ ] **Step 5: Run to verify pass** — `swift test --filter VideoDecoderTests`: PASS.
+- [x] **Step 5: Run to verify pass** — `swift test --filter VideoDecoderTests`: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Package.swift Sources/SpiceMedia Tests/SpiceMediaTests
@@ -1374,7 +1383,7 @@ Reports: per stream, after `activateReport`, count frames+drops; when the count 
 
 MJPEG frames with `flags & StreamFlags.topDown == 0` flip rows before emit (reuse the flip the canvas uses — a private copy; SpiceMedia cannot import SpiceCanvas).
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```swift
 import Testing
@@ -1457,15 +1466,15 @@ private func mjpegCreate(id: UInt32 = 1, dest: SpiceRect = SpiceRect(top: 0, lef
 
 (`jpegFrame` moves to a shared test-support file in `Tests/SpiceMediaTests/` used by both test files.)
 
-- [ ] **Step 2: Run to verify failure.**
+- [x] **Step 2: Run to verify failure.**
 
-- [ ] **Step 3: Implement `StreamPlayer`**
+- [x] **Step 3: Implement `StreamPlayer`**
 
 Internal state: `[UInt32: StreamState]` where `StreamState` holds `create` fields, current `dest`/`clip`, a `VideoDecoder`, appearance order, and an optional `ReportWindow { uniqueID, maxWindowSize, timeoutMs, opened: ContinuousClock.Instant, firstMM: UInt32?, lastMM: UInt32, frames: UInt32, drops: UInt32 }`. `StreamState` holds a `~Copyable` decoder, so store states in a `Dictionary` of classes or use `consume`-friendly handling — simplest: make `StreamState` a `final class` (actor-confined, never escapes, not Sendable — fine inside the actor). Data for an unknown id is dropped silently (destroy raced data — normal, not an error). Events stream is `.unbounded` like Canvas's.
 
-- [ ] **Step 4: Run to verify pass** — `swift test --filter StreamPlayerTests`: PASS.
+- [x] **Step 4: Run to verify pass** — `swift test --filter StreamPlayerTests`: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Sources/SpiceMedia Tests/SpiceMediaTests
@@ -1494,7 +1503,7 @@ case streamDestroyed(id: UInt32, displayID: UInt8)
 case allStreamsDestroyed(displayID: UInt8)
 ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `Tests/SpiceKitTests/StreamSessionTests.swift`, following `SpiceSessionTests`'s fixture pattern (`fakeLink` + `frame(...)` builders from `TestSupport.swift`):
 
@@ -1544,9 +1553,9 @@ Also a `DisplayChannel.send(streamReport:)` unit test in `Tests/SpiceCoreTests` 
 
 Check `TestSupport.swift` for the existing session-builder helper name (`SpiceSessionTests` constructs sessions from `fakeLink` bodies); reuse it rather than inventing `makeSession` if one exists under another name.
 
-- [ ] **Step 2: Run to verify failure.**
+- [x] **Step 2: Run to verify failure.**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `DisplayChannel`:
 
@@ -1597,9 +1606,9 @@ case .display:
 
 Mind the existing drain comment in `start`: `.disconnected` must still come after every pixel — the display pump above awaits the player pump before `channelEnded`, preserving that order for stream frames too.
 
-- [ ] **Step 4: Run to verify pass** — `swift test`: PASS, including every pre-existing session/replay test (the routing change must not disturb draw traffic: `winDisplayReplayMatchesGolden` and `winDesktopReplayMatchesGolden` are the canaries).
+- [x] **Step 4: Run to verify pass** — `swift test`: PASS, including every pre-existing session/replay test (the routing change must not disturb draw traffic: `winDisplayReplayMatchesGolden` and `winDesktopReplayMatchesGolden` are the canaries).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Package.swift Sources/SpiceCore Sources/SpiceKit Tests/SpiceKitTests Tests/SpiceCoreTests
@@ -1638,7 +1647,7 @@ struct StreamFrameUpdate: Sendable {
 // ViewportEvent gains: case stream(StreamFrameUpdate), streamDestroyed(UInt32?)
 ```
 
-- [ ] **Step 1: Write failing seam-mapping test**
+- [x] **Step 1: Write failing seam-mapping test**
 
 `Tests/SpiceSeeTests/StreamSeamTests.swift` (this bundle compiles `Sources/SpiceSee` into itself; follow `ClipboardBridgeTests`'s import style):
 
@@ -1669,7 +1678,7 @@ import SpiceMedia
 
 (`translate(_:viewportID:)` becomes an internal static on `SpiceKitBackend`, like the existing cursor/clipboard translators.)
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 xcodegen generate
@@ -1678,7 +1687,7 @@ xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSeeTests -destination 'platf
 
 Expected: compile failure (missing types).
 
-- [ ] **Step 3: Implement the seam and adapter**
+- [x] **Step 3: Implement the seam and adapter**
 
 - `SessionBackend.swift`: the types above.
 - `SpiceKitBackend.connect`'s event loop:
@@ -1695,7 +1704,7 @@ case let .allStreamsDestroyed(displayID: id):
 - `SessionModel`'s backend-event switch: `.streamFrame(u)` → `publish(.stream(u), to: u.viewportID)`; `.streamDestroyed(vid, sid)` → `publish(.streamDestroyed(sid), to: vid)`. On `.disconnected`/`.failed`, also publish `.streamDestroyed(nil)` so a dead session never leaves a frozen video layer.
 - `MetalSurfaceView.Coordinator.pump`: two new cases → `view.apply(streamUpdate:)` / `view.removeStream(_:)`.
 
-- [ ] **Step 4: Implement compositing in `GuestSurfaceView`**
+- [x] **Step 4: Implement compositing in `GuestSurfaceView`**
 
 ```swift
 // MARK: Stream layers
@@ -1766,7 +1775,7 @@ encoder.setScissorRect(MTLScissorRect(x: 0, y: 0, width: Int(metalLayer.drawable
 
 Also reset `streams` when the primary texture is recreated for a new size (`apply(_ update: FrameUpdate)`'s recreate branch) — a mode change invalidates stream geometry, and the server destroys and recreates streams around it anyway.
 
-- [ ] **Step 5: Build and test everything**
+- [x] **Step 5: Build and test everything**
 
 ```bash
 swift build && swift test
@@ -1777,7 +1786,7 @@ xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSeeTests -destination 'platf
 
 Expected: all green. Note the app project links `SpiceMedia` transitively through `SpiceKit` (the SPM library product) — if the app target fails to find it, `project.yml` needs the package product added the same way `SpiceKit` already is; edit `project.yml`, never the xcodeproj.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Sources/SpiceSee Tests/SpiceSeeTests project.yml
@@ -1787,6 +1796,22 @@ git commit -m "feat(app): composite video stream layers over the guest surface"
 ---
 
 ### Task 14: Real-server MJPEG — fixture, replay, live smoothness check, docs
+
+> **Status 2026-08-31 — Steps 1-4 and 7 are BLOCKED, not skipped.** The LAN dev box
+> (192.168.50.6) went completely offline during this milestone's execution — no ping, ssh and both
+> SPICE ports closed — so `streaming-video` was never enabled, no streaming session was recorded,
+> and `win-video.s2c.bin`, `winVideoReplayDecodesStreams` and its golden do not exist. The stream
+> wire layouts remain **verified against `spice.proto` field-by-field but never confirmed against
+> bytes from a real server**, which is exactly what this task was supposed to provide.
+>
+> Steps 5-6 are done: the manual exit check is in `docs/dev-server.md` and the close-out is in
+> `CLAUDE.md`.
+>
+> When the box returns, prefer recording from the **Linux Mint guest on port 5931** over the Windows
+> guest: it exists purely for these tests and is expendable, whereas restarting the Windows guest
+> interrupts real work. `streaming-video=all` streams any animating region regardless of guest OS,
+> so a dragged window is enough to produce `STREAM_CREATE`.
+
 
 The self-consistency breaker: real spice-server MJPEG streams, recorded and replayed, plus the by-eye quality gate. Also the milestone's documentation close-out.
 
@@ -1868,7 +1893,7 @@ Capture the session window (`CGWindowListCopyWindowInfo` id → `screencapture -
 log stream --predicate 'subsystem == "com.spicesee"' --level info
 ```
 
-- [ ] **Step 5: Hand the user the manual exit check, restore the server**
+- [x] **Step 5: Hand the user the manual exit check, restore the server**
 
 Add `## M4 exit check (manual)` to `docs/dev-server.md`:
 
@@ -1878,7 +1903,7 @@ Add `## M4 exit check (manual)` to `docs/dev-server.md`:
 
 Restore the server's original qemu command line (from the note taken in Step 1) unless the user wants streaming left on. State plainly in the final report that check 1–3 are the user's, like M2's exit check.
 
-- [ ] **Step 6: Update CLAUDE.md and the memory of record**
+- [x] **Step 6: Update CLAUDE.md and the memory of record**
 
 In `CLAUDE.md`'s architecture paragraph: M4 done (tiers 2–3, palette cache, JPEG-alpha, MJPEG/H.264 streams via `SpiceMedia`, STREAM_REPORT), M5 next; note the new `SpiceMedia` target in the layer table; add the "streams composite in Metal, frames cross as `[UInt8]` by strict-concurrency design" rule and the "no jitter buffer until audio (M6)" decision to the input-rules-style gotcha list. Update `docs/dev-server.md`'s fixture table with `win-desktop` and `win-video`. Keep both edits surgical.
 

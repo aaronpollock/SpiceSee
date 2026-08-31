@@ -100,6 +100,7 @@ gitignored and only these three files are kept.
 | `win-inputs.c2s.bin` | conn-8 c2s, 348 B | `KEY_MODIFIERS`, `PONG`×2, `MOUSE_POSITION`×2, `MOUSE_PRESS`/`MOUSE_RELEASE` (left×2, right, wheel-up), `KEY_SCANCODE`×3 |
 | `win-inputs.s2c.bin` | conn-8 s2c, 266 B | `INPUTS_INIT`, `PING`×2, `KEY_MODIFIERS`×2 |
 | `win-cursor.s2c.bin` | conn-9 s2c, 269 B | `SET_ACK`, `CURSOR_INIT` (flags NONE — VGA guest, no cursor commands), `PING`×2 |
+| `win-desktop.s2c.bin` | 2026-08-30, conn-7 s2c, 7.8 MB | the *installed* Win11 desktop driven through a right-click menu, the start menu and a window drag: `DRAW_COPY`×126 on two surfaces, `MONITORS_CONFIG`×2, `MARK`×2, `SURFACE_DESTROY`, `INVAL_ALL_PALETTES`. Renders clean; **zero** unsupported commands, and zero tier-2/3 commands — see "Where tier-2/3 draw commands actually come from" |
 
 Two things task 15 needs from this:
 
@@ -121,8 +122,10 @@ USB tablet) for this recording, so `remote-viewer` never grabs the pointer and s
 ```sh
 # here
 swift run spicerec 5901 192.168.50.6 5930 recordings/win-input
-# on the Ubuntu box — MACIP is this Mac's address as seen from the box (a VPN address, not
-# ipconfig getifaddr en0's LAN address, when the box reaches the Mac over VPN): 192.168.4.3
+# on the Ubuntu box — MACIP is this Mac's address as seen from the box. On the LAN that is
+# 192.168.50.38 (ipconfig getifaddr en0). The 192.168.4.3 this file used to give is a VPN
+# address; on 2026-08-30 it was stale and the box could not ping it, so a recording made
+# against it captured zero bytes. Check which path the box reaches the Mac on before recording.
 ssh aaron@192.168.50.6 'cat > /tmp/drive.sh' <<'EOF'
 #!/bin/sh
 remote-viewer spice://MACIP:5901 &
@@ -157,6 +160,50 @@ raw press-then-release scancode bytes back to back (`e0 53 e0 d3` for Delete, E0
 — the same byte order `XTScancode.wireCode`/`rawBytes` already use). `InputsChannel` now mirrors
 this: it picks 104 vs. 101/102 once, from the server's link-reply caps, and falls back to 101/102
 when the server doesn't advertise the capability.
+
+## Where tier-2/3 draw commands actually come from
+
+Recorded 2026-08-30, while scoping M4 (canvas tiers 2-3). **Neither guest on this box emits a
+single tier-2 or tier-3 draw command.** Message histograms of whole captures, taken by replaying
+each recording through `DisplayChannel` and tallying `DisplayMessage` cases:
+
+| Capture | Guest / driver | Histogram |
+|---|---|---|
+| `win-display.s2c.bin` | Win11 installer, QXL WDDM | `copy=1` |
+| `win-glz-bottomup.s2c.bin` | Win11, QXL WDDM | `copy=10` |
+| `win-desktop.s2c.bin` | Win11 desktop, QXL WDDM | `copy=126`, `surfaceCreate=2`, `mark=2`, `monitorsConfig=2`, `surfaceDestroy=1`, `invalAllPalettes=1` |
+| Linux Mint 22 Cinnamon, port 5931 | X11 + **modesetting** | `copy=6377`, `surfaceCreate=1`, `mark=1`, `monitorsConfig=1`, `invalAllPalettes=1` |
+
+No `FILL`, `OPAQUE`, `BLEND`, `ROP3`, `TRANSPARENT`, `STROKE` or `TEXT` in any of them, and the
+`win-desktop` capture was driven hard on purpose (right-click menu, start menu, an eight-step
+window drag). The emptiness is structural, not a weak drive script:
+
+- **Windows 11's QXL driver is WDDM.** It composites inside the guest and hands QXL finished
+  dirty-rect bitmaps. The classic QXL 2D command set is implemented by the *XDDM* driver
+  (Windows 7 and earlier), which maps the Windows DDI — `BitBlt` ROP3, `LineTo`, `TextOut` —
+  onto `ROP3`/`STROKE`/`TEXT`.
+- **The Mint guest is X11** (`XDG_SESSION_TYPE=x11`, confirmed in-guest) **but X loaded
+  `modesetting`, not `qxl`.** `/var/log/Xorg.0.log` probes only `modesetting`, `FBDEV` and
+  `VESA`, even though `xserver-xorg-video-qxl` is installed. Under modesetting, X renders in
+  software into a dumb KMS buffer and the qxl *kernel* driver pushes damage as `DRAW_COPY`.
+  Only the userspace `xf86-video-qxl` EXA driver emits `FILL`/`OPAQUE`/`BLEND`.
+
+So a fixture that exercises tiers 2-3 needs one of: an X session forced onto `Driver "qxl"` via
+`/etc/X11/xorg.conf.d` (needs root in the guest, and a non-compositing WM — Cinnamon's compositor
+would blit whole frames anyway), or a Windows 7-era XDDM guest, or a synthetic capture. Until one
+exists, **tier-2/3 code is covered by unit tests only**, and a "zero unsupported events on a real
+desktop recording" gate proves nothing — it is already green with no tier-2/3 code at all.
+
+### The Linux Mint guest (port 5931)
+
+A second guest on the same box for exactly this comparison: Linux Mint, Cinnamon, X11, SPICE on
+**5931** (the Windows guest keeps 5930). No `spice-vdagent` installed, so it is in **server mouse
+mode** — `remote-viewer` grabs the pointer, and scripted input is far more reliable through the
+keyboard (`xdotool key super`, `ctrl+alt+t`, `alt+F7` to move a window) than through the mouse.
+
+```sh
+swift run spicesee-cli dump 192.168.50.6 5931 6 /tmp/mint.png   # 1280x800
+```
 
 ## Why this guest is a good fixture
 
@@ -365,6 +412,56 @@ Two things need a real Proxmox cluster, which does not exist here — this is th
 
 Neither has been exercised here: there is no Proxmox cluster on this network, only the standalone
 quickemu guest this whole document is otherwise about.
+
+## M4 exit check (manual)
+
+M4's engine work is unit-tested but **has never been seen against a real server** — see CLAUDE.md's
+M4 caveat. These checks are the user's, like M2's, and each one is the first real-traffic evidence
+for the thing it names.
+
+Prerequisite for 1 and 2: the guest's spice-server needs streaming enabled. Capture the running
+qemu command line first (`ps -ww -eo args | grep qemu-system`) so the change is reversible, append
+`,streaming-video=all` to its `-spice` argument, stop the VM cleanly (quickemu's own stop or an ACPI
+shutdown — **never `kill -9` a guest with a mounted filesystem**), and relaunch the edited command
+under `tmux`/`nohup`. `all` rather than `filter` makes stream creation deterministic: any animating
+region streams, with no rate heuristic to satisfy. The Windows guest's original argument, recorded
+2026-08-30, was:
+
+    -spice disable-ticketing=on,port=5930,addr=
+
+**Build Release for the smoothness checks, not Debug.** The tier-2/3 kernels are per-pixel Swift
+scanline loops (`Tier2.draw` calls `ropCombine` per channel, pattern tiling does two modulos per
+pixel, stroke and glyph masks are per-pixel); at `-Onone` none of it inlines or vectorizes. The
+pre-M4 path is mostly memcpy/vImage and barely cares, so a Debug build penalises the new code far
+more than the old and biases the very comparison these checks are making. The corruption check
+below is about pixels rather than timing, so Debug is fine there — and `assert()` survives in
+Debug, which Release strips.
+
+```sh
+xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -configuration Release -destination 'platform=macOS' build
+BUILT_PRODUCTS_DIR=$(xcodebuild -project SpiceSee.xcodeproj -scheme SpiceSee -configuration Release -showBuildSettings | grep ' BUILT_PRODUCTS_DIR' | awk '{print $3}')
+"$BUILT_PRODUCTS_DIR/SpiceSee.app/Contents/MacOS/SpiceSee"
+```
+
+- [ ] **Video plays as well as it did before M4.** Play a full-screen YouTube HD video in the guest
+      through SpiceSee. Bar: **indistinguishable from the pre-M4 draw path — zero lag, zero
+      choppiness, no tearing at the stream's edges**, and a window resize mid-video stays clean.
+      This is the performance gate the whole stream path is judged on.
+- [ ] **The draw path did not regress.** Restore the original command line (streaming off) and play
+      the same video. It should look exactly as it did before M4 — this is what proves the tier-2/3
+      routing changes left tier-1 traffic alone.
+- [ ] **No corruption anywhere, by eye.** Right-click menus, window drags, text selection across the
+      desktop. Tiers 2-3 have no real-traffic coverage at all, so this check is the only thing
+      standing between them and a corruption bug.
+- [ ] **`STREAM_REPORT` actually goes out.** With streaming on, watch
+      `log stream --predicate 'subsystem == "com.spicesee"' --level info` and confirm reports are
+      sent and no canvas `unsupported` lines appear.
+
+If a fixture can be recorded while streaming is on, promote the display capture to
+`Tests/SpiceKitTests/Fixtures/win-video.s2c.bin` and add the replay test the M4 plan's Task 14
+describes — that would give the stream wire layouts their first confirmation against real bytes.
+The layouts are currently transcribed from `spice.proto` and verified field-by-field against it,
+but no real server has ever sent them to this client.
 
 ## Known issues (not fixed, out of M3's scope)
 
