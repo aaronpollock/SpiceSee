@@ -119,6 +119,27 @@ private func copyFromCache(_ box: SpiceRect, id: UInt64, w pw: UInt32, h ph: UIn
     #expect(s.pixel(x: 3, y: 0) == 0xFF00_0000)              // surface x=3 (mask-local x=1): untouched
 }
 
+@Test func maskOriginUsesPlusMaskPosNotMinus() async throws {
+    // box.left=2 AND mask.pos.x=1 are BOTH non-zero, so this exercises the whole formula
+    // `mx = x - rect.left + mask.pos.x`, not just the `rect.left` term: with both non-zero, a sign
+    // error on `mask.pos` (`x - rect.left - mask.pos.x`) predicts mx=-1 (out of range, uncovered)
+    // for x=2 and mx=0 for x=3 — the OPPOSITE of the correct mx=1 (covered) / mx=2 (uncovered).
+    let c = Canvas(); await c.apply(create(4, 1))
+    var w = SpiceWriter()
+    drawBase(&w, SpiceRect(top: 0, left: 2, bottom: 1, right: 4))
+    w.u8(1); w.u32(0xFFFFFF); w.u16(ROPD.opPut)
+    w.u8(0); w.i32(1); w.i32(0)                              // mask flags=0, pos=(1,0)
+    let ptr = w.bytes.count; w.u32(0)
+    w.patchU32(at: ptr, UInt32(w.bytes.count))
+    w.u64(0); w.u8(ImageType.bitmap.rawValue); w.u8(0); w.u32(4); w.u32(1)
+    w.u8(BitmapFormat.bit1LE.rawValue); w.u8(BitmapFlags.topDown); w.u32(4); w.u32(1); w.u32(1); w.u32(0)
+    w.bytes([0x03])                                          // index0=1, index1=1, index2=0, index3=0
+    await c.apply(try DisplayMessage(type: DisplayServerMsg.drawFill.rawValue, payload: w.bytes))
+    let s = try #require(await c.snapshot(surfaceID: 0))
+    #expect(s.pixel(x: 2, y: 0) == 0xFFFF_FFFF)              // correct mx=1 → coverage[1]=1: covered
+    #expect(s.pixel(x: 3, y: 0) == 0xFF00_0000)              // correct mx=2 → coverage[2]=0: untouched
+}
+
 @Test func hostileCopyBoxIsRejectedNotAllocated() async throws {
     let c = Canvas(); await c.apply(create(4, 4))
     let px: [UInt8] = [0, 0, 255, 255,  0, 255, 0, 255,  255, 0, 0, 255,  255, 255, 255, 255]   // 2×2 BGRA
