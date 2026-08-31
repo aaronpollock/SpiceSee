@@ -77,6 +77,55 @@ public struct DrawAlphaBlend: Sendable, Equatable {
     }
 }
 
+public struct DrawRop3: Sendable, Equatable {
+    public var base: DrawBase, source: SpiceImage?, sourceArea: SpiceRect, brush: SpiceBrush
+    public var rop3: UInt8, scaleMode: UInt8, mask: SpiceQMask
+    init(reader r: inout SpiceReader, body: SpiceReader) throws {
+        base = try DrawBase(reader: &r)
+        source = try SpiceImage.at(pointer: try r.u32(), base: body)
+        sourceArea = try SpiceRect(reader: &r); brush = try SpiceBrush(reader: &r, base: body)
+        rop3 = try r.u8(); scaleMode = try r.u8(); mask = try SpiceQMask(reader: &r, base: body)
+    }
+}
+
+public struct DrawTransparent: Sendable, Equatable {
+    public var base: DrawBase, source: SpiceImage?, sourceArea: SpiceRect, srcColor: UInt32, trueColor: UInt32
+    init(reader r: inout SpiceReader, body: SpiceReader) throws {
+        base = try DrawBase(reader: &r)
+        source = try SpiceImage.at(pointer: try r.u32(), base: body)
+        sourceArea = try SpiceRect(reader: &r); srcColor = try r.u32(); trueColor = try r.u32()
+    }
+}
+
+public struct DrawStroke: Sendable, Equatable {
+    public var base: DrawBase, path: SpicePath, attr: SpiceLineAttr, brush: SpiceBrush
+    public var foreMode: UInt16, backMode: UInt16
+    init(reader r: inout SpiceReader, body: SpiceReader) throws {
+        base = try DrawBase(reader: &r)
+        let pathPtr = try r.u32()
+        guard pathPtr != 0 else { throw WireError.badValue(field: "path", value: 0) }
+        var pathReader = try body.reader(at: pathPtr)
+        path = try SpicePath(reader: &pathReader)
+        attr = try SpiceLineAttr(reader: &r); brush = try SpiceBrush(reader: &r, base: body)
+        foreMode = try r.u16(); backMode = try r.u16()
+    }
+}
+
+public struct DrawText: Sendable, Equatable {
+    public var base: DrawBase, str: SpiceString, backArea: SpiceRect, foreBrush: SpiceBrush, backBrush: SpiceBrush
+    public var foreMode: UInt16, backMode: UInt16
+    init(reader r: inout SpiceReader, body: SpiceReader) throws {
+        base = try DrawBase(reader: &r)
+        let strPtr = try r.u32()
+        guard strPtr != 0 else { throw WireError.badValue(field: "str", value: 0) }
+        var strReader = try body.reader(at: strPtr)
+        str = try SpiceString(reader: &strReader)
+        backArea = try SpiceRect(reader: &r)
+        foreBrush = try SpiceBrush(reader: &r, base: body); backBrush = try SpiceBrush(reader: &r, base: body)
+        foreMode = try r.u16(); backMode = try r.u16()
+    }
+}
+
 public struct MonitorHead: Sendable, Equatable {
     public var id, surfaceID, width, height, x, y, flags: UInt32
     init(reader r: inout SpiceReader) throws {
@@ -101,6 +150,7 @@ public enum DisplayMessage: Sendable {
     case fill(DrawFill), copy(DrawCopy), blend(DrawCopy), opaque(DrawOpaque)
     case blackness(DrawMaskOnly), whiteness(DrawMaskOnly), invers(DrawMaskOnly)
     case copyBits(CopyBits), alphaBlend(DrawAlphaBlend)
+    case rop3(DrawRop3), transparent(DrawTransparent), stroke(DrawStroke), text(DrawText)
     case invalList([ResourceID]), invalAllPixmaps, invalPalette(UInt64), invalAllPalettes
     case monitorsConfig(MonitorsConfig)
     case unsupported(type: UInt16, payload: [UInt8])
@@ -123,6 +173,10 @@ public enum DisplayMessage: Sendable {
         case .drawInvers: self = .invers(try DrawMaskOnly(reader: &r, body: body))
         case .copyBits: self = .copyBits(try CopyBits(reader: &r))
         case .drawAlphaBlend: self = .alphaBlend(try DrawAlphaBlend(reader: &r, body: body))
+        case .drawRop3: self = .rop3(try DrawRop3(reader: &r, body: body))
+        case .drawTransparent: self = .transparent(try DrawTransparent(reader: &r, body: body))
+        case .drawStroke: self = .stroke(try DrawStroke(reader: &r, body: body))
+        case .drawText: self = .text(try DrawText(reader: &r, body: body))
         case .invalList:
             let n = try r.u16()
             self = .invalList(try (0 ..< n).map { _ in ResourceID(type: try r.u8(), id: try r.u64()) })

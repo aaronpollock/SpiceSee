@@ -80,6 +80,10 @@ public actor Canvas {
                 let origin = SpicePoint(x: a.sourceArea.left + (r.left - a.base.box.left), y: a.sourceArea.top + (r.top - a.base.box.top))
                 Tier1.alphaBlend(into: s, rect: r, src: src, srcOrigin: origin, alpha: a.alpha)
             }
+        case let .rop3(r): throw CanvasError.unsupported("rop3 \(r.rop3) (task 5)")
+        case let .transparent(t): _ = t; throw CanvasError.unsupported("transparent (task 5)")
+        case .stroke: throw CanvasError.unsupported("stroke (task 6)")
+        case .text: throw CanvasError.unsupported("text (task 7)")
         case let .unsupported(type, _):
             throw CanvasError.unsupported("display message \(type)")
         }
