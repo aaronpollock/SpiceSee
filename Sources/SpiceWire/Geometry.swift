@@ -11,6 +11,10 @@ public struct SpiceRect: Sendable, Equatable {
     }
     public init(reader r: inout SpiceReader) throws {
         top = try r.i32(); left = try r.i32(); bottom = try r.i32(); right = try r.i32()
+        let (_, widthOverflow) = right.subtractingReportingOverflow(left)
+        guard !widthOverflow else { throw WireError.badValue(field: "width", value: UInt64(bitPattern: Int64(right))) }
+        let (_, heightOverflow) = bottom.subtractingReportingOverflow(top)
+        guard !heightOverflow else { throw WireError.badValue(field: "height", value: UInt64(bitPattern: Int64(bottom))) }
     }
     public var width: Int32 { right - left }
     public var height: Int32 { bottom - top }
