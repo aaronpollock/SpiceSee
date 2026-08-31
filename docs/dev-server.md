@@ -413,6 +413,42 @@ Two things need a real Proxmox cluster, which does not exist here — this is th
 Neither has been exercised here: there is no Proxmox cluster on this network, only the standalone
 quickemu guest this whole document is otherwise about.
 
+## M4 exit check (manual)
+
+M4's engine work is unit-tested but **has never been seen against a real server** — see CLAUDE.md's
+M4 caveat. These checks are the user's, like M2's, and each one is the first real-traffic evidence
+for the thing it names.
+
+Prerequisite for 1 and 2: the guest's spice-server needs streaming enabled. Capture the running
+qemu command line first (`ps -ww -eo args | grep qemu-system`) so the change is reversible, append
+`,streaming-video=all` to its `-spice` argument, stop the VM cleanly (quickemu's own stop or an ACPI
+shutdown — **never `kill -9` a guest with a mounted filesystem**), and relaunch the edited command
+under `tmux`/`nohup`. `all` rather than `filter` makes stream creation deterministic: any animating
+region streams, with no rate heuristic to satisfy. The Windows guest's original argument, recorded
+2026-08-30, was:
+
+    -spice disable-ticketing=on,port=5930,addr=
+
+- [ ] **Video plays as well as it did before M4.** Play a full-screen YouTube HD video in the guest
+      through SpiceSee. Bar: **indistinguishable from the pre-M4 draw path — zero lag, zero
+      choppiness, no tearing at the stream's edges**, and a window resize mid-video stays clean.
+      This is the performance gate the whole stream path is judged on.
+- [ ] **The draw path did not regress.** Restore the original command line (streaming off) and play
+      the same video. It should look exactly as it did before M4 — this is what proves the tier-2/3
+      routing changes left tier-1 traffic alone.
+- [ ] **No corruption anywhere, by eye.** Right-click menus, window drags, text selection across the
+      desktop. Tiers 2-3 have no real-traffic coverage at all, so this check is the only thing
+      standing between them and a corruption bug.
+- [ ] **`STREAM_REPORT` actually goes out.** With streaming on, watch
+      `log stream --predicate 'subsystem == "com.spicesee"' --level info` and confirm reports are
+      sent and no canvas `unsupported` lines appear.
+
+If a fixture can be recorded while streaming is on, promote the display capture to
+`Tests/SpiceKitTests/Fixtures/win-video.s2c.bin` and add the replay test the M4 plan's Task 14
+describes — that would give the stream wire layouts their first confirmation against real bytes.
+The layouts are currently transcribed from `spice.proto` and verified field-by-field against it,
+but no real server has ever sent them to this client.
+
 ## Known issues (not fixed, out of M3's scope)
 
 - **The app cannot be quit while a connection-failure sheet is up.**
