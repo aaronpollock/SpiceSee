@@ -171,7 +171,19 @@ public actor Canvas {
                 let origin = SpicePoint(x: originBase.x + (rect.left - t.base.box.left), y: originBase.y + (rect.top - t.base.box.top))
                 Tier2.drawTransparent(dst: s, rect: rect, src: src, srcOrigin: origin, key: t.trueColor & 0xFFFFFF)
             }
-        case .stroke: throw CanvasError.unsupported("stroke (task 6)")
+        case let .stroke(st):
+            // QXL strokes solid: `backMode` (the mode for the would-be gap colour) and the styled
+            // dash array parsed by `SpiceLineAttr` are both read off the wire and discarded here.
+            // If a desktop replay ever shows a dashed-line artifact, this is the first place to look.
+            let source: PixelSource
+            switch st.brush {
+            case .none: return
+            case let .solid(color): source = .solid(color)
+            case let .pattern(image, pos): source = .pattern(try resolve(image), seed: pos)
+            }
+            try forEachClipRect(st.base) { s, r in
+                Tier2.draw(s, rect: r, source: source, rop: st.foreMode, mask: Tier3.strokeMask(st.path, in: r))
+            }
         case .text: throw CanvasError.unsupported("text (task 7)")
         case let .unsupported(type, _):
             throw CanvasError.unsupported("display message \(type)")
