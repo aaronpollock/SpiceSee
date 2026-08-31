@@ -100,6 +100,7 @@ gitignored and only these three files are kept.
 | `win-inputs.c2s.bin` | conn-8 c2s, 348 B | `KEY_MODIFIERS`, `PONG`×2, `MOUSE_POSITION`×2, `MOUSE_PRESS`/`MOUSE_RELEASE` (left×2, right, wheel-up), `KEY_SCANCODE`×3 |
 | `win-inputs.s2c.bin` | conn-8 s2c, 266 B | `INPUTS_INIT`, `PING`×2, `KEY_MODIFIERS`×2 |
 | `win-cursor.s2c.bin` | conn-9 s2c, 269 B | `SET_ACK`, `CURSOR_INIT` (flags NONE — VGA guest, no cursor commands), `PING`×2 |
+| `win-desktop.s2c.bin` | 2026-08-30, conn-7 s2c, 7.8 MB | the *installed* Win11 desktop driven through a right-click menu, the start menu and a window drag: `DRAW_COPY`×126 on two surfaces, `MONITORS_CONFIG`×2, `MARK`×2, `SURFACE_DESTROY`, `INVAL_ALL_PALETTES`. Renders clean; **zero** unsupported commands, and zero tier-2/3 commands — see "Where tier-2/3 draw commands actually come from" |
 
 Two things task 15 needs from this:
 
@@ -121,8 +122,10 @@ USB tablet) for this recording, so `remote-viewer` never grabs the pointer and s
 ```sh
 # here
 swift run spicerec 5901 192.168.50.6 5930 recordings/win-input
-# on the Ubuntu box — MACIP is this Mac's address as seen from the box (a VPN address, not
-# ipconfig getifaddr en0's LAN address, when the box reaches the Mac over VPN): 192.168.4.3
+# on the Ubuntu box — MACIP is this Mac's address as seen from the box. On the LAN that is
+# 192.168.50.38 (ipconfig getifaddr en0). The 192.168.4.3 this file used to give is a VPN
+# address; on 2026-08-30 it was stale and the box could not ping it, so a recording made
+# against it captured zero bytes. Check which path the box reaches the Mac on before recording.
 ssh aaron@192.168.50.6 'cat > /tmp/drive.sh' <<'EOF'
 #!/bin/sh
 remote-viewer spice://MACIP:5901 &
@@ -157,6 +160,50 @@ raw press-then-release scancode bytes back to back (`e0 53 e0 d3` for Delete, E0
 — the same byte order `XTScancode.wireCode`/`rawBytes` already use). `InputsChannel` now mirrors
 this: it picks 104 vs. 101/102 once, from the server's link-reply caps, and falls back to 101/102
 when the server doesn't advertise the capability.
+
+## Where tier-2/3 draw commands actually come from
+
+Recorded 2026-08-30, while scoping M4 (canvas tiers 2-3). **Neither guest on this box emits a
+single tier-2 or tier-3 draw command.** Message histograms of whole captures, taken by replaying
+each recording through `DisplayChannel` and tallying `DisplayMessage` cases:
+
+| Capture | Guest / driver | Histogram |
+|---|---|---|
+| `win-display.s2c.bin` | Win11 installer, QXL WDDM | `copy=1` |
+| `win-glz-bottomup.s2c.bin` | Win11, QXL WDDM | `copy=10` |
+| `win-desktop.s2c.bin` | Win11 desktop, QXL WDDM | `copy=126`, `surfaceCreate=2`, `mark=2`, `monitorsConfig=2`, `surfaceDestroy=1`, `invalAllPalettes=1` |
+| Linux Mint 22 Cinnamon, port 5931 | X11 + **modesetting** | `copy=6377`, `surfaceCreate=1`, `mark=1`, `monitorsConfig=1`, `invalAllPalettes=1` |
+
+No `FILL`, `OPAQUE`, `BLEND`, `ROP3`, `TRANSPARENT`, `STROKE` or `TEXT` in any of them, and the
+`win-desktop` capture was driven hard on purpose (right-click menu, start menu, an eight-step
+window drag). The emptiness is structural, not a weak drive script:
+
+- **Windows 11's QXL driver is WDDM.** It composites inside the guest and hands QXL finished
+  dirty-rect bitmaps. The classic QXL 2D command set is implemented by the *XDDM* driver
+  (Windows 7 and earlier), which maps the Windows DDI — `BitBlt` ROP3, `LineTo`, `TextOut` —
+  onto `ROP3`/`STROKE`/`TEXT`.
+- **The Mint guest is X11** (`XDG_SESSION_TYPE=x11`, confirmed in-guest) **but X loaded
+  `modesetting`, not `qxl`.** `/var/log/Xorg.0.log` probes only `modesetting`, `FBDEV` and
+  `VESA`, even though `xserver-xorg-video-qxl` is installed. Under modesetting, X renders in
+  software into a dumb KMS buffer and the qxl *kernel* driver pushes damage as `DRAW_COPY`.
+  Only the userspace `xf86-video-qxl` EXA driver emits `FILL`/`OPAQUE`/`BLEND`.
+
+So a fixture that exercises tiers 2-3 needs one of: an X session forced onto `Driver "qxl"` via
+`/etc/X11/xorg.conf.d` (needs root in the guest, and a non-compositing WM — Cinnamon's compositor
+would blit whole frames anyway), or a Windows 7-era XDDM guest, or a synthetic capture. Until one
+exists, **tier-2/3 code is covered by unit tests only**, and a "zero unsupported events on a real
+desktop recording" gate proves nothing — it is already green with no tier-2/3 code at all.
+
+### The Linux Mint guest (port 5931)
+
+A second guest on the same box for exactly this comparison: Linux Mint, Cinnamon, X11, SPICE on
+**5931** (the Windows guest keeps 5930). No `spice-vdagent` installed, so it is in **server mouse
+mode** — `remote-viewer` grabs the pointer, and scripted input is far more reliable through the
+keyboard (`xdotool key super`, `ctrl+alt+t`, `alt+F7` to move a window) than through the mouse.
+
+```sh
+swift run spicesee-cli dump 192.168.50.6 5931 6 /tmp/mint.png   # 1280x800
+```
 
 ## Why this guest is a good fixture
 
