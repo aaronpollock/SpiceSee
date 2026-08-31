@@ -43,6 +43,13 @@ swift Tools/make-icons.swift
 
 Swift 6 language mode with strict concurrency, macOS 14 deployment target, arm64 only. No locks, no `@unchecked Sendable`.
 
+**Clean up app builds when a piece of work ends.** Every checkout (worktrees included) gets its own
+`~/Library/Developer/Xcode/DerivedData/SpiceSee-*`, so `SpiceSee.app` copies accumulate and Spotlight
+becomes a lottery for which one is current. When a worktree or milestone is done: delete its
+DerivedData directory (`defaults read <dir>/info WorkspacePath` says which checkout owns it), and if
+`~/Applications/SpiceSee.app` exists, refresh it from the main checkout's Release build so the
+launchable copy is never stale. The main checkout's DerivedData is the only one that should survive.
+
 ## Running against a real SPICE server
 
 The dev server is a quickemu Windows guest on the LAN, not a local process — endpoint, ticket state
