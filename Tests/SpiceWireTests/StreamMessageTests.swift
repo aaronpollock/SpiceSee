@@ -4,14 +4,16 @@ import Testing
 @Test func streamCreateParses() throws {
     var w = SpiceWriter()
     w.u32(0); w.u32(3); w.u8(StreamFlags.topDown); w.u8(VideoCodecType.mjpeg.rawValue); w.u64(0)
-    w.u32(640); w.u32(480); w.u32(640); w.u32(480)
+    // stream_* and src_* deliberately differ: with all four equal, a transposition of the two
+    // pairs would parse "correctly" and the test would pass anyway.
+    w.u32(640); w.u32(480); w.u32(320); w.u32(240)   // stream_width/height, src_width/height
     w.i32(10); w.i32(20); w.i32(490); w.i32(660)     // dest
     w.u8(0)                                           // clip none
     let m = try DisplayMessage(type: DisplayServerMsg.streamCreate.rawValue, payload: w.bytes)
     guard case let .streamCreate(s) = m else { Issue.record("case"); return }
     #expect(s.id == 3 && s.codec == .mjpeg && s.dest.width == 640)
     #expect(s.surfaceID == 0 && s.flags == StreamFlags.topDown)
-    #expect(s.streamWidth == 640 && s.streamHeight == 480 && s.srcWidth == 640 && s.srcHeight == 480)
+    #expect(s.streamWidth == 640 && s.streamHeight == 480 && s.srcWidth == 320 && s.srcHeight == 240)
     #expect(s.dest == SpiceRect(top: 10, left: 20, bottom: 490, right: 660))
     #expect(s.clip == .none)
 }
