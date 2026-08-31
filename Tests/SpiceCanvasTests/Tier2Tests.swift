@@ -129,3 +129,38 @@ private func transparentDraw(_ box: SpiceRect, pixels: [UInt8], w pw: UInt32, h 
     #expect(s.pixel(x: 0, y: 0) & 0xFFFFFF == 0x112233)       // keyed pixel untouched
     #expect(s.pixel(x: 1, y: 0) & 0xFFFFFF == 0xFF0000)       // red copied
 }
+
+private func rop3Draw(_ box: SpiceRect, pixels: [UInt8], w pw: UInt32, h ph: UInt32,
+                      brush: UInt32, code: UInt8) -> DisplayMessage {
+    var w = SpiceWriter(); drawBase(&w, box)
+    let ptr = w.bytes.count; w.u32(0)
+    w.i32(0); w.i32(0); w.i32(Int32(ph)); w.i32(Int32(pw))   // src_area
+    w.u8(1); w.u32(brush)                                    // brush: solid
+    w.u8(code); w.u8(0)                                      // rop3, scale_mode
+    noMask(&w)
+    w.patchU32(at: ptr, UInt32(w.bytes.count))
+    w.u64(7); w.u8(ImageType.bitmap.rawValue); w.u8(0); w.u32(pw); w.u32(ph)
+    w.u8(BitmapFormat.bit32.rawValue); w.u8(BitmapFlags.topDown); w.u32(pw); w.u32(ph); w.u32(pw * 4); w.u32(0)
+    w.bytes(pixels)
+    return try! DisplayMessage(type: DisplayServerMsg.drawRop3.rawValue, payload: w.bytes)
+}
+
+/// End-to-end ROP3 through the wire: `rop3KnownCodes` only covers the bit kernel, so nothing pinned
+/// which operand the *draw* passes as p, s and d. Each code below isolates one input, and all three
+/// values are distinct, so swapping any two roles fails at least one expectation.
+@Test func rop3CombinesBrushSourceAndDestByRole() async throws {
+    let src: [UInt8] = [0x44, 0x55, 0x66, 0xFF]              // BGRA -> 0x665544
+    func run(_ code: UInt8) async throws -> UInt32 {
+        let c = Canvas()
+        await c.apply(create(1, 1))
+        await c.apply(fill(SpiceRect(top: 0, left: 0, bottom: 1, right: 1), color: 0x112233))
+        await c.apply(rop3Draw(SpiceRect(top: 0, left: 0, bottom: 1, right: 1),
+                               pixels: src, w: 1, h: 1, brush: 0x998877, code: code))
+        let s = try #require(await c.snapshot(surfaceID: 0))
+        return s.pixel(x: 0, y: 0) & 0xFFFFFF
+    }
+    let patcopy = try await run(0xF0);   #expect(patcopy == 0x998877)   // brush only
+    let srccopy = try await run(0xCC);   #expect(srccopy == 0x665544)   // source only
+    let dstinv  = try await run(0x55);   #expect(dstinv  == 0xEEDDCC)   // ~dest
+    let srcinv  = try await run(0x66);   #expect(srcinv  == 0x777777)   // source ^ dest
+}
