@@ -1,6 +1,7 @@
 import os
 import SpiceCanvas
 import SpiceCore
+import SpiceMedia
 import SpiceWire
 
 public struct ConnectionConfig: Sendable {
@@ -65,6 +66,9 @@ public enum SessionEvent: Sendable {
     case channelFailed(ChannelDescriptor, SpiceError)
     case disconnected(SpiceError?)
     case migrated(MigrationTarget)
+    case streamFrame(StreamFrame, displayID: UInt8)
+    case streamDestroyed(id: UInt32, displayID: UInt8)
+    case allStreamsDestroyed(displayID: UInt8)
 }
 
 public actor SpiceSession {
@@ -80,6 +84,7 @@ public actor SpiceSession {
     private let canvas = Canvas()
     private var displays: [DisplayChannel] = []
     private var cursors: [CursorChannel] = []
+    private var players: [StreamPlayer] = []
     private var inputs: InputsChannel?
     private var agent: AgentSession?
     private var tasks: [Task<Void, Never>] = []
@@ -136,8 +141,37 @@ public actor SpiceSession {
                 case .display:
                     let d = try await DisplayChannel.open(transport: try await transports(desc), connectionID: info.connectionID, id: desc.id, password: password)
                     displays.append(d)
+                    let player = StreamPlayer()
+                    await player.setMMTime(info.mainInit.multiMediaTime)
+                    players.append(player)
+                    let playerPump = Task { [cont, weak self] in
+                        for await e in player.events {
+                            switch e {
+                            case let .frame(f): cont.yield(.streamFrame(f, displayID: desc.id))
+                            case let .destroyed(id): cont.yield(.streamDestroyed(id: id, displayID: desc.id))
+                            case .allDestroyed: cont.yield(.allStreamsDestroyed(displayID: desc.id))
+                            case let .report(r): await self?.sendStreamReport(r, on: d)
+                            }
+                        }
+                    }
+                    tasks.append(playerPump)
                     let pump = Task { [canvas, weak self] in
-                        for await m in d.messages { await canvas.apply(m) }
+                        for await m in d.messages {
+                            switch m {
+                            case let .streamCreate(c): await player.handle(create: c)
+                            case let .streamData(data): await player.handle(data: data)
+                            case let .streamClip(id, clip): await player.handle(clipChange: id, clip: clip)
+                            case let .streamDestroy(id): await player.handle(destroy: id)
+                            case .streamDestroyAll: await player.handleDestroyAll()
+                            case let .streamActivateReport(a): await player.handle(activateReport: a)
+                            default: await canvas.apply(m)
+                            }
+                        }
+                        // `.disconnected` must come after every stream frame too: finish the
+                        // player so its events stream ends, then await the pump that forwards
+                        // them, before ending the channel — same ordering the canvas pump relies on.
+                        await player.finish()
+                        _ = await playerPump.value
                         await self?.channelEnded(desc)
                     }
                     displayPumps.append(pump); tasks.append(pump)
@@ -212,6 +246,13 @@ public actor SpiceSession {
         await closeChannels()
     }
 
+    /// A lost report only degrades the server's bitrate adaptation for this stream — never worth
+    /// ending the session over.
+    private func sendStreamReport(_ r: StreamReport, on d: DisplayChannel) async {
+        do { try await d.send(streamReport: r) }
+        catch { log.error("stream report send failed: \(String(describing: error))") }
+    }
+
     private func closeChannels() async {
         guard !closing else { return }
         closing = true
@@ -241,6 +282,7 @@ public actor SpiceSession {
             cont.yield(.clipboard(.available(false)))
         case let .agentData(payload): await agent?.receive(payload)
         case let .agentToken(n): await agent?.credit(n)
+        case let .multiMediaTime(t): for p in players { await p.setMMTime(t.time) }
         case let .migrateSwitchHost(target): cont.yield(.migrated(target))
         // A begin without a switch means the server is preparing a migration it may still cancel;
         // the design's prompt belongs on the switch, so log and wait.

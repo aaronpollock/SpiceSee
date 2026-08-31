@@ -3,6 +3,7 @@ import os
 import SpiceCanvas
 import SpiceCore
 import SpiceKit
+import SpiceMedia
 import SpiceWire
 
 /// The real engine behind `SessionBackend`, replacing `MockSessionBackend` outside `--mock`.
@@ -122,6 +123,12 @@ final class SpiceKitBackend: SessionBackend {
                         continuation.yield(.agent(connected ? .connected : .absent))
                     case let .clipboard(event):
                         if let mapped = Self.translate(event) { continuation.yield(.clipboard(mapped)) }
+                    case let .streamFrame(f, displayID: id):
+                        continuation.yield(.streamFrame(Self.translate(f, viewportID: Int(id))))
+                    case let .streamDestroyed(id: sid, displayID: id):
+                        continuation.yield(.streamDestroyed(viewportID: Int(id), streamID: sid))
+                    case let .allStreamsDestroyed(displayID: id):
+                        continuation.yield(.streamDestroyed(viewportID: Int(id), streamID: nil))
                     case let .migrated(t):
                         // The adapter only knows the host it dialled; SessionModel substitutes the
                         // connection's display name, which is what the sheet actually quotes.
@@ -197,6 +204,20 @@ final class SpiceKitBackend: SessionBackend {
         case let .buttonUp(b): return [.buttonUp(button(b))]
         case let .wheel(clicks): return clicks == 0 ? [] : [.wheel(clicks: clicks)]
         }
+    }
+
+    static func translate(_ f: SpiceMedia.StreamFrame, viewportID: Int) -> StreamFrameUpdate {
+        let clip: [GuestRect]?
+        switch f.clip {
+        case .none: clip = nil
+        case let .rects(rects): clip = rects.map(Self.guestRect)
+        }
+        return StreamFrameUpdate(viewportID: viewportID, streamID: f.streamID, dest: Self.guestRect(f.dest),
+                                 clip: clip, width: f.width, height: f.height, pixels: f.pixels)
+    }
+
+    private static func guestRect(_ r: SpiceRect) -> GuestRect {
+        GuestRect(x: Int(r.left), y: Int(r.top), width: Int(r.width), height: Int(r.height))
     }
 
     private static func target(_ m: GuestModifier) -> ModifierTarget { switch m { case .super: .super; case .ctrl: .ctrl; case .alt: .alt } }

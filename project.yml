@@ -48,7 +48,7 @@ targets:
       base:
         SWIFT_VERSION: "6.0"
         SWIFT_STRICT_CONCURRENCY: complete
-        ARCHS: "arm64 x86_64"
+        ARCHS: arm64
         ONLY_ACTIVE_ARCH: "NO"
         ENABLE_HARDENED_RUNTIME: "YES"
         CODE_SIGN_STYLE: Automatic
@@ -69,6 +69,12 @@ targets:
     dependencies:
       - package: SpiceSee
         product: SpiceKit
+    # An explicit scheme so coverage stays off: Xcode's implicit test scheme instruments the
+    # CSpiceCodec package with -profile-generate but links the dynamic framework without the
+    # profile runtime, and the link fails on ___llvm_profile_runtime.
+    scheme:
+      testTargets: [SpiceSeeTests]
+      gatherCoverageData: false
     settings:
       base:
         SWIFT_VERSION: "6.0"

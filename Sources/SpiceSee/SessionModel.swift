@@ -111,6 +111,10 @@ final class SessionModel {
             publish(.frame(update), to: update.viewportID)
         case let .cursor(viewportID, change):
             publish(.cursor(change), to: viewportID)
+        case let .streamFrame(update):
+            publish(.stream(update), to: update.viewportID)
+        case let .streamDestroyed(viewportID, streamID):
+            publish(.streamDestroyed(streamID), to: viewportID)
         case var .migrated(offer):
             // The backend knows only the host it dialled; the sheet quotes the VM by the name the
             // user gave the connection.
@@ -120,8 +124,10 @@ final class SessionModel {
             phaseBeforeFileFailure = nil   // a real failure ends the session: dismissing must reach .idle
             phase = .failed(failure)
             clipboard.stop()
+            for v in viewports { publish(.streamDestroyed(nil), to: v.id) }
         case .disconnected:
             phase = .idle
+            for v in viewports { publish(.streamDestroyed(nil), to: v.id) }
             viewports = []
             pointerCaptured = false
             clipboard.stop()
