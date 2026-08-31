@@ -106,13 +106,13 @@ public struct VideoDecoder: ~Copyable {
     // MARK: - H.264
 
     private mutating func decodeH264(_ data: [UInt8]) throws -> VideoFrame {
-        var vclNAL: [UInt8]?
+        var vclNALs: [[UInt8]] = []
         for nal in Self.splitAnnexBNALs(data) {
             guard let first = nal.first else { continue }
             switch first & 0x1F {
             case 7: sps = nal
             case 8: pps = nal
-            case 1, 5: vclNAL = nal   // keep the last VCL NAL in this delivery
+            case 1, 5: vclNALs.append(nal)   // a frame can be split across multiple slices
             default: break
             }
         }
@@ -125,8 +125,12 @@ public struct VideoDecoder: ~Copyable {
         }
         // No session yet means no SPS/PPS+IDR has ever landed — tolerate loss by dropping, not crashing.
         guard session != nil, let formatDescription else { throw VideoDecodeError.noKeyframe }
-        guard let vclNAL else { throw VideoDecodeError.noKeyframe }   // parameter-sets-only delivery
-        let sampleBuffer = try Self.makeSampleBuffer(Self.avccPacket(from: vclNAL), formatDescription: formatDescription)
+        guard !vclNALs.isEmpty else { throw VideoDecodeError.noKeyframe }   // parameter-sets-only delivery
+        // AVCC packs every slice of the frame into one sample, each with its own length prefix —
+        // dropping all but the last slice (as an earlier version of this did) silently corrupts
+        // any frame an encoder splits into multiple slices.
+        let avcc = vclNALs.reduce(into: [UInt8]()) { $0.append(contentsOf: Self.avccPacket(from: $1)) }
+        let sampleBuffer = try Self.makeSampleBuffer(avcc, formatDescription: formatDescription)
         return try decodeSampleBuffer(sampleBuffer)
     }
 
@@ -219,8 +223,18 @@ public struct VideoDecoder: ~Copyable {
         return sampleBuffer
     }
 
-    /// Empty decode flags make this call synchronous — the output handler runs before this returns,
-    /// which is what makes writing into a local `var` race-free without any locking.
+    /// Empty decode flags make this call synchronous — the output handler runs and returns before
+    /// `VTDecompressionSessionDecodeFrame` itself returns, so the write into `outcome` below can
+    /// never race a read of it. `VTDecompressionOutputHandler` is declared `@Sendable`, though, so
+    /// the compiler can't see that guarantee and flags the capture anyway
+    /// (`#SendableClosureCaptures`) — that warning is expected here and does not indicate a real
+    /// race. It is left as a warning deliberately: routing the write through a pointer instead does
+    /// not actually avoid it, since neither `UnsafeMutablePointer<T>` (its `Sendable` conformance is
+    /// unconditionally unavailable in the standard library) nor `UnsafeMutableRawPointer` (does not
+    /// conform to `Sendable` at all) can carry the capture without the same diagnostic reappearing
+    /// one level down — confirmed by trying both. The remaining alternatives (a lock, `@unchecked
+    /// Sendable`, `nonisolated(unsafe)`) are exactly what this module must not use. Do not "fix"
+    /// this warning with one of those; the fix would introduce more risk than the warning itself.
     private mutating func decodeSampleBuffer(_ sampleBuffer: CMSampleBuffer) throws -> VideoFrame {
         guard let session else { throw VideoDecodeError.format("no active decompression session") }
         let outWidth = width, outHeight = height

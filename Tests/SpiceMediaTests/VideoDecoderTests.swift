@@ -35,10 +35,18 @@ private func jpegFrame(width: Int, height: Int, top: (r: UInt8, g: UInt8, b: UIn
 /// `VideoDecoder`. This is the inverse of the decoder's AVCC/Annex-B conversion, which is exactly
 /// why the round-trip test built from it is self-consistent rather than a real-server proof.
 private enum H264TestEncoder {
-    static func encodeGradient(width: Int, height: Int, frames: Int) throws -> [[UInt8]] {
+    /// `maxSliceBytes`, when given, asks the encoder to split each frame into multiple slices.
+    /// The hardware encoder on this machine reports that property unsupported (`kVTPropertyNotSupportedErr`)
+    /// but still honors it once hardware acceleration is disabled, producing genuine multi-slice
+    /// IDR output — real encoder output, not a hand-built bitstream.
+    static func encodeGradient(width: Int, height: Int, frames: Int, maxSliceBytes: Int? = nil) throws -> [[UInt8]] {
         var session: VTCompressionSession?
+        let spec: CFDictionary? = maxSliceBytes == nil ? nil : [
+            kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder: false,
+            kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder: false,
+        ] as CFDictionary
         let status = VTCompressionSessionCreate(allocator: nil, width: Int32(width), height: Int32(height),
-                                                 codecType: kCMVideoCodecType_H264, encoderSpecification: nil,
+                                                 codecType: kCMVideoCodecType_H264, encoderSpecification: spec,
                                                  imageBufferAttributes: nil, compressedDataAllocator: nil,
                                                  outputCallback: nil, refcon: nil, compressionSessionOut: &session)
         guard status == noErr, let session else { throw VideoDecodeError.decode(status) }
@@ -47,6 +55,9 @@ private enum H264TestEncoder {
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_RealTime, value: kCFBooleanTrue)
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_MaxKeyFrameInterval, value: 1 as CFNumber)
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_ProfileLevel, value: kVTProfileLevel_H264_Baseline_AutoLevel)
+        if let maxSliceBytes {
+            VTSessionSetProperty(session, key: kVTCompressionPropertyKey_MaxH264SliceBytes, value: maxSliceBytes as CFNumber)
+        }
 
         var annexB: [[UInt8]] = []
         for f in 0 ..< frames {
@@ -123,6 +134,37 @@ private enum H264TestEncoder {
     }
 }
 
+/// Splits Annex-B on start codes, returning each NAL's payload (start code stripped) — a
+/// test-local mirror of `VideoDecoder`'s own splitter, used to inspect encoder output and to
+/// build hand-picked deliveries from it.
+private func annexBNALPayloads(_ data: [UInt8]) -> [[UInt8]] {
+    var starts: [Int] = []
+    var i = 0
+    while i + 2 < data.count {
+        if data[i] == 0, data[i + 1] == 0, data[i + 2] == 1 { starts.append(i); i += 3 } else { i += 1 }
+    }
+    var nals: [[UInt8]] = []
+    for (idx, start) in starts.enumerated() {
+        let payloadStart = start + 3
+        let end = idx + 1 < starts.count ? starts[idx + 1] : data.count
+        guard payloadStart < end else { continue }
+        nals.append(Array(data[payloadStart ..< end]))
+    }
+    return nals
+}
+
+/// Keeps only the SPS/PPS NALs from an Annex-B delivery, re-emitting them with 4-byte start codes.
+/// `H264TestEncoder` always resends SPS/PPS ahead of every slice, so a genuine
+/// parameter-sets-only delivery never occurs on its own — this builds one directly from a real
+/// encoded delivery's parameter sets.
+private func parameterSetsOnly(_ annexB: [UInt8]) -> [UInt8] {
+    annexBNALPayloads(annexB).reduce(into: [UInt8]()) { out, nal in
+        guard let first = nal.first, first & 0x1F == 7 || first & 0x1F == 8 else { return }
+        out.append(contentsOf: [0, 0, 0, 1])
+        out.append(contentsOf: nal)
+    }
+}
+
 @Test func mjpegDecodesToBGRA() throws {
     var d = VideoDecoder(codec: .mjpeg)
     let top = (r: UInt8(255), g: UInt8(0), b: UInt8(0))
@@ -173,4 +215,50 @@ private enum H264TestEncoder {
 @Test func h264TruncatedStartCodeDoesNotTrap() {
     var h = VideoDecoder(codec: .h264)
     #expect(throws: (any Error).self) { _ = try h.decode([0, 0, 1]) }   // start code with no NAL bytes after it
+}
+
+@Test func h264MultiSliceFrameDecodesFully() throws {
+    // Forces the software H.264 encoder to split the frame into multiple slices — real encoder
+    // output, not a hand-built bitstream.
+    let annexB = try H264TestEncoder.encodeGradient(width: 64, height: 48, frames: 1, maxSliceBytes: 64)
+    let nals = annexBNALPayloads(annexB[0])
+    let vclNALs = nals.filter { nal in guard let f = nal.first else { return false }; return f & 0x1F == 1 || f & 0x1F == 5 }
+    #expect(vclNALs.count >= 2)   // sanity: the encoder really did split this frame into multiple slices
+
+    var full = VideoDecoder(codec: .h264)
+    let frameFull = try full.decode(annexB[0])
+    #expect(frameFull.width == 64 && frameFull.height == 48)
+    #expect(frameFull.pixels.count == 64 * 48 * 4)
+
+    // Regression check for a version of `decodeH264` that kept only the last VCL NAL of a delivery
+    // ("keep the last VCL NAL in this delivery"), silently dropping every earlier slice. Dimensions
+    // alone don't catch that: VT's decoder tolerates a delivery missing its earlier slice(s) and
+    // still produces a correctly-sized (but content-corrupt) image — confirmed by re-running this
+    // exact scenario with that old line restored, which passed a dimensions-only version of this
+    // test. So build the delivery the buggy code would actually have handed to VT (SPS + PPS + only
+    // the last slice) and require the real decode to differ from it — that fails under the bug,
+    // because the buggy code's real output IS this last-slice-only decode, making them identical.
+    let paramSets = nals.filter { nal in guard let f = nal.first else { return false }; return f & 0x1F == 7 || f & 0x1F == 8 }
+    var lastSliceOnlyDelivery: [UInt8] = []
+    for nal in paramSets { lastSliceOnlyDelivery.append(contentsOf: [0, 0, 0, 1]); lastSliceOnlyDelivery.append(contentsOf: nal) }
+    if let lastSlice = vclNALs.last { lastSliceOnlyDelivery.append(contentsOf: [0, 0, 0, 1]); lastSliceOnlyDelivery.append(contentsOf: lastSlice) }
+
+    var lastOnly = VideoDecoder(codec: .h264)
+    let framePartial = try lastOnly.decode(lastSliceOnlyDelivery)
+    #expect(frameFull.pixels != framePartial.pixels)
+}
+
+@Test func h264ParameterSetsOnlyDeliveryThrowsNoKeyframe() throws {
+    let annexB = try H264TestEncoder.encodeGradient(width: 64, height: 48, frames: 1)
+    let paramsOnly = parameterSetsOnly(annexB[0])
+    #expect(!paramsOnly.isEmpty)   // sanity: the delivery actually carries SPS/PPS to feed the decoder
+    var d = VideoDecoder(codec: .h264)
+    do {
+        _ = try d.decode(paramsOnly)
+        Issue.record("expected VideoDecodeError.noKeyframe, decode succeeded instead")
+    } catch VideoDecodeError.noKeyframe {
+        // expected: a session was never established, since no VCL NAL has ever arrived
+    } catch {
+        Issue.record("expected VideoDecodeError.noKeyframe, got \(error)")
+    }
 }
