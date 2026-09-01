@@ -171,6 +171,11 @@ public actor SpiceSession {
                             case .streamDestroyAll: await player.handleDestroyAll()
                             case let .streamActivateReport(a): await player.handle(activateReport: a)
                             case let .monitorsConfig(cfg):
+                                // Yielded straight onto `cont`, while this channel's canvas events
+                                // take a second hop through the independent `canvasPump` task — so
+                                // this can land on `session.events` ahead of a `.canvas` event that
+                                // preceded it on the wire (e.g. the SURFACE_CREATE it's meant to
+                                // follow). Consumers must tolerate either order, not assume it.
                                 cont.yield(.monitorsConfig(HeadRect.heads(from: cfg), displayID: desc.id))
                             default: await canvas.apply(m)
                             }
