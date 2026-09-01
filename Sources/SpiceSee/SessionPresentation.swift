@@ -61,7 +61,9 @@ private struct ConnectFailurePresenter: ViewModifier {
 /// running, so both the Window menu and the manager's Show Displays button land here.
 @MainActor
 func showAllDisplays(_ session: SessionModel, using openWindow: OpenWindowAction) {
-    for viewport in session.viewports { openWindow(id: "session", value: viewport.id) }
+    // `knownViewports`, so a head the guest dropped when its window closed can be brought back:
+    // its window reporting a size is what asks the guest to re-enable it.
+    for viewport in session.knownViewports { openWindow(id: "session", value: viewport.id) }
 }
 
 private struct SessionWindowOpener: ViewModifier {
@@ -77,6 +79,12 @@ private struct SessionWindowOpener: ViewModifier {
             guard !viewports.isEmpty else {
                 for viewport in previous { dismissWindow(id: "session", value: viewport.id) }
                 return
+            }
+            // A head the guest dropped leaves a window with nothing to render in it, still
+            // subscribed — close it too, not just the whole set when the session ends.
+            let live = Set(viewports.map(\.id))
+            for viewport in previous where !live.contains(viewport.id) {
+                dismissWindow(id: "session", value: viewport.id)
             }
             let toOpen = settings.openWindowPerMonitor ? viewports : Array(viewports.prefix(1))
             for viewport in toOpen { openWindow(id: "session", value: viewport.id) }

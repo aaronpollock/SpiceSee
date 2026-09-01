@@ -13,6 +13,10 @@ final class SessionModel {
 
     private(set) var phase: Phase = .idle
     private(set) var viewports: [ViewportInfo] = []
+    /// Every viewport seen since connect, including heads the guest has since dropped. A head whose
+    /// window is closed is asked to be disabled, so the guest stops reporting it — without this it
+    /// could never be offered back, and Show All Displays is the only way to re-enable one.
+    private(set) var knownViewports: [ViewportInfo] = []
     private(set) var agent: AgentState = .negotiating
     private(set) var endpoint: String = ""
     var migrationOffer: MigrationOffer?
@@ -91,6 +95,11 @@ final class SessionModel {
         self.connection = connection
         endpoint = connection.endpoint
         scaling = .fit
+        // `hiDPI` is assigned before `phase` leaves `.connected`, so a reconnect over a live session
+        // would otherwise arm a debounce from the old session's windows.
+        resizeTask?.cancel()
+        windowMetrics.removeAll()
+        knownViewports = []
         hiDPI = connection.advanced.hiDPI
         releaseChord = connection.advanced.releaseChord
         keyboardMapping = KeyboardMapping(commandMapsTo: connection.advanced.commandMapsTo,
@@ -119,10 +128,12 @@ final class SessionModel {
         case let .connected(viewports):
             graceTask?.cancel()
             self.viewports = viewports
+            mergeKnown(viewports)
             phase = .connected
             clipboard.start()
         case let .viewportsChanged(viewports):
             self.viewports = viewports
+            mergeKnown(viewports)
         case let .clipboard(event):
             clipboard.handle(event)
         case let .agent(state):
@@ -151,6 +162,7 @@ final class SessionModel {
             for v in viewports { publish(.streamDestroyed(nil), to: v.id) }
             resizeTask?.cancel()
             windowMetrics.removeAll()
+            knownViewports = []
         case .disconnected:
             graceTask?.cancel()
             phase = .idle
@@ -160,7 +172,17 @@ final class SessionModel {
             clipboard.stop()
             resizeTask?.cancel()
             windowMetrics.removeAll()
+            knownViewports = []
         }
+    }
+
+    /// Latest size wins for a head still present; a head that vanished keeps its last known entry.
+    private func mergeKnown(_ viewports: [ViewportInfo]) {
+        var merged = knownViewports
+        for v in viewports {
+            if let i = merged.firstIndex(where: { $0.id == v.id }) { merged[i] = v } else { merged.append(v) }
+        }
+        knownViewports = merged
     }
 
     func retry(password: String?) {
@@ -174,6 +196,7 @@ final class SessionModel {
         phase = .idle
         resizeTask?.cancel()
         windowMetrics.removeAll()
+        knownViewports = []
         Task { [backend] in await backend.disconnect() }
     }
 
@@ -195,13 +218,18 @@ final class SessionModel {
         phase = .idle
         resizeTask?.cancel()
         windowMetrics.removeAll()
+        knownViewports = []
         Task { [backend] in await backend.disconnect() }
     }
 
     func viewportSizeChanged(_ viewportID: Int, points: CGSize, backingScale: CGFloat) {
         let first = windowMetrics[viewportID] == nil
         windowMetrics[viewportID] = (points, backingScale)
-        guard !first else { return }
+        // A first report for a head the guest is not currently showing is a window being reopened
+        // for a head that was disabled — that report IS the request to bring it back. For a head
+        // already in the layout it is only the window opening, and stays suppressed.
+        let disabled = !viewports.contains { $0.id == viewportID }
+        guard !first || disabled else { return }
         let (w, h) = requestedPixels(points: points, backingScale: backingScale)
         if let current = viewports.first(where: { $0.id == viewportID }),
            current.width == w, current.height == h { return }
@@ -232,7 +260,9 @@ final class SessionModel {
             guard let self, !Task.isCancelled, self.phase == .connected, self.agent == .connected else { return }
             let open = Set(self.viewportSubscribers.values.map(\.viewportID))
             guard !open.isEmpty else { return }   // never disable every head from the Window menu
-            let layouts = self.viewports.map { v -> DisplayLayout in
+            // Over `knownViewports`, not `viewports`: a head the guest dropped when its window
+            // closed has to stay in the layout to be offered back as enabled when it reopens.
+            let layouts = self.knownViewports.map { v -> DisplayLayout in
                 guard open.contains(v.id) else {
                     return DisplayLayout(viewportID: v.id, width: 0, height: 0, enabled: false)
                 }
@@ -240,8 +270,8 @@ final class SessionModel {
                     ?? (v.width, v.height)
                 return DisplayLayout(viewportID: v.id, width: w, height: h, enabled: true)
             }
-            let backend = self.backend
-            Task { await backend.requestDisplayLayout(layouts) }
+            // Awaited inline, not in a nested task: two expiries must not reach the backend out of order.
+            await self.backend.requestDisplayLayout(layouts)
         }
     }
 

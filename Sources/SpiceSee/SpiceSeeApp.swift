@@ -70,7 +70,9 @@ struct SpiceSeeApp: App {
         }
 
         WindowGroup(id: "session", for: ViewportInfo.ID.self) { $viewportID in
-            if let viewport = session.viewports.first(where: { $0.id == viewportID }) {
+            // `knownViewports`: a reopened window for a disabled head has to render, because it is
+            // the window reporting its size that asks the guest to re-enable that head.
+            if let viewport = session.knownViewports.first(where: { $0.id == viewportID }) {
                 SessionWindowView(session: session, viewport: viewport)
             }
         }
