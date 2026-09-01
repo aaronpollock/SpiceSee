@@ -43,7 +43,9 @@ public struct SpiceBitmap: Sendable, Equatable {
 
 public enum ImagePayload: Sendable, Equatable {
     case bitmap(SpiceBitmap)
-    case quic([UInt8]), lzRGB([UInt8]), glzRGB([UInt8]), zlibGlzRGB([UInt8])
+    case quic([UInt8]), lzRGB([UInt8]), glzRGB([UInt8])
+    /// `glzSize` is the wire's `glz_data_size`: how many bytes the zlib payload inflates to.
+    case zlibGlzRGB(glzSize: UInt32, data: [UInt8])
     case lzPlt(flags: UInt8, palette: SpicePalette?, paletteID: UInt64?, data: [UInt8])
     case jpeg([UInt8])
     case jpegAlpha(flags: UInt8, jpegSize: UInt32, data: [UInt8])
@@ -93,7 +95,10 @@ public struct SpiceImage: Sendable, Equatable {
         case .quic: payload = .quic(try Self.sizedData(&r))
         case .lzRGB: payload = .lzRGB(try Self.sizedData(&r))
         case .glzRGB: payload = .glzRGB(try Self.sizedData(&r))
-        case .zlibGlzRGB: payload = .zlibGlzRGB(try Self.sizedData(&r))
+        case .zlibGlzRGB:
+            let glzSize = try r.u32()
+            guard glzSize <= 1 << 26 else { throw WireError.badValue(field: "glz_data_size", value: UInt64(glzSize)) }
+            payload = .zlibGlzRGB(glzSize: glzSize, data: try Self.sizedData(&r))
         case .lz4: payload = .lz4(try Self.sizedData(&r))
         case .jpeg: payload = .jpeg(try Self.sizedData(&r))
         case .jpegAlpha:

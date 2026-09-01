@@ -1,4 +1,5 @@
 import Testing
+import Compression
 import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
@@ -163,4 +164,34 @@ private enum PNGFixtures {
                         data: [UInt8](repeating: 0, count: stride * h))
     var d = ImageDecoder(); var palettes = PaletteCache()
     #expect(throws: CanvasError.self) { _ = try d.decodeBitmap(b, palettes: &palettes) }
+}
+
+// MARK: - zlib inflate sizing
+
+/// A 200 KB repaint can arrive as a few hundred zlib bytes; guessing the output buffer from the
+/// input size (the old `inflate`) under-allocates exactly there. The wire's `glz_data_size` is
+/// the true output size, so `inflate` takes it and fails closed on any mismatch.
+@Test func inflateUsesTheDeclaredUncompressedSize() throws {
+    let original = [UInt8](repeating: 0, count: 200_000)
+    let wrapped = try zlibWrap(original)
+    let out = try ImageDecoder.inflate(wrapped, uncompressedSize: 200_000)
+    #expect(out == original)
+}
+
+@Test func inflateRejectsAWrongDeclaredSize() throws {
+    let wrapped = try zlibWrap([UInt8](repeating: 7, count: 1000))
+    #expect(throws: CanvasError.self) { _ = try ImageDecoder.inflate(wrapped, uncompressedSize: 999) }
+}
+
+/// spice-server compresses with zlib's `compress2`, so the wire bytes carry the 2-byte zlib
+/// header and adler32 trailer that Compression.framework's raw-deflate encoder does not emit.
+private func zlibWrap(_ raw: [UInt8]) throws -> [UInt8] {
+    var deflated = [UInt8](repeating: 0, count: raw.count + 1024)
+    let n = raw.withUnsafeBufferPointer { src in deflated.withUnsafeMutableBufferPointer { dst in
+        compression_encode_buffer(dst.baseAddress!, dst.count, src.baseAddress!, src.count, nil, COMPRESSION_ZLIB) } }
+    guard n > 0 else { throw CanvasError.decode("test deflate") }
+    var a: UInt32 = 1, b: UInt32 = 0
+    for byte in raw { a = (a + UInt32(byte)) % 65521; b = (b + a) % 65521 }
+    let adler = b << 16 | a
+    return [0x78, 0x9C] + deflated[0 ..< n] + [UInt8(adler >> 24), UInt8(adler >> 16 & 0xFF), UInt8(adler >> 8 & 0xFF), UInt8(adler & 0xFF)]
 }

@@ -69,3 +69,35 @@ private func bitmapMessage() -> [UInt8] {
     var r = SpiceReader(w.bytes)
     #expect(throws: WireError.self) { _ = try SpiceRect(reader: &r) }
 }
+
+// MARK: - ZLIB_GLZ_RGB
+
+/// The layout every draw from a low-bandwidth-classified server uses: the descriptor is followed
+/// by TWO lengths — `glz_data_size` (the uncompressed GLZ blob) and then the zlib data's own
+/// size. Reading it like the single-length codecs slices `glz_data_size` bytes out of a message
+/// that only holds the zlib bytes — which is how every draw from a real Proxmox VM over a VPN
+/// was dropped as truncated. Shape and sizes here are from that capture (17:18:46, size 316).
+@Test func zlibGlzImageCarriesBothLengths() throws {
+    var w = SpiceWriter()
+    w.u64(0)                    // image id
+    w.u8(107); w.u8(0)          // ZLIB_GLZ_RGB, no flags
+    w.u32(1280); w.u32(768)
+    w.u32(4069)                 // glz_data_size: the *uncompressed* GLZ size
+    w.u32(213)                  // data_size: what is actually in the message
+    w.bytes([UInt8](repeating: 0xAB, count: 213))
+    let image = try SpiceImage(reader: SpiceReader(w.bytes), base: SpiceReader(w.bytes))
+    guard case let .zlibGlzRGB(glzSize, data) = image.payload else {
+        Issue.record("parsed as \(image.payload)"); return
+    }
+    #expect(glzSize == 4069)
+    #expect(data.count == 213)
+}
+
+@Test func zlibGlzRefusesAnAbsurdUncompressedSize() {
+    var w = SpiceWriter()
+    w.u64(0); w.u8(107); w.u8(0); w.u32(1280); w.u32(768)
+    w.u32(UInt32.max)           // a hostile glz_data_size must fail before anything is allocated
+    w.u32(4)
+    w.bytes([1, 2, 3, 4])
+    #expect(throws: WireError.self) { _ = try SpiceImage(reader: SpiceReader(w.bytes), base: SpiceReader(w.bytes)) }
+}

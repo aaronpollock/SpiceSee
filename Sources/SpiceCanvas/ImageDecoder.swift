@@ -30,7 +30,7 @@ public struct ImageDecoder: ~Copyable {
             let pal = try Self.resolvePalette(flags: flags, palette: palette, paletteID: paletteID, palettes: &palettes)
             return try decodeLZ(data, palette: pal, w, h)
         case let .glzRGB(data): return try decodeGLZ(data)
-        case let .zlibGlzRGB(data): return try decodeGLZ(try Self.inflate(data))
+        case let .zlibGlzRGB(glzSize, data): return try decodeGLZ(try Self.inflate(data, uncompressedSize: Int(glzSize)))
         case let .jpeg(data): return try Self.decodeJPEG(data, w, h)
         case let .jpegAlpha(flags, jpegSize, data): return try decodeJPEGAlpha(flags: flags, jpegSize: jpegSize, data: data, w, h)
         case .lz4: throw CanvasError.unsupported("image type \(image.descriptor.type)")
@@ -88,14 +88,22 @@ public struct ImageDecoder: ~Copyable {
         return DecodedImage(width: Int(w), height: Int(h), pixels: out, hasAlpha: false)
     }
 
-    static func inflate(_ zlib: [UInt8]) throws -> [UInt8] {
+    /// `uncompressedSize` comes off the wire (`glz_data_size`, capped at parse), so the buffer is
+    /// exact — guessing from the input size under-allocates on well-compressed repaints. Anything
+    /// but a full, exact inflation fails closed.
+    static func inflate(_ zlib: [UInt8], uncompressedSize: Int) throws -> [UInt8] {
         guard zlib.count > 6 else { throw CanvasError.decode("zlib too short") }
+        guard uncompressedSize > 0 else { throw CanvasError.decode("zlib declares empty output") }
         let raw = Array(zlib[2 ..< zlib.count - 4])             // strip 2-byte zlib header and adler32 trailer
-        var out = [UInt8](repeating: 0, count: max(raw.count * 8, 1 << 16))
+        // One spare byte: the decoder truncates silently at the buffer's end, so an exact-size
+        // buffer cannot tell "fit exactly" from "there was more" — with the spare, a stream
+        // bigger than declared lands on size+1 and the equality below catches both mismatches.
+        var out = [UInt8](repeating: 0, count: uncompressedSize + 1)
         let n = raw.withUnsafeBufferPointer { src in out.withUnsafeMutableBufferPointer { dst in
             compression_decode_buffer(dst.baseAddress!, dst.count, src.baseAddress!, src.count, nil, COMPRESSION_ZLIB) } }
-        guard n > 0 else { throw CanvasError.decode("zlib") }
-        return Array(out[0 ..< n])
+        guard n == uncompressedSize else { throw CanvasError.decode("zlib inflated \(n), declared \(uncompressedSize)") }
+        out.removeLast()
+        return out
     }
 
     static func flipRows(_ px: [UInt8], width: Int, height: Int) -> [UInt8] {
