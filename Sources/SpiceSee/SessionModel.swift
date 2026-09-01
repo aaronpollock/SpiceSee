@@ -29,7 +29,9 @@ final class SessionModel {
     var clipboardSync = true {
         didSet { clipboard.enabled = clipboardSync }
     }
-    var muted = false
+    var muted = false {
+        didSet { audio.muted = muted }
+    }
     var pointerCaptured = false
     var releaseChord: ReleaseChord = .controlOption
     private(set) var pointerMode: PointerMode = .client
@@ -59,6 +61,7 @@ final class SessionModel {
     private var viewportSubscribers: [UUID: (viewportID: Int, continuation: AsyncStream<ViewportEvent>.Continuation)] = [:]
     private let backend: any SessionBackend
     private let clipboard: ClipboardBridge
+    private let audio: AudioOutput
     private var pump: Task<Void, Never>?
 
     var connection: SavedConnection?
@@ -67,6 +70,7 @@ final class SessionModel {
     init(backend: any SessionBackend) {
         self.backend = backend
         clipboard = ClipboardBridge(backend: backend)
+        audio = AudioOutput()
     }
 
     /// Every viewport window gets its OWN stream. One shared stream would split events between
@@ -92,6 +96,7 @@ final class SessionModel {
     }
 
     func connect(_ connection: SavedConnection, password: String?) {
+        audio.stop()
         self.connection = connection
         endpoint = connection.endpoint
         scaling = .fit
@@ -139,6 +144,8 @@ final class SessionModel {
             mergeKnown(viewports)
         case let .clipboard(event):
             clipboard.handle(event)
+        case let .audio(event):
+            audio.handle(event)
         case let .agent(state):
             agent = state          // capture is decided by pointer mode now, not by agent presence
         case let .pointerMode(mode):
@@ -162,6 +169,7 @@ final class SessionModel {
             phaseBeforeFileFailure = nil   // a real failure ends the session: dismissing must reach .idle
             phase = .failed(failure)
             clipboard.stop()
+            audio.stop()
             for v in viewports { publish(.streamDestroyed(nil), to: v.id) }
             resizeTask?.cancel()
             windowMetrics.removeAll()
@@ -173,6 +181,7 @@ final class SessionModel {
             viewports = []
             pointerCaptured = false
             clipboard.stop()
+            audio.stop()
             resizeTask?.cancel()
             windowMetrics.removeAll()
             knownViewports = []
@@ -196,6 +205,7 @@ final class SessionModel {
     func cancel() {
         pump?.cancel()
         clipboard.stop()
+        audio.stop()
         phase = .idle
         resizeTask?.cancel()
         windowMetrics.removeAll()
@@ -217,6 +227,7 @@ final class SessionModel {
         graceTask?.cancel()
         pump?.cancel()
         clipboard.stop()
+        audio.stop()
         viewports = []
         phase = .idle
         resizeTask?.cancel()

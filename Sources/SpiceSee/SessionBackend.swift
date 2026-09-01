@@ -98,6 +98,15 @@ enum ClipboardEvent: Sendable, Equatable {
     case guestReleased
 }
 
+/// Guest audio, decoded. `frames` are interleaved Float32 at the announced rate/channels.
+enum AudioEvent: Sendable, Equatable {
+    case started(sampleRate: Int, channels: Int, opus: Bool)
+    case pcm(frames: [Float], mmTime: UInt32)
+    case volume([Float])
+    case mute(Bool)
+    case stopped
+}
+
 enum BackendEvent: Sendable {
     case step(ConnectStep)
     case connected(viewports: [ViewportInfo])
@@ -105,6 +114,7 @@ enum BackendEvent: Sendable {
     case viewportsChanged([ViewportInfo])
     case agent(AgentState)
     case clipboard(ClipboardEvent)
+    case audio(AudioEvent)
     case pointerMode(PointerMode)
     case frame(FrameUpdate)
     case cursor(viewportID: Int, CursorChange)
