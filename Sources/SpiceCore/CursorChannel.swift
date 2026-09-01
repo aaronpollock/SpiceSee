@@ -31,7 +31,7 @@ public actor CursorChannel {
         pump = Task {
             for await raw in source {
                 do { cont.yield(try CursorMessage(type: raw.type, payload: raw.payload)) }
-                catch { log.error("cursor/\(descriptor.id): drop type \(raw.type): \(String(describing: error))") }
+                catch { log.error("cursor/\(descriptor.id): drop type \(raw.type): \(String(describing: error), privacy: .public)") }
             }
             cont.finish()
         }

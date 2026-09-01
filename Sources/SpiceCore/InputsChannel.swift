@@ -52,7 +52,7 @@ public actor InputsChannel {
             for await raw in messages {
                 guard let self else { return }
                 do { await self.handle(try InputsMessage(type: raw.type, payload: raw.payload)) }
-                catch { self.log.error("inputs: drop type \(raw.type): \(String(describing: error))") }
+                catch { self.log.error("inputs: drop type \(raw.type): \(String(describing: error), privacy: .public)") }
             }
         }
     }

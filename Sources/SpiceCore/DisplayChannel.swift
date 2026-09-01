@@ -40,7 +40,13 @@ public actor DisplayChannel {
         pump = Task {
             for await raw in source {
                 do { cont.yield(try DisplayMessage(type: raw.type, payload: raw.payload)) }
-                catch { log.error("display/\(descriptor.id): drop type \(raw.type): \(String(describing: error))") }
+                catch {
+                    // The reason and a payload prefix are deliberately public: a draw this
+                    // channel cannot parse is the one situation where the bytes themselves
+                    // are the diagnostic, and they never contain a ticket.
+                    let prefix = raw.payload.prefix(96).map { String(format: "%02x", $0) }.joined()
+                    log.error("display/\(descriptor.id): drop type \(raw.type) size \(raw.payload.count): \(String(describing: error), privacy: .public) payload[..96]=\(prefix, privacy: .public)")
+                }
             }
             cont.finish()
         }
