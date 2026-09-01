@@ -75,5 +75,37 @@ int main(void) {
     msg.type = VD_AGENT_CLIPBOARD_RELEASE; msg.size = 4;
     memcpy(buf, &msg, sizeof msg); memcpy(buf + sizeof msg, rel, 4);
     dump("clipboard_release", buf, sizeof msg + 4);
+
+    /* MONITORS_CONFIG, flags=USE_POS: one enabled 1920x1080 head, then a
+       sparse two-head config whose second head is disabled (all zeros). */
+    printf("sizeof(VDAgentMonitorsConfig) = %zu\n", sizeof(VDAgentMonitorsConfig));
+    printf("sizeof(VDAgentMonConfig)      = %zu\n", sizeof(VDAgentMonConfig));
+    printf("flag USE_POS=%d cap MONITORS=%d SPARSE=%d\n",
+           VD_AGENT_CONFIG_MONITORS_FLAG_USE_POS,
+           VD_AGENT_CAP_MONITORS_CONFIG, VD_AGENT_CAP_SPARSE_MONITORS_CONFIG);
+
+    size_t msize = sizeof(VDAgentMonitorsConfig) + sizeof(VDAgentMonConfig);
+    VDAgentMonitorsConfig *mc = calloc(1, msize);
+    mc->num_of_monitors = 1;
+    mc->flags = VD_AGENT_CONFIG_MONITORS_FLAG_USE_POS;
+    VDAgentMonConfig *mon = (VDAgentMonConfig *)(mc + 1);
+    mon->width = 1920; mon->height = 1080; mon->depth = 32; mon->x = 0; mon->y = 0;
+    msg.type = VD_AGENT_MONITORS_CONFIG; msg.size = msize;
+    memcpy(buf, &msg, sizeof msg); memcpy(buf + sizeof msg, mc, msize);
+    dump("monitors_config_1", buf, sizeof msg + msize);
+    free(mc);
+
+    size_t m2size = sizeof(VDAgentMonitorsConfig) + 2 * sizeof(VDAgentMonConfig);
+    VDAgentMonitorsConfig *mc2 = calloc(1, m2size);
+    mc2->num_of_monitors = 2;
+    mc2->flags = VD_AGENT_CONFIG_MONITORS_FLAG_USE_POS;
+    VDAgentMonConfig *mons = (VDAgentMonConfig *)(mc2 + 1);
+    mons[0].width = 2560; mons[0].height = 1440; mons[0].depth = 32;
+    mons[0].x = 0; mons[0].y = 0;
+    /* mons[1] stays calloc-zero: a disabled head in a sparse config */
+    msg.type = VD_AGENT_MONITORS_CONFIG; msg.size = m2size;
+    memcpy(buf, &msg, sizeof msg); memcpy(buf + sizeof msg, mc2, m2size);
+    dump("monitors_config_sparse", buf, sizeof msg + m2size);
+    free(mc2);
     return 0;
 }

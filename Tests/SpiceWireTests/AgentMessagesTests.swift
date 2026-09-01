@@ -142,4 +142,28 @@ import Testing
                                  hasSelection: true)
         #expect(m == .clipboardRelease(.clipboard))
     }
+
+    @Test func monitorsConfigMatchesTheCStructs() {
+        // From Tools/agentref.c `monitors_config_1`: header(20) + num,flags + height,width,depth,x,y.
+        let one = AgentMessage.monitorsConfig(
+            flags: AgentMonitorsFlags.usePosition,
+            monitors: [AgentMonitorConfig(width: 1920, height: 1080, depth: 32, x: 0, y: 0)])
+        #expect(hex(stream(one)) ==
+            "01000000" + "02000000" + "0000000000000000" + "1c000000"   // header: proto, type, opaque, size 28
+            + "01000000" + "01000000"                                   // num_of_monitors, flags
+            + "38040000" + "80070000" + "20000000" + "00000000" + "00000000")  // height, width, depth, x, y
+    }
+
+    @Test func sparseMonitorsConfigSendsDisabledHeadsAsZeros() {
+        // From `monitors_config_sparse`: an all-zero VDAgentMonConfig is a disabled head.
+        let sparse = AgentMessage.monitorsConfig(
+            flags: AgentMonitorsFlags.usePosition,
+            monitors: [AgentMonitorConfig(width: 2560, height: 1440, depth: 32, x: 0, y: 0),
+                       AgentMonitorConfig(width: 0, height: 0, depth: 0, x: 0, y: 0)])
+        #expect(hex(stream(sparse)) ==
+            "01000000" + "02000000" + "0000000000000000" + "30000000"   // header: size 48
+            + "02000000" + "01000000"                                   // num_of_monitors, flags
+            + "a0050000" + "000a0000" + "20000000" + "00000000" + "00000000"  // 2560x1440 (height first)
+            + "0000000000000000000000000000000000000000")               // disabled head: all zeros
+    }
 }

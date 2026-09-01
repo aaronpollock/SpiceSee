@@ -55,12 +55,28 @@ public struct AgentFrame: Sendable, Equatable {
     public init(type: UInt32, payload: [UInt8]) { self.type = type; self.payload = payload }
 }
 
+/// `VDAgentMonConfig` — one requested guest monitor. All zeros = a disabled head (sparse config).
+public struct AgentMonitorConfig: Sendable, Equatable {
+    public var width: UInt32, height: UInt32, depth: UInt32
+    public var x: Int32, y: Int32
+    public init(width: UInt32, height: UInt32, depth: UInt32 = 32, x: Int32 = 0, y: Int32 = 0) {
+        self.width = width; self.height = height; self.depth = depth; self.x = x; self.y = y
+    }
+}
+
+public enum AgentMonitorsFlags {
+    /// `VD_AGENT_CONFIG_MONITORS_FLAG_USE_POS`
+    public static let usePosition: UInt32 = 1 << 0
+}
+
 public enum AgentMessage: Sendable, Equatable {
     case announceCapabilities(request: Bool, caps: CapabilitySet)
     case clipboardGrab(ClipboardSelection, [ClipboardType])
     case clipboardRequest(ClipboardSelection, ClipboardType)
     case clipboard(ClipboardSelection, ClipboardType, [UInt8])
     case clipboardRelease(ClipboardSelection)
+    /// Client → guest only; the guest never sends this type back, so there is no decoder for it.
+    case monitorsConfig(flags: UInt32, monitors: [AgentMonitorConfig])
     case other(AgentFrame)
 
     /// `hasSelection` is the *agent's* `VD_AGENT_CAP_CLIPBOARD_SELECTION`, not ours: the side that
@@ -133,6 +149,11 @@ public enum AgentMessage: Sendable, Equatable {
         case let .clipboardRelease(sel):
             put(sel)
             return AgentFrame(type: AgentMsgType.clipboardRelease.rawValue, payload: w.bytes)
+        case let .monitorsConfig(flags, monitors):
+            w.u32(UInt32(monitors.count)); w.u32(flags)
+            // VDAgentMonConfig is height-first — pinned against the packed C struct in agentref.
+            for m in monitors { w.u32(m.height); w.u32(m.width); w.u32(m.depth); w.i32(m.x); w.i32(m.y) }
+            return AgentFrame(type: AgentMsgType.monitorsConfig.rawValue, payload: w.bytes)
         case let .other(frame):
             return frame
         }
