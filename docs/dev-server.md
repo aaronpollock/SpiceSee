@@ -540,7 +540,7 @@ blanked when this was written, and waking it to type blind is not something to d
 - [ ] **Host → guest.** With `--send` set, paste in the guest. The probe prints
       `guest is pasting, wants utf8Text` and the guest receives both lines, with the line break
       intact rather than as a single run-on line.
-- [ ] **In the app.** ⌘C on the Mac, then paste in the guest; copy in the guest, then ⌘V on the Mac.
+- [x] **In the app.** ⌘C on the Mac, then paste in the guest; copy in the guest, then ⌘V on the Mac.
       The toolbar's clipboard toggle turns sharing off, and with it off neither direction moves.
 - [ ] **Note the ⌘ mapping.** ⌘ maps to Super by default, so ⌘V inside the viewport sends **Win+V**
       (Windows clipboard history), not paste. Paste in the guest with **⌃V**, or set ⌘→Ctrl in the
@@ -589,19 +589,21 @@ halves — actually copying/pasting an image — are the checklist below.
 
 In the app, needing a person on both ends:
 
-- [ ] Drag a viewport window: ~250 ms after the drag ends the guest desktop matches the new size.
+(The in-app boxes below were verified by the user on 2026-09-01 against the Windows dev guest — "works great". The probe-only boxes above still want a run with someone at the guest console.)
+
+- [x] Drag a viewport window: ~250 ms after the drag ends the guest desktop matches the new size.
       With the 2× toolbar toggle on, the guest resolution doubles the window's point size and 1:1
       shows one guest pixel per device pixel.
-- [ ] Copy an image in the guest, ⌘V on the Mac; copy an image on the Mac (⌘⇧4 to clipboard works),
+- [x] Copy an image in the guest, ⌘V on the Mac; copy an image on the Mac (⌘⇧4 to clipboard works),
       paste in the guest (⌃V — ⌘V is Win+V, see the M5 clipboard notes above). Clipboard toggle off
       stops both.
 - [ ] The outstanding text-clipboard boxes in "M5 clipboard exit check" above.
-- [ ] **First-report guard vs. window-open transient.** Open a viewport window and watch the guest:
+- [x] **First-report guard vs. window-open transient.** Open a viewport window and watch the guest:
       does SwiftUI's first `onChange(of: proxy.size)` after the window opens carry a transient or
       zero size that burns the debounce's "first report" guard, so the *real* content size then goes
       out as a resize request right at window-open time? Watch for an unwanted resolution change
       immediately after opening a window, not just after a drag.
-- [ ] **`onDisappear` vs. full screen.** `--mock --scenario desktop --autoconnect` opens two windows
+- [x] **`onDisappear` vs. full screen.** `--mock --scenario desktop --autoconnect` opens two windows
       (the scenario's second display); enter and leave full screen on one of them. Confirm neither
       window's `onDisappear` fires during the transition — if it did, that head would wrongly
       report as disabled to the guest mid-transition.
