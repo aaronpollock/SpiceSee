@@ -12,6 +12,7 @@ private struct StubBackend: SessionBackend {
     func offerClipboardText() async {}
     func sendClipboardText(_ text: String) async {}
     func requestClipboardText() async {}
+    func requestDisplayLayout(_ layouts: [DisplayLayout]) async {}
 }
 
 /// A guest whose display is blanked sends no primary surface until it gets input — and it can

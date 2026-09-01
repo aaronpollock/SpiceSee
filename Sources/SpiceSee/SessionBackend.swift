@@ -62,6 +62,14 @@ struct StreamFrameUpdate: Sendable {
     var pixels: [UInt8]
 }
 
+/// One head's requested state, in guest pixels. The seam's own type — no SPICE type crosses.
+struct DisplayLayout: Sendable, Equatable {
+    var viewportID: Int
+    var width: Int
+    var height: Int
+    var enabled: Bool
+}
+
 /// What one viewport window consumes: pixels and the pointer drawn over them.
 enum ViewportEvent: Sendable {
     case frame(FrameUpdate)
@@ -139,4 +147,7 @@ protocol SessionBackend: Sendable {
     func sendClipboardText(_ text: String) async
     /// Asks for what `.guestOffersText` announced; the answer arrives as `.guestText`.
     func requestClipboardText() async
+    /// Asks the guest to adopt this layout, one entry per known viewport, closed windows disabled.
+    /// Silently ignored without an agent that does monitors-config.
+    func requestDisplayLayout(_ layouts: [DisplayLayout]) async
 }

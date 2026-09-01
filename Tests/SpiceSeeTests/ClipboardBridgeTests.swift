@@ -20,6 +20,7 @@ import Testing
         func offerClipboardText() async { record("offer") }
         func sendClipboardText(_ text: String) async { record("send(\(text))") }
         func requestClipboardText() async { record("request") }
+        func requestDisplayLayout(_ layouts: [DisplayLayout]) async {}
     }
 
     /// A pasteboard of its own, so a test never disturbs what the user has copied.

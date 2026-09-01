@@ -18,6 +18,7 @@ import Testing
         func offerClipboardText() async {}
         func sendClipboardText(_ text: String) async {}
         func requestClipboardText() async {}
+        func requestDisplayLayout(_ layouts: [DisplayLayout]) async {}
     }
 
     @Test func viewportsChangedReplacesTheListWithoutTouchingThePhase() async throws {

@@ -82,6 +82,7 @@ final class MockSessionBackend: SessionBackend {
     func offerClipboardText() async {}
     func sendClipboardText(_ text: String) async {}
     func requestClipboardText() async {}
+    func requestDisplayLayout(_ layouts: [DisplayLayout]) async {}
 
     /// A 12×20 black arrow with a white outline — enough to see the overlay in `--mock`.
     private static let arrowCursor: CursorImage = {

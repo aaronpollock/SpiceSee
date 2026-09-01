@@ -216,6 +216,12 @@ final class SpiceKitBackend: SessionBackend {
         await live.session?.sendClipboard(.utf8Text, Array(text.utf8))
     }
 
+    func requestDisplayLayout(_ layouts: [DisplayLayout]) async {
+        let ordered = layouts.sorted { $0.viewportID < $1.viewportID }
+        await live.session?.sendMonitorsConfig(MonitorTiling.compose(
+            ordered.map { (width: $0.width, height: $0.height, enabled: $0.enabled) }))
+    }
+
     /// Types other than text are dropped rather than surfaced: the seam above speaks only text, so
     /// announcing an image offer the app cannot answer would strand the guest waiting.
     private static func translate(_ e: SpiceKit.ClipboardEvent) -> ClipboardEvent? {
