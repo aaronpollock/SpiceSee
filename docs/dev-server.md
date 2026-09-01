@@ -545,3 +545,69 @@ blanked when this was written, and waking it to type blind is not something to d
 - [ ] **Note the ⌘ mapping.** ⌘ maps to Super by default, so ⌘V inside the viewport sends **Win+V**
       (Windows clipboard history), not paste. Paste in the guest with **⌃V**, or set ⌘→Ctrl in the
       connection's Advanced settings.
+
+## M5 exit check (manual)
+
+Machine-driveable halves first — run them before handing the rest over.
+
+**Resize, verified 2026-09-01.** `spicesee-cli resize 192.168.50.6 5930 1600 900`:
+
+```
+connected; requesting 1600x900, watching for 20.0s
+display 0 primary now 1280x720
+display 0 heads: 1280x720@0,0
+sent VD_AGENT_MONITORS_CONFIG 1600x900 (dropped silently if the guest lacks the cap)
+display 0 heads: 1600x900@0,0
+display 0 heads: 1600x900@0,0
+display 0 heads: 1600x900@0,0
+disconnected
+```
+
+The Windows guest answered with the `monitorsConfig` heads line, not a bare "primary now" line.
+Restored immediately after with
+`spicesee-cli resize 192.168.50.6 5930 1920 1080`, which came back the same shape and settled on
+`1920x1080@0,0`. This is the packed `VD_AGENT_MONITORS_CONFIG` encoder, the `monitorsConfig` cap
+gate, and a real guest applying it, all in one round trip.
+
+**Clipboard image, verified 2026-09-01 (wire half only).**
+`spicesee-cli clipboard 192.168.50.6 5930 --send-image Tests/SpiceKitTests/Fixtures/win-display.golden.png --save-image /tmp/guest-copy.png --seconds 10`:
+
+```
+connected; watching the clipboard for 10.0s
+clipboard sharing negotiated
+disconnected
+```
+
+No one was at the guest console, so neither `guest is pasting, wants imagePNG` nor a write to
+`/tmp/guest-copy.png` happened — expected, and `/tmp/guest-copy.png` was confirmed absent
+afterward. What this run does prove: `--send-image`/`--save-image` parse and don't throw, and
+negotiation still succeeds with the image capability announced alongside text. The guest-console
+halves — actually copying/pasting an image — are the checklist below.
+
+- [ ] `spicesee-cli clipboard --send-image <png> --save-image /tmp/g.png` moves an image each way
+      (needs a person at the guest console to copy/paste, as with the text checks above).
+
+In the app, needing a person on both ends:
+
+- [ ] Drag a viewport window: ~250 ms after the drag ends the guest desktop matches the new size.
+      With the 2× toolbar toggle on, the guest resolution doubles the window's point size and 1:1
+      shows one guest pixel per device pixel.
+- [ ] Copy an image in the guest, ⌘V on the Mac; copy an image on the Mac (⌘⇧4 to clipboard works),
+      paste in the guest (⌃V — ⌘V is Win+V, see the M5 clipboard notes above). Clipboard toggle off
+      stops both.
+- [ ] The outstanding text-clipboard boxes in "M5 clipboard exit check" above.
+- [ ] **First-report guard vs. window-open transient.** Open a viewport window and watch the guest:
+      does SwiftUI's first `onChange(of: proxy.size)` after the window opens carry a transient or
+      zero size that burns the debounce's "first report" guard, so the *real* content size then goes
+      out as a resize request right at window-open time? Watch for an unwanted resolution change
+      immediately after opening a window, not just after a drag.
+- [ ] **`onDisappear` vs. full screen.** `--mock --scenario desktop --autoconnect` opens two windows
+      (the scenario's second display); enter and leave full screen on one of them. Confirm neither
+      window's `onDisappear` fires during the transition — if it did, that head would wrongly
+      report as disabled to the guest mid-transition.
+
+**Multi-head is mock-proven, not server-proven** — the same honesty rule as M4's tier-2/3 gate.
+Neither dev guest exposes a second head (Windows/WDDM single-QXL; the Proxmox guest runs
+modesetting), so the viewport model's evidence is `ViewportMapperTests` + the two-window `--mock`
+review. A future guest with `qxl.heads=2` (or two qxl devices) upgrades this to a live check: open
+both windows, close one, and the guest should drop to one active monitor.
