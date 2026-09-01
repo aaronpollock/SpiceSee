@@ -66,7 +66,7 @@ private func mainBytesWithDisplay() throws -> [UInt8] {
         switch e {
         case let .streamFrame(f, displayID: 0): sawFrame = f.streamID == 7 && f.width == 64
         case .streamDestroyed(id: 7, displayID: 0): sawDestroy = true
-        case .canvas(.unsupported): sawUnsupportedCanvas = true
+        case .canvas(.unsupported, displayID: _): sawUnsupportedCanvas = true
         case .disconnected: break
         default: continue
         }

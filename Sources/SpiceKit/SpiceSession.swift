@@ -59,7 +59,8 @@ public enum ClipboardEvent: Sendable, Equatable {
 
 public enum SessionEvent: Sendable {
     case connected(SessionInfo)
-    case canvas(CanvasEvent)
+    case canvas(CanvasEvent, displayID: UInt8)
+    case monitorsConfig([HeadRect], displayID: UInt8)
     case pointerMode(PointerMode)
     case cursor(CursorChange, displayID: UInt8)
     case agent(connected: Bool)
@@ -82,7 +83,7 @@ public actor SpiceSession {
     private let inputStream: AsyncStream<GuestInput>
     private let inputCont: AsyncStream<GuestInput>.Continuation
     private let main: MainChannel
-    private let canvas = Canvas()
+    private var canvases: [(id: UInt8, canvas: Canvas)] = []
     private var displays: [DisplayChannel] = []
     private var cursors: [CursorChannel] = []
     private var players: [StreamPlayer] = []
@@ -131,8 +132,6 @@ public actor SpiceSession {
     private func start(password: String?, transports: @escaping TransportFactory) async {
         cont.yield(.connected(info))
         cont.yield(.pointerMode(pointerMode))
-        let canvasPump = Task { [canvas, cont] in for await e in canvas.events { cont.yield(.canvas(e)) } }
-        tasks.append(canvasPump)
 
         var displayPumps: [Task<Void, Never>] = []
         var cursorPumps: [Task<Void, Never>] = []
@@ -142,6 +141,12 @@ public actor SpiceSession {
                 case .display:
                     let d = try await DisplayChannel.open(transport: try await transports(desc), connectionID: info.connectionID, id: desc.id, password: password)
                     displays.append(d)
+                    let canvas = Canvas()
+                    canvases.append((desc.id, canvas))
+                    let canvasPump = Task { [cont] in
+                        for await e in canvas.events { cont.yield(.canvas(e, displayID: desc.id)) }
+                    }
+                    tasks.append(canvasPump)
                     let player = StreamPlayer()
                     await player.setMMTime(info.mainInit.multiMediaTime)
                     players.append(player)
@@ -156,7 +161,7 @@ public actor SpiceSession {
                         }
                     }
                     tasks.append(playerPump)
-                    let pump = Task { [canvas, weak self] in
+                    let pump = Task { [cont, weak self] in
                         for await m in d.messages {
                             switch m {
                             case let .streamCreate(c): await player.handle(create: c)
@@ -165,6 +170,8 @@ public actor SpiceSession {
                             case let .streamDestroy(id): await player.handle(destroy: id)
                             case .streamDestroyAll: await player.handleDestroyAll()
                             case let .streamActivateReport(a): await player.handle(activateReport: a)
+                            case let .monitorsConfig(cfg):
+                                cont.yield(.monitorsConfig(HeadRect.heads(from: cfg), displayID: desc.id))
                             default: await canvas.apply(m)
                             }
                         }
@@ -173,6 +180,11 @@ public actor SpiceSession {
                         // them, before ending the channel — same ordering the canvas pump relies on.
                         await player.finish()
                         _ = await playerPump.value
+                        // The canvas drains the same way: no more messages can reach it, so finish
+                        // it and await its pump before declaring the channel over — .disconnected
+                        // must still come after every pixel.
+                        await canvas.finish()
+                        _ = await canvasPump.value
                         await self?.channelEnded(desc)
                     }
                     displayPumps.append(pump); tasks.append(pump)
@@ -225,13 +237,11 @@ public actor SpiceSession {
         // canvas may still hold events those produced. Drain in that order, then close. Main ends
         // either because the server dropped it or because `channelEnded` closed it on another
         // channel's behalf — the pumps below finish either way, since every channel is closed.
-        tasks.append(Task { [weak self, main, canvas, cont] in
+        tasks.append(Task { [weak self, main, cont] in
             for await m in main.events { await self?.handleMain(m) }
             await self?.channelEnded(MainChannel.descriptor)
             for pump in displayPumps { _ = await pump.value }
             for pump in cursorPumps { _ = await pump.value }
-            await canvas.finish()
-            _ = await canvasPump.value
             cont.yield(.disconnected(await self?.lossReason))
         })
     }
@@ -407,8 +417,9 @@ public actor SpiceSession {
     }
 
     public func snapshotPrimary() async -> DecodedImage? {
-        guard let id = await canvas.primarySurfaceID else { return nil }
-        return await canvas.snapshot(surfaceID: id)
+        guard let entry = canvases.min(by: { $0.id < $1.id }) else { return nil }
+        guard let id = await entry.canvas.primarySurfaceID else { return nil }
+        return await entry.canvas.snapshot(surfaceID: id)
     }
 
     public func disconnect() async {

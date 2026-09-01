@@ -21,7 +21,7 @@ import SpiceCore
     #expect(session.info.channels.contains(ChannelDescriptor(type: .display, id: 0)))
     var sawSurface = false
     for await e in session.events {
-        if case .canvas(.surfaceCreated(let d)) = e, d.isPrimary { sawSurface = true }
+        if case .canvas(.surfaceCreated(let d), displayID: _) = e, d.isPrimary { sawSurface = true }
         if case .disconnected = e { break }
     }
     #expect(sawSurface)

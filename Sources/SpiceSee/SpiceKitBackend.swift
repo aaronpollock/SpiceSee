@@ -94,7 +94,7 @@ final class SpiceKitBackend: SessionBackend {
                     switch event {
                     case .connected:
                         break   // the UI is told once there are pixels to show, below
-                    case let .canvas(.surfaceCreated(d)) where d.isPrimary:
+                    case let .canvas(.surfaceCreated(d), displayID: _) where d.isPrimary:
                         // Gate `.connected` on the primary surface: before it exists there is
                         // nothing to put in a viewport, and ViewportInfo carries its size.
                         let viewports = displays.enumerated().map { i, ch in
@@ -104,18 +104,20 @@ final class SpiceKitBackend: SessionBackend {
                             ? [ViewportInfo(id: 0, index: 0, total: 1, width: d.width, height: d.height)]
                             : viewports))
                         announced = true
-                    case let .canvas(.updated(u)) where u.isPrimary:
+                    case let .canvas(.updated(u), displayID: _) where u.isPrimary:
                         continuation.yield(.frame(FrameUpdate(viewportID: viewportID,
                                                               surfaceWidth: u.surfaceWidth, surfaceHeight: u.surfaceHeight,
                                                               x: Int(u.rect.left), y: Int(u.rect.top),
                                                               width: Int(u.rect.width), height: Int(u.rect.height),
                                                               pixels: u.pixels)))
-                    case .canvas(.updated), .canvas(.surfaceCreated):
+                    case .canvas(.updated, displayID: _), .canvas(.surfaceCreated, displayID: _):
                         break   // off-screen surfaces are scratch buffers, not viewport content
-                    case let .canvas(.unsupported(what)):
+                    case let .canvas(.unsupported(what), displayID: _):
                         log.notice("canvas: \(what, privacy: .public)")
-                    case .canvas(.surfaceDestroyed):
+                    case .canvas(.surfaceDestroyed, displayID: _):
                         break
+                    case .monitorsConfig:
+                        break   // multi-display routing lands in a later task
                     case let .pointerMode(mode):
                         continuation.yield(.pointerMode(mode == .client ? .client : .server))
                     case let .cursor(change, displayID):
