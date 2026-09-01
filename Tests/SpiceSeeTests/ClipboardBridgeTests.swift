@@ -11,18 +11,38 @@ import Testing
         private(set) var requests: [ClipboardKind] = []
         private(set) var sentTexts: [String] = []
         private(set) var sentPNGs: [[UInt8]] = []
+        /// One chronological log spanning every recorder below — the typed arrays above each lose
+        /// cross-kind ordering, which is what actually proves the single-consumer FIFO processes
+        /// events in the order they were queued rather than one `Task` per event racing another.
+        private(set) var calls: [String] = []
 
         nonisolated func connect(_ target: ConnectionTarget) -> AsyncStream<BackendEvent> { .init { $0.finish() } }
         nonisolated func disconnect() async {}
         nonisolated func sendCtrlAltDel() async {}
         nonisolated func sendInput(_ event: InputEvent) {}
-        func offerClipboard(_ kinds: [ClipboardKind]) async { offers.append(kinds) }
-        func requestClipboard(_ kind: ClipboardKind) async { requests.append(kind) }
-        func sendClipboardText(_ text: String) async { sentTexts.append(text) }
-        func sendClipboardPNG(_ bytes: [UInt8]) async { sentPNGs.append(bytes) }
+        nonisolated private func name(_ k: ClipboardKind) -> String { k == .text ? "text" : "png" }
+        func offerClipboard(_ kinds: [ClipboardKind]) async {
+            offers.append(kinds)
+            calls.append("offer(\(kinds.map(name).joined(separator: ",")))")
+        }
+        func requestClipboard(_ kind: ClipboardKind) async {
+            requests.append(kind)
+            calls.append("request(\(name(kind)))")
+        }
+        func sendClipboardText(_ text: String) async {
+            sentTexts.append(text)
+            calls.append("send(\(text))")
+        }
+        func sendClipboardPNG(_ bytes: [UInt8]) async {
+            sentPNGs.append(bytes)
+            calls.append("sendPNG(\(bytes.count) bytes)")
+        }
         nonisolated func requestDisplayLayout(_ layouts: [DisplayLayout]) async {}
 
-        func clear() { offers.removeAll(); requests.removeAll(); sentTexts.removeAll(); sentPNGs.removeAll() }
+        func clear() {
+            offers.removeAll(); requests.removeAll(); sentTexts.removeAll(); sentPNGs.removeAll()
+            calls.removeAll()
+        }
     }
 
     /// A pasteboard of its own, so a test never disturbs what the user has copied.
@@ -203,10 +223,12 @@ import Testing
         bridge.handle(.guestRequests(.text))
         try await settle()
 
-        // The initial offer that `.available(true)` triggers, then the answer — both landed,
-        // in the order the single-consumer queue guarantees.
-        #expect(await backend.offers == [[.text]])
-        #expect(await backend.sentTexts == ["on the mac"])
+        // The initial offer that `.available(true)` triggers, then the answer — in that order.
+        // Asserted against the one chronological log spanning both recorders: a regression that
+        // handled each event in its own `Task` could still leave both typed arrays populated,
+        // just in whichever order the two tasks happened to race, and this is the assertion that
+        // would catch it.
+        #expect(await backend.calls == ["offer(text)", "send(on the mac)"])
     }
 
     @Test func hostImageIsOfferedAsPNG() async {
