@@ -2,6 +2,7 @@ import Foundation
 import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
+import Testing
 
 /// Fills the top half of the image with `top` and the bottom half with `bottom`, so decoded output
 /// can be checked for both channel order (BGRA vs RGBA) and row order (top-down vs bottom-up) —
@@ -29,4 +30,19 @@ func jpegFrame(width: Int, height: Int, top: (r: UInt8, g: UInt8, b: UInt8), bot
 /// Solid-color convenience over the two-tone helper above.
 func jpegFrame(width: Int, height: Int, r: UInt8, g: UInt8, b: UInt8) throws -> [UInt8] {
     try jpegFrame(width: width, height: height, top: (r, g, b), bottom: (r, g, b))
+}
+
+/// The libopus-encoded tone from `Tools/opusref.c`: `[u32 LE length][bytes]` × 100.
+func opusFixturePackets() throws -> [[UInt8]] {
+    let url = try #require(Bundle.module.url(forResource: "tone-48k-stereo.opus", withExtension: "bin", subdirectory: "Fixtures"))
+    let data = [UInt8](try Data(contentsOf: url))
+    var packets: [[UInt8]] = []
+    var i = 0
+    while i + 4 <= data.count {
+        let len = Int(data[i]) | Int(data[i + 1]) << 8 | Int(data[i + 2]) << 16 | Int(data[i + 3]) << 24
+        i += 4
+        guard i + len <= data.count else { break }
+        packets.append(Array(data[i ..< i + len])); i += len
+    }
+    return packets
 }

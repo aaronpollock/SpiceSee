@@ -25,7 +25,7 @@ let package = Package(
         .testTarget(name: "SpiceCanvasTests", dependencies: ["SpiceCanvas", .product(name: "CSpiceCodec", package: "CSpiceCodec")]),
         .testTarget(name: "SpiceKitTests", dependencies: ["SpiceKit", "SpiceCore", "SpiceCanvas", "SpiceMedia"],
                     resources: [.copy("Fixtures")]),
-        .testTarget(name: "SpiceMediaTests", dependencies: ["SpiceMedia", "SpiceWire"]),
+        .testTarget(name: "SpiceMediaTests", dependencies: ["SpiceMedia", "SpiceWire"], resources: [.copy("Fixtures")]),
     ],
     swiftLanguageModes: [.v6]
 )
