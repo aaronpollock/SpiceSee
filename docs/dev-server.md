@@ -611,3 +611,10 @@ Neither dev guest exposes a second head (Windows/WDDM single-QXL; the Proxmox gu
 modesetting), so the viewport model's evidence is `ViewportMapperTests` + the two-window `--mock`
 review. A future guest with `qxl.heads=2` (or two qxl devices) upgrades this to a live check: open
 both windows, close one, and the guest should drop to one active monitor.
+
+**Deviation from the spec: `DisplayLayout` carries no position.** The spec's layout type had a
+`position` per head; the seam type ships size and enabled only, and `MonitorTiling` synthesises the
+arrangement — enabled heads left to right at y=0. Host window positions do not map onto a guest
+desktop in any meaningful way (different screen counts, scales and origins, and the guest arranges
+its own monitors), so a position sent from here would be noise the guest has to reconcile. It
+becomes a real field only if a multi-head guest is ever seen needing it.
