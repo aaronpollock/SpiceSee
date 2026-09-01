@@ -146,11 +146,15 @@ final class SpiceKitBackend: SessionBackend {
                     case let .pointerMode(mode):
                         continuation.yield(.pointerMode(mode == .client ? .client : .server))
                     case let .cursor(change, displayID):
-                        for l in mapper.layouts where l.displayID == displayID {
-                            switch change {
-                            case .shape:
+                        switch change {
+                        case .shape:
+                            for l in mapper.layouts where l.displayID == displayID {
                                 continuation.yield(.cursor(viewportID: l.viewportID, Self.translate(change)))
-                            case let .moved(x, y):
+                            }
+                        case let .moved(x, y):
+                            // Only the head under the pointer: broadcasting would draw a ghost in the
+                            // letterbox of every other head's window.
+                            if let l = mapper.layout(displayID: displayID, containingX: x, y: y) {
                                 continuation.yield(.cursor(viewportID: l.viewportID,
                                                            .moved(x: x - l.rect.x, y: y - l.rect.y)))
                             }
@@ -160,7 +164,8 @@ final class SpiceKitBackend: SessionBackend {
                     case let .clipboard(event):
                         if let mapped = Self.translate(event) { continuation.yield(.clipboard(mapped)) }
                     case let .streamFrame(f, displayID: id):
-                        for l in mapper.layouts where l.displayID == id {
+                        for l in mapper.layouts(displayID: id, intersectingX: Int(f.dest.left), y: Int(f.dest.top),
+                                                width: Int(f.dest.width), height: Int(f.dest.height)) {
                             var u = Self.translate(f, viewportID: l.viewportID)
                             u.dest.x -= l.rect.x; u.dest.y -= l.rect.y
                             u.clip = u.clip.map { $0.map { r in
@@ -266,7 +271,8 @@ final class SpiceKitBackend: SessionBackend {
         for s in [XTScancode.delete, .leftAlt, .leftControl] { inputCont.yield(.guest(.keyUp(s))) }
     }
 
-    private static func translate(_ e: InputEvent, mapper: ViewportMapper) -> [GuestInput] {
+    /// Internal rather than private so the head-origin arithmetic is pinned by `InputTranslationTests`.
+    static func translate(_ e: InputEvent, mapper: ViewportMapper) -> [GuestInput] {
         switch e {
         case let .keyDown(code, m):
             return KeyMap.scancode(keyCode: code, commandMapsTo: target(m.commandMapsTo), optionMapsTo: target(m.optionMapsTo)).map { [.keyDown($0)] } ?? []

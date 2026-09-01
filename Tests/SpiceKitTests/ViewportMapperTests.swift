@@ -135,4 +135,30 @@ import SpiceWire
             AgentMonitorConfig(width: 2560, height: 1440, depth: 32, x: 1920, y: 0),
         ])
     }
+
+    @Test func onlyTheHeadContainingAPointIsReturned() {
+        var m = ViewportMapper()
+        m.primaryCreated(displayID: 0, width: 200, height: 100)
+        m.headsChanged(displayID: 0, heads: [
+            HeadRect(id: 0, x: 0, y: 0, width: 100, height: 100),
+            HeadRect(id: 1, x: 100, y: 0, width: 100, height: 100),
+        ])
+        #expect(m.layout(displayID: 0, containingX: 150, y: 10)?.viewportID == 1)
+        #expect(m.layout(displayID: 0, containingX: 99, y: 10)?.viewportID == 0)
+        #expect(m.layout(displayID: 0, containingX: 250, y: 10) == nil)
+        #expect(m.layout(displayID: 1, containingX: 10, y: 10) == nil)
+    }
+
+    @Test func onlyHeadsIntersectingARectAreReturned() {
+        var m = ViewportMapper()
+        m.primaryCreated(displayID: 0, width: 300, height: 100)
+        m.headsChanged(displayID: 0, heads: [
+            HeadRect(id: 0, x: 0, y: 0, width: 100, height: 100),
+            HeadRect(id: 1, x: 100, y: 0, width: 100, height: 100),
+            HeadRect(id: 2, x: 200, y: 0, width: 100, height: 100),
+        ])
+        let hit = m.layouts(displayID: 0, intersectingX: 90, y: 10, width: 20, height: 20)
+        #expect(hit.map(\.viewportID) == [0, 1])
+        #expect(m.layouts(displayID: 0, intersectingX: 300, y: 0, width: 10, height: 10).isEmpty)
+    }
 }

@@ -112,6 +112,26 @@ public struct ViewportMapper: Sendable, Equatable {
         }
     }
 
+    /// The head of `displayID` whose rect contains the surface point, if any — the one a server-mode
+    /// cursor position should be delivered to, rather than every head of the display.
+    public func layout(displayID: UInt8, containingX x: Int, y: Int) -> ViewportLayout? {
+        layouts.first { l in
+            l.displayID == displayID
+                && x >= l.rect.x && x < l.rect.x + l.rect.width
+                && y >= l.rect.y && y < l.rect.y + l.rect.height
+        }
+    }
+
+    /// The heads of `displayID` whose rects intersect the surface rectangle — the ones a stream frame
+    /// with that `dest` actually lands on.
+    public func layouts(displayID: UInt8, intersectingX x: Int, y: Int, width: Int, height: Int) -> [ViewportLayout] {
+        layouts.filter { l in
+            l.displayID == displayID
+                && x < l.rect.x + l.rect.width && x + width > l.rect.x
+                && y < l.rect.y + l.rect.height && y + height > l.rect.y
+        }
+    }
+
     public func origin(of viewportID: Int) -> (displayID: UInt8, x: Int, y: Int)? {
         guard let layout = layouts.first(where: { $0.viewportID == viewportID }) else { return nil }
         return (layout.displayID, layout.rect.x, layout.rect.y)

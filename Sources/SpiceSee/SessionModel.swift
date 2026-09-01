@@ -128,7 +128,10 @@ final class SessionModel {
         case let .connected(viewports):
             graceTask?.cancel()
             self.viewports = viewports
-            mergeKnown(viewports)
+            // Replace, don't merge: the grace period may already have announced a placeholder
+            // viewport 0, and merging would keep it as a phantom head (disabled in every layout
+            // request, offered by Show Displays) whenever the guest's real head id is not 0.
+            knownViewports = viewports
             phase = .connected
             clipboard.start()
         case let .viewportsChanged(viewports):
