@@ -101,9 +101,11 @@ final class SpiceKitBackend: SessionBackend {
                     }
                 }
                 func publishLayout() {
-                    inputCont.yield(.layout(mapper))
                     let infos = viewportInfos()
+                    // An empty layout is a primary being rebuilt, not a real one: installing it in
+                    // the input FIFO would drop every pointer position until the primary returns.
                     guard !infos.isEmpty else { return }
+                    inputCont.yield(.layout(mapper))
                     if announced { continuation.yield(.viewportsChanged(infos)) }
                     else { continuation.yield(.connected(viewports: infos)); announced = true }
                 }
