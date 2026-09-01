@@ -19,7 +19,9 @@ final class SessionModel {
 
     // Per-session view state, seeded from the connection's Advanced settings.
     var scaling: ScalingMode = .fit
-    var hiDPI = false
+    var hiDPI = false {
+        didSet { scheduleResizeRequest() }
+    }
     var clipboardSync = true {
         didSet { clipboard.enabled = clipboardSync }
     }
@@ -37,6 +39,14 @@ final class SessionModel {
     /// an unfailable, uncancellable spinner.
     var displayGraceSeconds: Double = 2
     private var graceTask: Task<Void, Never>?
+
+    /// Resize-follows-window. Sizes are requested, not imposed: the guest answers with a new
+    /// primary, which flows back as `.viewportsChanged`. The first report per viewport and any
+    /// report matching the guest's current size are recorded but not sent — those are windows
+    /// opening or fitting, not the user asking for a resolution.
+    var resizeDebounce: Duration = .milliseconds(250)
+    private var resizeTask: Task<Void, Never>?
+    private var windowMetrics: [Int: (points: CGSize, backingScale: CGFloat)] = [:]
 
     /// Set only by `presentFailure`, so `dismissFailure` can put back a session the file error
     /// interrupted. Cleared the moment it is used or made stale by a real connect attempt.
@@ -139,6 +149,8 @@ final class SessionModel {
             phase = .failed(failure)
             clipboard.stop()
             for v in viewports { publish(.streamDestroyed(nil), to: v.id) }
+            resizeTask?.cancel()
+            windowMetrics.removeAll()
         case .disconnected:
             graceTask?.cancel()
             phase = .idle
@@ -146,6 +158,8 @@ final class SessionModel {
             viewports = []
             pointerCaptured = false
             clipboard.stop()
+            resizeTask?.cancel()
+            windowMetrics.removeAll()
         }
     }
 
@@ -158,6 +172,8 @@ final class SessionModel {
         pump?.cancel()
         clipboard.stop()
         phase = .idle
+        resizeTask?.cancel()
+        windowMetrics.removeAll()
         Task { [backend] in await backend.disconnect() }
     }
 
@@ -177,7 +193,56 @@ final class SessionModel {
         clipboard.stop()
         viewports = []
         phase = .idle
+        resizeTask?.cancel()
+        windowMetrics.removeAll()
         Task { [backend] in await backend.disconnect() }
+    }
+
+    func viewportSizeChanged(_ viewportID: Int, points: CGSize, backingScale: CGFloat) {
+        let first = windowMetrics[viewportID] == nil
+        windowMetrics[viewportID] = (points, backingScale)
+        guard !first else { return }
+        let (w, h) = requestedPixels(points: points, backingScale: backingScale)
+        if let current = viewports.first(where: { $0.id == viewportID }),
+           current.width == w, current.height == h { return }
+        scheduleResizeRequest()
+    }
+
+    func viewportWindowClosed(_ viewportID: Int) {
+        windowMetrics[viewportID] = nil
+        guard phase == .connected else { return }
+        scheduleResizeRequest()
+    }
+
+    private func requestedPixels(points: CGSize, backingScale: CGFloat) -> (Int, Int) {
+        let s = hiDPI ? backingScale : 1
+        return (Int((points.width * s).rounded()), Int((points.height * s).rounded()))
+    }
+
+    private func scheduleResizeRequest() {
+        // `hiDPI`'s didSet fires this during `connect()`'s initial seed assignment too, before
+        // `phase` becomes `.connecting` — guarding here (not just in the debounced task) stops
+        // that from leaving a stray task alive that could later fire once a window's first report
+        // has populated `windowMetrics`, wrongly sending a size nobody asked for.
+        guard phase == .connected else { return }
+        resizeTask?.cancel()
+        resizeTask = Task { [weak self] in
+            guard let debounce = self?.resizeDebounce else { return }
+            try? await Task.sleep(for: debounce)
+            guard let self, !Task.isCancelled, self.phase == .connected, self.agent == .connected else { return }
+            let open = Set(self.viewportSubscribers.values.map(\.viewportID))
+            guard !open.isEmpty else { return }   // never disable every head from the Window menu
+            let layouts = self.viewports.map { v -> DisplayLayout in
+                guard open.contains(v.id) else {
+                    return DisplayLayout(viewportID: v.id, width: 0, height: 0, enabled: false)
+                }
+                let (w, h) = self.windowMetrics[v.id].map { self.requestedPixels(points: $0.points, backingScale: $0.backingScale) }
+                    ?? (v.width, v.height)
+                return DisplayLayout(viewportID: v.id, width: w, height: h, enabled: true)
+            }
+            let backend = self.backend
+            Task { await backend.requestDisplayLayout(layouts) }
+        }
     }
 
     func sendInput(_ event: InputEvent) {

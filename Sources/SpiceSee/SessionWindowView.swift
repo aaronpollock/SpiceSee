@@ -9,6 +9,7 @@ struct SessionWindowView: View {
 
     @State private var hudVisible = false
     @State private var hudTimer: Task<Void, Never>?
+    @State private var window: NSWindow?
 
     var body: some View {
         GeometryReader { proxy in
@@ -38,6 +39,12 @@ struct SessionWindowView: View {
                             .frame(maxHeight: .infinity, alignment: .center)
                     }
                 }
+                .background(WindowReader { window = $0 })
+                .onChange(of: proxy.size) { _, size in
+                    session.viewportSizeChanged(viewport.id, points: size,
+                                                backingScale: window?.backingScaleFactor ?? 2)
+                }
+                .onDisappear { session.viewportWindowClosed(viewport.id) }
         }
         .background(WindowConfigurator())
         .migrationSheet(session: session, viewport: viewport)
