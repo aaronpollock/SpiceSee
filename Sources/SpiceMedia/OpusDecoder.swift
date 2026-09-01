@@ -54,10 +54,27 @@ public final class OpusDecoder {
     }
 
     /// One packet in, its interleaved Float32 frames out. The first packet of a stream comes back
-    /// short by the pre-skip; garbage comes back as an error or as nothing.
+    /// short by the pre-skip; garbage comes back as an error or as nothing; an empty packet decodes
+    /// to nothing without asking the converter (it would otherwise see a nil base pointer).
     public func decode(_ packet: [UInt8]) throws -> [Float] {
-        final class Feed { var packet: [UInt8]; var consumed = false; var desc = AudioStreamPacketDescription()
-            init(_ p: [UInt8]) { packet = p } }
+        guard !packet.isEmpty else { return [] }
+        // Owns its packet bytes and packet description as explicitly allocated storage, freed in
+        // deinit, rather than pointers borrowed from `withUnsafe...` closures — those pointers are
+        // only valid inside their closure, but the input callback below hands them to the converter
+        // to read *after* this call returns from them.
+        final class Feed {
+            let buffer: UnsafeMutableRawBufferPointer
+            let descPtr: UnsafeMutablePointer<AudioStreamPacketDescription>
+            var consumed = false
+            init(_ packet: [UInt8]) {
+                let bytes = UnsafeMutableRawBufferPointer.allocate(byteCount: packet.count, alignment: 1)
+                packet.withUnsafeBytes { bytes.copyMemory(from: $0) }
+                buffer = bytes
+                descPtr = .allocate(capacity: 1)
+                descPtr.pointee = AudioStreamPacketDescription(mStartOffset: 0, mVariableFramesInPacket: 0, mDataByteSize: UInt32(packet.count))
+            }
+            deinit { buffer.deallocate(); descPtr.deallocate() }
+        }
         let feed = Feed(packet)
         let input: AudioConverterComplexInputDataProc = { _, ioPackets, ioData, outDesc, userData in
             // userData is always the pointer we handed AudioConverterFillComplexBuffer below, so
@@ -65,23 +82,24 @@ public final class OpusDecoder {
             let feed = Unmanaged<Feed>.fromOpaque(userData!).takeUnretainedValue()
             guard !feed.consumed else { ioPackets.pointee = 0; return OpusDecoder.noMoreData }
             feed.consumed = true
-            feed.packet.withUnsafeMutableBufferPointer { p in
-                ioData.pointee.mNumberBuffers = 1
-                ioData.pointee.mBuffers.mData = UnsafeMutableRawPointer(p.baseAddress)
-                ioData.pointee.mBuffers.mDataByteSize = UInt32(p.count)
-                ioData.pointee.mBuffers.mNumberChannels = 0
-            }
-            feed.desc = AudioStreamPacketDescription(mStartOffset: 0, mVariableFramesInPacket: 0, mDataByteSize: UInt32(feed.packet.count))
-            outDesc?.pointee = withUnsafeMutablePointer(to: &feed.desc) { $0 }
+            ioData.pointee.mNumberBuffers = 1
+            ioData.pointee.mBuffers.mData = feed.buffer.baseAddress
+            ioData.pointee.mBuffers.mDataByteSize = UInt32(feed.buffer.count)
+            ioData.pointee.mBuffers.mNumberChannels = 0
+            outDesc?.pointee = feed.descPtr
             ioPackets.pointee = 1
             return noErr
         }
         var out = [Float](repeating: 0, count: maxFrames * channels)
         var frames = UInt32(maxFrames)
-        let status: OSStatus = out.withUnsafeMutableBufferPointer { p in
-            var list = AudioBufferList(mNumberBuffers: 1, mBuffers: AudioBuffer(
-                mNumberChannels: UInt32(channels), mDataByteSize: UInt32(p.count * 4), mData: UnsafeMutableRawPointer(p.baseAddress)))
-            return AudioConverterFillComplexBuffer(converter, input, Unmanaged.passUnretained(feed).toOpaque(), &frames, &list, nil)
+        // `feed` is otherwise last used to build the opaque pointer below, which is not a formal
+        // use ARC tracks — without this, the compiler is free to release it before Fill runs.
+        let status: OSStatus = withExtendedLifetime(feed) {
+            out.withUnsafeMutableBufferPointer { p in
+                var list = AudioBufferList(mNumberBuffers: 1, mBuffers: AudioBuffer(
+                    mNumberChannels: UInt32(channels), mDataByteSize: UInt32(p.count * 4), mData: UnsafeMutableRawPointer(p.baseAddress)))
+                return AudioConverterFillComplexBuffer(converter, input, Unmanaged.passUnretained(feed).toOpaque(), &frames, &list, nil)
+            }
         }
         guard status == noErr || status == Self.noMoreData else { throw AudioDecodeError(status: status) }
         return Array(out.prefix(Int(frames) * channels))

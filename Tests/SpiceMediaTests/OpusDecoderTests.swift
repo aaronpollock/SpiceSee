@@ -28,4 +28,9 @@ import Testing
         let r = try? decoder.decode([0xFF, 0x00, 0x13, 0x37])
         #expect(r == nil || r!.count % 2 == 0)
     }
+
+    @Test func emptyPacketDecodesToNothing() throws {
+        let decoder = try OpusDecoder(sampleRate: 48000, channels: 2)
+        #expect(try decoder.decode([]).isEmpty)
+    }
 }
