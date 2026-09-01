@@ -215,7 +215,8 @@ public actor StreamPlayer {
     }
 }
 
-private extension Duration {
+/// Calculates the elapsed time in milliseconds. Shared by AudioPlayer; do not make private.
+extension Duration {
     var milliseconds: Int64 {
         let (seconds, attoseconds) = components
         return seconds * 1000 + attoseconds / 1_000_000_000_000_000

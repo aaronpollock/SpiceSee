@@ -90,3 +90,13 @@ private func drain(_ p: AudioPlayer) async -> [AudioEvent] {
     await p.handle(.data(time: 0, payload: s16([1, 2])))
     #expect(await drain(p).isEmpty)
 }
+
+@Test func dataAfterStopIsDropped() async {
+    let p = AudioPlayer(opusAvailable: true)
+    await p.handle(.mode(time: 0, mode: AudioDataMode.raw.rawValue))
+    await p.handle(start())
+    await p.handle(.stop)
+    await p.handle(.data(time: 0, payload: s16([1, 2])))
+    let events = await drain(p)
+    #expect(events == [.started(sampleRate: 48000, channels: 2, opus: false), .stopped])
+}

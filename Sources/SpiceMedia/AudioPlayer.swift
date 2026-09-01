@@ -5,7 +5,8 @@ import SpiceWire
 private let maxLatenessMs: Int64 = 80
 
 public enum AudioEvent: Sendable, Equatable {
-    case started(sampleRate: Int, channels: Int, opus: Bool)
+    case started(sampleRate: Int, channels: Int, /// The codec the server negotiated (PLAYBACK_MODE), not whether local decode succeeded — the probe prints it as MODE=OPUS.
+                 opus: Bool)
     case pcm(frames: [Float], mmTime: UInt32)
     case volume([Float])
     case mute(Bool)
@@ -84,6 +85,7 @@ public actor AudioPlayer {
         case let .mute(on):
             cont.yield(.mute(on))
         case .stop:
+            format = nil
             decoder = nil
             cont.yield(.stopped)
         case let .latency(ms):
@@ -102,12 +104,5 @@ public actor AudioPlayer {
             i += 2
         }
         return out
-    }
-}
-
-private extension Duration {
-    var milliseconds: Int64 {
-        let (seconds, attoseconds) = components
-        return seconds * 1000 + attoseconds / 1_000_000_000_000_000
     }
 }
