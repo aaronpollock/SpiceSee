@@ -208,12 +208,29 @@ final class SpiceKitBackend: SessionBackend {
 
     func disconnect() async { await live.disconnect() }
 
-    func offerClipboardText() async { await live.session?.offerClipboard([.utf8Text]) }
+    func offerClipboard(_ kinds: [ClipboardKind]) async {
+        await live.session?.offerClipboard(kinds.map(Self.wireType))
+    }
 
-    func requestClipboardText() async { await live.session?.requestClipboard(.utf8Text) }
+    func requestClipboard(_ kind: ClipboardKind) async {
+        await live.session?.requestClipboard(Self.wireType(kind))
+    }
 
     func sendClipboardText(_ text: String) async {
         await live.session?.sendClipboard(.utf8Text, Array(text.utf8))
+    }
+
+    func sendClipboardPNG(_ bytes: [UInt8]) async {
+        await live.session?.sendClipboard(.imagePNG, bytes)
+    }
+
+    private static func wireType(_ k: ClipboardKind) -> ClipboardType { k == .text ? .utf8Text : .imagePNG }
+    private static func kind(_ t: ClipboardType) -> ClipboardKind? {
+        switch t {
+        case .utf8Text: .text
+        case .imagePNG: .png
+        default: nil
+        }
     }
 
     func requestDisplayLayout(_ layouts: [DisplayLayout]) async {
@@ -222,15 +239,22 @@ final class SpiceKitBackend: SessionBackend {
             ordered.map { (width: $0.width, height: $0.height, enabled: $0.enabled) }))
     }
 
-    /// Types other than text are dropped rather than surfaced: the seam above speaks only text, so
-    /// announcing an image offer the app cannot answer would strand the guest waiting.
+    /// Types the seam does not speak (BMP, TIFF, file lists) are dropped here: announcing an offer
+    /// the app cannot answer would strand the guest waiting.
     private static func translate(_ e: SpiceKit.ClipboardEvent) -> ClipboardEvent? {
         switch e {
-        case let .available(on): .available(on)
-        case let .guestOffers(types): types.contains(.utf8Text) ? .guestOffersText : nil
-        case let .guestRequests(type): type == .utf8Text ? .guestRequestsText : nil
-        case let .guestData(type, bytes): type == .utf8Text ? .guestText(String(decoding: bytes, as: UTF8.self)) : nil
-        case .guestReleased: .guestReleased
+        case let .available(on): return .available(on)
+        case let .guestOffers(types):
+            let kinds = types.compactMap(kind)
+            return kinds.isEmpty ? nil : .guestOffers(kinds)
+        case let .guestRequests(type): return kind(type).map(ClipboardEvent.guestRequests)
+        case let .guestData(type, bytes):
+            switch type {
+            case .utf8Text: return .guestText(String(decoding: bytes, as: UTF8.self))
+            case .imagePNG: return .guestImagePNG(bytes)
+            default: return nil
+            }
+        case .guestReleased: return .guestReleased
         }
     }
 

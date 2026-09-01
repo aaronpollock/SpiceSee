@@ -79,18 +79,22 @@ enum ViewportEvent: Sendable {
     case streamDestroyed(UInt32?)
 }
 
-/// Clipboard sharing, narrowed to plain text — the only type SpiceSee exchanges today. The agent
-/// protocol underneath is type-generic, so widening this to images is an adapter change, not a
-/// protocol one.
+/// The clipboard content kinds SpiceSee exchanges: text, and PNG for images. The agent protocol
+/// underneath is type-generic; the adapter narrows to what this seam speaks, dropping BMP/TIFF/JPG/file lists.
+enum ClipboardKind: Sendable, Equatable { case text, png }
+
+/// Clipboard sharing, widened from text-only to also carry PNG images.
 enum ClipboardEvent: Sendable, Equatable {
     /// Whether the guest agent is up and has negotiated clipboard sharing.
     case available(Bool)
-    /// The guest copied text. Ask for it with `requestClipboardText`.
-    case guestOffersText
-    /// The guest is pasting and wants the host clipboard; answer with `sendClipboardText`.
-    case guestRequestsText
-    /// The guest's answer, with LF line endings.
+    /// The guest copied one or more of these kinds. Ask for one with `requestClipboard`.
+    case guestOffers([ClipboardKind])
+    /// The guest is pasting and wants this kind from the host; answer with `sendClipboardText`/`sendClipboardPNG`.
+    case guestRequests(ClipboardKind)
+    /// The guest's answer for `.text`, with LF line endings.
     case guestText(String)
+    /// The guest's answer for `.png`.
+    case guestImagePNG([UInt8])
     case guestReleased
 }
 
@@ -141,12 +145,14 @@ protocol SessionBackend: Sendable {
     func sendCtrlAltDel() async
     /// Synchronous on purpose: the backend must preserve order, and a `Task` per event would not.
     func sendInput(_ event: InputEvent)
-    /// Tells the guest the host clipboard holds text it may ask for.
-    func offerClipboardText() async
-    /// Answers `.guestRequestsText`. Line endings are converted to the guest's convention below.
+    /// Tells the guest the host clipboard holds these kinds, so it may ask for one.
+    func offerClipboard(_ kinds: [ClipboardKind]) async
+    /// Answers `.guestRequests(.text)`. Line endings are converted to the guest's convention below.
     func sendClipboardText(_ text: String) async
-    /// Asks for what `.guestOffersText` announced; the answer arrives as `.guestText`.
-    func requestClipboardText() async
+    /// Answers `.guestRequests(.png)`.
+    func sendClipboardPNG(_ bytes: [UInt8]) async
+    /// Asks for what `.guestOffers` announced; the answer arrives as `.guestText`/`.guestImagePNG`.
+    func requestClipboard(_ kind: ClipboardKind) async
     /// Asks the guest to adopt this layout, one entry per known viewport, closed windows disabled.
     /// Silently ignored without an agent that does monitors-config.
     func requestDisplayLayout(_ layouts: [DisplayLayout]) async

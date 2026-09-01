@@ -21,7 +21,7 @@ final class ClipboardBridge {
 
     /// One FIFO with a single consumer, started in `init` and never cancelled — the same shape, and
     /// for the same reason, as the input queue in `SpiceKitBackend`. Handling each event in its own
-    /// `Task` would let `.guestOffersText` overtake the `.available(true)` that enables it.
+    /// `Task` would let `.guestOffers` overtake the `.available(true)` that enables it.
     private let events: AsyncStream<ClipboardEvent>
     private let eventCont: AsyncStream<ClipboardEvent>.Continuation
     private var consumer: Task<Void, Never>?
@@ -85,21 +85,39 @@ final class ClipboardBridge {
             available = on
             // A guest that has just come up has not seen anything copied before now; offer what is
             // already on the pasteboard so the first paste works without a second ⌘C.
-            if on, enabled, pasteboard.string(forType: .string) != nil {
-                await backend.offerClipboardText()
+            if on, enabled {
+                let kinds = hostKinds()
+                if !kinds.isEmpty { await backend.offerClipboard(kinds) }
             }
-        case .guestOffersText:
+        case let .guestOffers(kinds):
             guard enabled else { return }
-            await backend.requestClipboardText()
+            // Text wins when both are offered — the overwhelmingly common paste. Eager fetch on
+            // purpose: NSPasteboard's data provider is synchronous and cannot await the agent,
+            // which is the same reason the text path has always fetched on offer.
+            if kinds.contains(.text) { await backend.requestClipboard(.text) }
+            else if kinds.contains(.png) { await backend.requestClipboard(.png) }
         case let .guestText(text):
             guard enabled else { return }
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
             ownChangeCount = pasteboard.changeCount
             lastSeenChangeCount = pasteboard.changeCount
-        case .guestRequestsText:
-            guard enabled, let text = pasteboard.string(forType: .string) else { return }
-            await backend.sendClipboardText(text)
+        case let .guestImagePNG(bytes):
+            guard enabled else { return }
+            pasteboard.clearContents()
+            pasteboard.setData(Data(bytes), forType: .png)
+            ownChangeCount = pasteboard.changeCount
+            lastSeenChangeCount = pasteboard.changeCount
+        case let .guestRequests(kind):
+            guard enabled else { return }
+            switch kind {
+            case .text:
+                guard let text = pasteboard.string(forType: .string) else { return }
+                await backend.sendClipboardText(text)
+            case .png:
+                guard let png = hostPNG() else { return }
+                await backend.sendClipboardPNG(png)
+            }
         case .guestReleased:
             break   // the Mac pasteboard keeps what it has; nothing to clear
         }
@@ -110,7 +128,24 @@ final class ClipboardBridge {
         guard count != lastSeenChangeCount else { return }
         lastSeenChangeCount = count
         guard enabled, available, count != ownChangeCount else { return }
-        guard pasteboard.string(forType: .string) != nil else { return }
-        await backend.offerClipboardText()
+        let kinds = hostKinds()
+        guard !kinds.isEmpty else { return }
+        await backend.offerClipboard(kinds)
+    }
+
+    private func hostKinds() -> [ClipboardKind] {
+        var kinds: [ClipboardKind] = []
+        if pasteboard.string(forType: .string) != nil { kinds.append(.text) }
+        if pasteboard.data(forType: .png) != nil || pasteboard.data(forType: .tiff) != nil { kinds.append(.png) }
+        return kinds
+    }
+
+    /// PNG is encoded at request time, not at grab time — the grab is only an announcement.
+    private func hostPNG() -> [UInt8]? {
+        if let png = pasteboard.data(forType: .png) { return Array(png) }
+        guard let tiff = pasteboard.data(forType: .tiff),
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return nil }
+        return Array(png)
     }
 }

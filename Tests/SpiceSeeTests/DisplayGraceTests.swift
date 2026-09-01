@@ -9,9 +9,10 @@ private struct StubBackend: SessionBackend {
     func disconnect() async {}
     func sendCtrlAltDel() async {}
     func sendInput(_ event: InputEvent) {}
-    func offerClipboardText() async {}
+    func offerClipboard(_ kinds: [ClipboardKind]) async {}
     func sendClipboardText(_ text: String) async {}
-    func requestClipboardText() async {}
+    func sendClipboardPNG(_ bytes: [UInt8]) async {}
+    func requestClipboard(_ kind: ClipboardKind) async {}
     func requestDisplayLayout(_ layouts: [DisplayLayout]) async {}
 }
 
