@@ -8,7 +8,17 @@ final class MockSessionBackend: SessionBackend {
     }
 
     private let scenario: Scenario
-    init(scenario: Scenario = .desktop) { self.scenario = scenario }
+
+    /// One live consumer per app run — the mock assumes a single active session, which is what
+    /// `--mock` review is. Layout requests are answered ~200 ms later the way a guest would:
+    /// a new viewport list, then a full repaint at the granted size.
+    private let resizeStream: AsyncStream<[DisplayLayout]>
+    private let resizeCont: AsyncStream<[DisplayLayout]>.Continuation
+
+    init(scenario: Scenario = .desktop) {
+        self.scenario = scenario
+        (resizeStream, resizeCont) = AsyncStream.makeStream(of: [DisplayLayout].self)
+    }
 
     func connect(_ target: ConnectionTarget) -> AsyncStream<BackendEvent> {
         let scenario = self.scenario
@@ -47,7 +57,8 @@ final class MockSessionBackend: SessionBackend {
                     ]))
                     continuation.yield(.agent(scenario == .noAgent ? .absent : .negotiating))
                     continuation.yield(.pointerMode(scenario == .noAgent ? .server : .client))
-                    continuation.yield(.frame(Self.desktop(width: size.width, height: size.height)))
+                    continuation.yield(.frame(Self.desktop(width: size.width, height: size.height, viewportID: 0, band: (60, 42, 32))))
+                    continuation.yield(.frame(Self.desktop(width: 2560, height: 1440, viewportID: 1, band: (32, 42, 60))))
                     continuation.yield(.cursor(viewportID: 0, .shape(Self.arrowCursor)))
                     continuation.yield(.cursor(viewportID: 0, .moved(x: 300, y: 260)))
                     if scenario != .noAgent {
@@ -61,12 +72,36 @@ final class MockSessionBackend: SessionBackend {
                             vmName: "win11-desk", newHost: "pve3.lan", newPort: 5904, newTLSPort: 5901,
                             certSubject: "CN=pve3,O=PVE Cluster Manager CA")))
                     }
-                    // Blink a caret so the viewport is visibly live.
-                    var on = true
-                    while !Task.isCancelled {
-                        try await Task.sleep(for: .milliseconds(500))
-                        continuation.yield(.frame(Self.caret(on: on, surface: size)))
-                        on.toggle()
+                    // The resizer and the caret blink run as structured siblings so cancelling
+                    // `task` (below, on stream termination) cancels both together.
+                    await withTaskGroup(of: Void.self) { group in
+                        group.addTask {
+                            for await layouts in self.resizeStream {
+                                try? await Task.sleep(for: .milliseconds(200))
+                                let enabled = layouts.filter(\.enabled)
+                                guard !enabled.isEmpty else { continue }
+                                continuation.yield(.viewportsChanged(enabled.enumerated().map { i, l in
+                                    ViewportInfo(id: l.viewportID, index: i, total: enabled.count,
+                                                 width: l.width, height: l.height)
+                                }))
+                                for l in enabled {
+                                    continuation.yield(.frame(Self.desktop(width: l.width, height: l.height,
+                                                                           viewportID: l.viewportID,
+                                                                           band: l.viewportID == 0 ? (60, 42, 32) : (32, 42, 60))))
+                                }
+                            }
+                        }
+                        group.addTask {
+                            // Blink a caret so the viewport is visibly live. Always drawn against
+                            // the ORIGINAL viewport-0 size: a mock resize may leave it at a stale
+                            // offset, but the resizer's full repaint above already proves the resize.
+                            var on = true
+                            while !Task.isCancelled {
+                                try? await Task.sleep(for: .milliseconds(500))
+                                continuation.yield(.frame(Self.caret(on: on, surface: size)))
+                                on.toggle()
+                            }
+                        }
                     }
                 } catch {}
                 continuation.finish()
@@ -83,7 +118,7 @@ final class MockSessionBackend: SessionBackend {
     func sendClipboardText(_ text: String) async {}
     func sendClipboardPNG(_ bytes: [UInt8]) async {}
     func requestClipboard(_ kind: ClipboardKind) async {}
-    func requestDisplayLayout(_ layouts: [DisplayLayout]) async {}
+    func requestDisplayLayout(_ layouts: [DisplayLayout]) async { resizeCont.yield(layouts) }
 
     /// A 12×20 black arrow with a white outline — enough to see the overlay in `--mock`.
     private static let arrowCursor: CursorImage = {
@@ -100,18 +135,20 @@ final class MockSessionBackend: SessionBackend {
         return CursorImage(width: w, height: h, hotX: 0, hotY: 0, pixels: px)
     }()
 
-    /// A flat desktop with a title bar band, so scaling and 1:1 are visibly different.
-    private static func desktop(width: Int, height: Int) -> FrameUpdate {
+    /// A flat desktop with a title bar band, so scaling and 1:1 are visibly different. `band` is
+    /// the band's BGR — viewport 1 gets a visibly different colour so a swapped window is obvious.
+    private static func desktop(width: Int, height: Int, viewportID: Int,
+                                 band: (UInt8, UInt8, UInt8)) -> FrameUpdate {
         var px = [UInt8](repeating: 0, count: width * height * 4)
         for y in 0 ..< height {
-            let band = y < 96
-            let (b, g, r): (UInt8, UInt8, UInt8) = band ? (60, 42, 32) : (UInt8(70 + y * 40 / height), 52, 44)
+            let inBand = y < 96
+            let (b, g, r): (UInt8, UInt8, UInt8) = inBand ? band : (UInt8(70 + y * 40 / height), 52, 44)
             for x in 0 ..< width {
                 let i = (y * width + x) * 4
                 px[i] = b; px[i + 1] = g; px[i + 2] = r; px[i + 3] = 0xFF
             }
         }
-        return FrameUpdate(viewportID: 0, surfaceWidth: width, surfaceHeight: height,
+        return FrameUpdate(viewportID: viewportID, surfaceWidth: width, surfaceHeight: height,
                            x: 0, y: 0, width: width, height: height, pixels: px)
     }
 
