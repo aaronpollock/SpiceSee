@@ -8,7 +8,8 @@ func usage() -> Never {
     print("""
     usage: spicesee-cli connect <host> <port> [password] [--tls-port <p>] [--ca <file.pem>] [--host-subject <s>]
            spicesee-cli dump <host> <port> <seconds> <out.png> [password]
-           spicesee-cli clipboard <host> <port> [password] [--send <text>] [--seconds <n>]
+           spicesee-cli clipboard <host> <port> [password] [--send <text>] [--send-image <png>] [--save-image <out.png>] [--seconds <n>]
+           spicesee-cli resize <host> <port> <width> <height> [password] [--seconds <n>]
            spicesee-cli vv <file.vv> [seconds out.png]
     """)
     exit(2)
@@ -84,7 +85,8 @@ func escaped(_ s: String) -> String {
 /// Exercises the agent clipboard against a real guest: prints the negotiation, answers the guest's
 /// paste requests with `text`, and fetches whatever the guest copies. This is how M5 is checked
 /// end to end — the unit tests can only prove the bytes, not that a real vdagent accepts them.
-func clipboardProbe(_ config: ConnectionConfig, seconds: Double, send text: String?) async throws {
+func clipboardProbe(_ config: ConnectionConfig, seconds: Double, send text: String?,
+                     sendImage: [UInt8]?, saveImageTo: URL?) async throws {
     let session = try await SpiceSession.connect(config)
     print("connected; watching the clipboard for \(seconds)s")
     let deadline = Task {
@@ -99,22 +101,71 @@ func clipboardProbe(_ config: ConnectionConfig, seconds: Double, send text: Stri
             print("agent \(connected ? "connected" : "gone")")
         case let .clipboard(.available(on)):
             print("clipboard sharing \(on ? "negotiated" : "unavailable")")
-            if on, let text {
-                print("offering \(text.utf8.count) bytes of text")
-                await session.offerClipboard([.utf8Text])
+            if on {
+                var offered: [ClipboardType] = []
+                if let text {
+                    print("offering \(text.utf8.count) bytes of text")
+                    offered.append(.utf8Text)
+                }
+                if sendImage != nil { offered.append(.imagePNG) }
+                if !offered.isEmpty { await session.offerClipboard(offered) }
             }
         case let .clipboard(.guestOffers(types)):
             print("guest grabbed, offering: \(types.map(String.init(describing:)).joined(separator: " "))")
             if types.contains(.utf8Text) { await session.requestClipboard(.utf8Text) }
+            if types.contains(.imagePNG), saveImageTo != nil { await session.requestClipboard(.imagePNG) }
         case let .clipboard(.guestRequests(type)):
             print("guest is pasting, wants \(type)")
+            if type == .imagePNG {
+                guard let sendImage else { print("  nothing to send (pass --send-image)"); continue }
+                await session.sendClipboard(.imagePNG, sendImage)
+                print("  sent \(sendImage.count) bytes")
+                continue
+            }
             guard let text else { print("  nothing to send (pass --send)"); continue }
             await session.sendClipboard(.utf8Text, Array(text.utf8))
             print("  sent \(text.utf8.count) bytes")
+        case let .clipboard(.guestData(.imagePNG, bytes)):
+            guard let saveImageTo else { continue }
+            try Data(bytes).write(to: saveImageTo)
+            print("wrote \(bytes.count) bytes to \(saveImageTo.path)")
         case let .clipboard(.guestData(type, bytes)):
             print("guest sent \(bytes.count) bytes of \(type): \"\(escaped(String(decoding: bytes, as: UTF8.self)))\"")
         case .clipboard(.guestReleased):
             print("guest released its clipboard")
+        case .disconnected:
+            print("disconnected")
+            return
+        default:
+            break
+        }
+    }
+}
+
+/// Asks a live guest to change resolution and reports what comes back. Proves the whole wire path
+/// — capability gate, packed message, guest reaction — without dragging a window.
+func resizeProbe(_ config: ConnectionConfig, width: UInt32, height: UInt32, seconds: Double) async throws {
+    let session = try await SpiceSession.connect(config)
+    print("connected; requesting \(width)x\(height), watching for \(seconds)s")
+    let deadline = Task {
+        try? await Task.sleep(for: .seconds(seconds))
+        await session.disconnect()
+    }
+    defer { deadline.cancel() }
+
+    for await event in session.events {
+        switch event {
+        case let .agent(connected):
+            print("agent \(connected ? "connected" : "gone")")
+        case .clipboard(.available):
+            // Capability negotiation is complete once clipboard availability is decided —
+            // the same ANNOUNCE_CAPABILITIES answers for monitors config.
+            await session.sendMonitorsConfig([AgentMonitorConfig(width: width, height: height)])
+            print("sent VD_AGENT_MONITORS_CONFIG \(width)x\(height) (dropped silently if the guest lacks the cap)")
+        case let .monitorsConfig(heads, displayID: id):
+            print("display \(id) heads: \(heads.map { "\($0.width)x\($0.height)@\($0.x),\($0.y)" }.joined(separator: " "))")
+        case let .canvas(.surfaceCreated(d), displayID: id) where d.isPrimary:
+            print("display \(id) primary now \(d.width)x\(d.height)")
         case .disconnected:
             print("disconnected")
             return
@@ -164,13 +215,30 @@ case "dump":
     }
 
 case "clipboard":
-    let (positional, flags) = takeFlags(Array(args.dropFirst(2)), ["--send", "--seconds"])
+    let (positional, flags) = takeFlags(Array(args.dropFirst(2)), ["--send", "--send-image", "--save-image", "--seconds"])
     guard positional.count >= 2, let port = UInt16(positional[1]) else { usage() }
     let seconds = flags["--seconds"].flatMap(Double.init) ?? 20
     do {
+        // Read up front so a missing file fails fast with a readable error, not mid-negotiation.
+        let sendImage = try flags["--send-image"].map { try Array(Data(contentsOf: URL(fileURLWithPath: $0))) }
+        let saveImageTo = flags["--save-image"].map { URL(fileURLWithPath: $0) }
         try await clipboardProbe(ConnectionConfig(host: positional[0], port: port,
                                                   password: positional.count > 2 ? positional[2] : nil),
-                                 seconds: seconds, send: flags["--send"])
+                                 seconds: seconds, send: flags["--send"],
+                                 sendImage: sendImage, saveImageTo: saveImageTo)
+    } catch {
+        print("error: \(describe(error))"); exit(1)
+    }
+
+case "resize":
+    let (positional, flags) = takeFlags(Array(args.dropFirst(2)), ["--seconds"])
+    guard positional.count >= 4, let port = UInt16(positional[1]),
+          let width = UInt32(positional[2]), let height = UInt32(positional[3]) else { usage() }
+    let seconds = flags["--seconds"].flatMap(Double.init) ?? 20
+    do {
+        try await resizeProbe(ConnectionConfig(host: positional[0], port: port,
+                                               password: positional.count > 4 ? positional[4] : nil),
+                              width: width, height: height, seconds: seconds)
     } catch {
         print("error: \(describe(error))"); exit(1)
     }
