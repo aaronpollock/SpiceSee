@@ -19,10 +19,13 @@ public struct AgentEvent: Sendable {
 /// Driven by `SpiceSession`, which owns the main channel's message stream — this actor never reads
 /// the socket itself, it is fed the agent messages that arrive there and hands back chunks to send.
 public actor AgentSession {
-    /// What the client announces. Only clipboard: SpiceSee does not route the pointer, the monitor
-    /// layout or the audio volume through the agent, and announcing a capability it does not honour
-    /// would tell the guest to stop using the paths that do work.
-    public static let clientCaps = CapabilitySet(bits: [AgentCap.clipboardByDemand, AgentCap.clipboardSelection])
+    /// What the client announces. Clipboard, plus `sparseMonitorsConfig` because our
+    /// `VD_AGENT_MONITORS_CONFIG` may carry disabled heads (M5). Still absent on purpose: the
+    /// pointer and audio-volume paths, which SpiceSee does not route — announcing a capability it
+    /// does not honour would tell the guest to stop using the paths that do work.
+    public static let clientCaps = CapabilitySet(bits: [AgentCap.clipboardByDemand,
+                                                        AgentCap.clipboardSelection,
+                                                        AgentCap.sparseMonitorsConfig])
 
     public nonisolated let messages: AsyncStream<AgentEvent>
     private let cont: AsyncStream<AgentEvent>.Continuation
@@ -43,6 +46,11 @@ public actor AgentSession {
 
     /// Whether clipboard messages may be sent: the guest must have said it does clipboard-by-demand.
     public var clipboardReady: Bool { connected && capsReceived && guestCaps.contains(AgentCap.clipboardByDemand) }
+
+    /// Whether a monitors config may be sent: the guest must have announced it applies them.
+    public var guestSupportsMonitorsConfig: Bool {
+        connected && capsReceived && guestCaps.contains(AgentCap.monitorsConfig)
+    }
 
     /// The guest's line endings, which decide whether text needs converting on the way through.
     public var guestWantsCRLF: Bool { guestCaps.contains(AgentCap.guestLineEndCRLF) }

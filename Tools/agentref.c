@@ -32,6 +32,7 @@ int main(void) {
     caps->request = 1;
     VD_AGENT_SET_CAPABILITY(caps->caps, VD_AGENT_CAP_CLIPBOARD_BY_DEMAND);
     VD_AGENT_SET_CAPABILITY(caps->caps, VD_AGENT_CAP_CLIPBOARD_SELECTION);
+    VD_AGENT_SET_CAPABILITY(caps->caps, VD_AGENT_CAP_SPARSE_MONITORS_CONFIG);
     unsigned char buf[512];
     VDAgentMessage msg = { .protocol = VD_AGENT_PROTOCOL, .type = VD_AGENT_ANNOUNCE_CAPABILITIES,
                            .opaque = 0, .size = capsize };

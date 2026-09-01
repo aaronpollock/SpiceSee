@@ -340,6 +340,8 @@ public actor SpiceSession {
         case let .clipboardRelease(selection):
             guard selection == .clipboard else { return }
             cont.yield(.clipboard(.guestReleased))
+        case .monitorsConfig:
+            break
         case .other:
             break
         }
@@ -370,6 +372,14 @@ public actor SpiceSession {
     public func releaseClipboard() async {
         guard let agent, await agent.clipboardReady else { return }
         await agent.send(.clipboardRelease(.clipboard))
+    }
+
+    /// Asks the guest to adopt this monitor layout (`VD_AGENT_MONITORS_CONFIG`). Silently absent
+    /// without a guest that announced the capability, like every other agent feature. The guest
+    /// answers with a new primary surface and/or DISPLAY_MONITORS_CONFIG, never with a reply here.
+    public func sendMonitorsConfig(_ monitors: [AgentMonitorConfig]) async {
+        guard let agent, await agent.guestSupportsMonitorsConfig, !monitors.isEmpty else { return }
+        await agent.send(.monitorsConfig(flags: AgentMonitorsFlags.usePosition, monitors: monitors))
     }
 
     /// Absolute positioning is what the user wants whenever the server can do it (agent or tablet);

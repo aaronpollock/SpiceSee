@@ -21,9 +21,9 @@ import Testing
     }
 
     @Test func announceCapabilitiesMatchesSpiceGTK() {
-        let caps = CapabilitySet(bits: [AgentCap.clipboardByDemand, AgentCap.clipboardSelection])
+        let caps = CapabilitySet(bits: [AgentCap.clipboardByDemand, AgentCap.clipboardSelection, AgentCap.sparseMonitorsConfig])
         #expect(hex(stream(.announceCapabilities(request: true, caps: caps)))
-                == "010000000600000000000000000000000800000001000000" + "60000000")
+                == "010000000600000000000000000000000800000001000000" + "e0000000")
     }
 
     @Test func clipboardGrabMatchesSpiceGTK() {
