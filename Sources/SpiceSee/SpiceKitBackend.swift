@@ -204,6 +204,7 @@ final class SpiceKitBackend: SessionBackend {
                         }
                         continuation.finish()
                         return
+                    case .audio: break   // wired in Task 7
                     }
                 }
                 continuation.yield(.disconnected)

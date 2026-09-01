@@ -71,6 +71,7 @@ public enum SessionEvent: Sendable {
     case streamFrame(StreamFrame, displayID: UInt8)
     case streamDestroyed(id: UInt32, displayID: UInt8)
     case allStreamsDestroyed(displayID: UInt8)
+    case audio(AudioEvent)
 }
 
 public actor SpiceSession {
@@ -87,6 +88,8 @@ public actor SpiceSession {
     private var displays: [DisplayChannel] = []
     private var cursors: [CursorChannel] = []
     private var players: [StreamPlayer] = []
+    private var playback: PlaybackChannel?
+    private var audio: AudioPlayer?
     private var inputs: InputsChannel?
     private var agent: AgentSession?
     private var tasks: [Task<Void, Never>] = []
@@ -135,6 +138,7 @@ public actor SpiceSession {
 
         var displayPumps: [Task<Void, Never>] = []
         var cursorPumps: [Task<Void, Never>] = []
+        var audioPumps: [Task<Void, Never>] = []
         for desc in info.channels {
             do {
                 switch desc.type {
@@ -204,6 +208,27 @@ public actor SpiceSession {
                     cursorPumps.append(pump); tasks.append(pump)
                 case .inputs where desc.id == 0:
                     inputs = try await InputsChannel.open(transport: try await transports(desc), connectionID: info.connectionID, password: password)
+                case .playback where desc.id == 0:
+                    let opus = OpusDecoder.isAvailable()
+                    var bits = [PlaybackCap.volume, PlaybackCap.latency]
+                    if opus { bits.append(PlaybackCap.opus) }
+                    let ch = try await PlaybackChannel.open(transport: try await transports(desc), connectionID: info.connectionID,
+                                                            id: desc.id, password: password, caps: CapabilitySet(bits: bits))
+                    playback = ch
+                    let player = AudioPlayer(opusAvailable: opus)
+                    audio = player
+                    await player.setMMTime(info.mainInit.multiMediaTime)
+                    let audioPump = Task { [cont] in for await e in player.events { cont.yield(.audio(e)) } }
+                    tasks.append(audioPump)
+                    let pump = Task { [weak self] in
+                        for await m in ch.messages { await player.handle(m) }
+                        // Same drain shape as the canvas and stream pumps: every decoded chunk is on
+                        // `cont` before the channel is declared over, so .disconnected stays last.
+                        await player.finish()
+                        _ = await audioPump.value
+                        await self?.channelEnded(desc)
+                    }
+                    audioPumps.append(pump); tasks.append(pump)
                 default:
                     continue
                 }
@@ -247,6 +272,7 @@ public actor SpiceSession {
             await self?.channelEnded(MainChannel.descriptor)
             for pump in displayPumps { _ = await pump.value }
             for pump in cursorPumps { _ = await pump.value }
+            for pump in audioPumps { _ = await pump.value }
             cont.yield(.disconnected(await self?.lossReason))
         })
     }
@@ -275,6 +301,7 @@ public actor SpiceSession {
         inputCont.finish()
         for d in displays { await d.close() }
         for c in cursors { await c.close() }
+        await playback?.close()
         await inputs?.close()
         await main.close()
     }
@@ -298,7 +325,9 @@ public actor SpiceSession {
             cont.yield(.clipboard(.available(false)))
         case let .agentData(payload): await agent?.receive(payload)
         case let .agentToken(n): await agent?.credit(n)
-        case let .multiMediaTime(t): for p in players { await p.setMMTime(t.time) }
+        case let .multiMediaTime(t):
+            for p in players { await p.setMMTime(t.time) }
+            await audio?.setMMTime(t.time)
         case let .migrateSwitchHost(target): cont.yield(.migrated(target))
         // A begin without a switch means the server is preparing a migration it may still cancel;
         // the design's prompt belongs on the switch, so log and wait.
