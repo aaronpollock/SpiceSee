@@ -19,11 +19,13 @@ public struct HeadRect: Sendable, Equatable {
 
 public struct ViewportLayout: Sendable, Equatable {
     public var displayID: UInt8
-    public var headIndex: Int
+    /// The guest's own monitor id, not a position in the list: windows key on `viewportID`, so
+    /// removing one head must not renumber the heads that survive it.
+    public var headID: Int
     public var rect: HeadRect
-    public var viewportID: Int { Int(displayID) << 8 | headIndex }
-    public init(displayID: UInt8, headIndex: Int, rect: HeadRect) {
-        self.displayID = displayID; self.headIndex = headIndex; self.rect = rect
+    public var viewportID: Int { Int(displayID) << 8 | headID }
+    public init(displayID: UInt8, headID: Int, rect: HeadRect) {
+        self.displayID = displayID; self.headID = headID; self.rect = rect
     }
 }
 
@@ -42,8 +44,10 @@ public struct ViewportMapper: Sendable, Equatable {
     public init() {}
 
     public mutating func primaryCreated(displayID: UInt8, width: Int, height: Int) {
-        displays[displayID, default: DisplayState()].width = width
-        displays[displayID]!.height = height
+        var state = displays[displayID, default: DisplayState()]
+        state.width = width
+        state.height = height
+        displays[displayID] = state
     }
 
     public mutating func primaryDestroyed(displayID: UInt8) {
@@ -67,10 +71,14 @@ public struct ViewportMapper: Sendable, Equatable {
         return clamped.isEmpty ? [HeadRect(id: 0, x: 0, y: 0, width: w, height: h)] : clamped
     }
 
+    /// The head half of a viewport id. The guest's monitor id is a `UInt32` and only 8 bits are
+    /// available, so it is clamped rather than wrapped — a colliding id is better than a silent one.
+    private static func headID(_ head: HeadRect) -> Int { min(Int(head.id), 255) }
+
     public var layouts: [ViewportLayout] {
         displays.sorted { $0.key < $1.key }.flatMap { id, state in
-            effectiveHeads(state).enumerated().map { i, rect in
-                ViewportLayout(displayID: id, headIndex: i, rect: rect)
+            effectiveHeads(state).map { rect in
+                ViewportLayout(displayID: id, headID: Self.headID(rect), rect: rect)
             }
         }
     }
@@ -91,12 +99,12 @@ public struct ViewportMapper: Sendable, Equatable {
 
     public func slices(displayID: UInt8, dirtyX: Int, dirtyY: Int, width: Int, height: Int) -> [Slice] {
         guard let state = displays[displayID] else { return [] }
-        return effectiveHeads(state).enumerated().compactMap { i, head in
+        return effectiveHeads(state).compactMap { head in
             let left = max(dirtyX, head.x), top = max(dirtyY, head.y)
             let right = min(dirtyX + width, head.x + head.width)
             let bottom = min(dirtyY + height, head.y + head.height)
             guard right > left, bottom > top else { return nil }
-            return Slice(viewportID: Int(displayID) << 8 | i,
+            return Slice(viewportID: Int(displayID) << 8 | Self.headID(head),
                          headWidth: head.width, headHeight: head.height,
                          destX: left - head.x, destY: top - head.y,
                          srcX: left - dirtyX, srcY: top - dirtyY,

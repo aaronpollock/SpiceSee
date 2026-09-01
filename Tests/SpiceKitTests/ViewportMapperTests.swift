@@ -26,7 +26,7 @@ import SpiceWire
     @Test func aPrimaryWithNoHeadsIsOneFullViewport() {
         var m = ViewportMapper()
         m.primaryCreated(displayID: 0, width: 1280, height: 800)
-        #expect(m.layouts == [ViewportLayout(displayID: 0, headIndex: 0,
+        #expect(m.layouts == [ViewportLayout(displayID: 0, headID: 0,
                                              rect: HeadRect(id: 0, x: 0, y: 0, width: 1280, height: 800))])
         #expect(m.layouts[0].viewportID == 0)
     }
@@ -44,6 +44,20 @@ import SpiceWire
             HeadRect(id: 1, x: 1920, y: 0, width: 1080, height: 1080),
         ])
         #expect(m.layouts.map(\.viewportID) == [0, 1])
+    }
+
+    @Test func aSurvivingHeadKeepsItsViewportID() {
+        var m = ViewportMapper()
+        m.primaryCreated(displayID: 0, width: 200, height: 100)
+        m.headsChanged(displayID: 0, heads: [
+            HeadRect(id: 0, x: 0, y: 0, width: 100, height: 100),
+            HeadRect(id: 1, x: 100, y: 0, width: 100, height: 100),
+        ])
+        m.headsChanged(displayID: 0, heads: [HeadRect(id: 1, x: 100, y: 0, width: 100, height: 100)])
+        // Head 1's window keys on id 1; renumbering it to 0 would orphan that window and open a second.
+        #expect(m.layouts.map(\.viewportID) == [1])
+        #expect(m.slices(displayID: 0, dirtyX: 100, dirtyY: 0, width: 100, height: 100).map(\.viewportID) == [1])
+        #expect(m.origin(of: 1)! == (displayID: 0, x: 100, y: 0))
     }
 
     @Test func headsSurviveAPrimaryRebuildAtANewSize() {
