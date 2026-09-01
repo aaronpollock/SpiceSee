@@ -111,6 +111,8 @@ final class SessionModel {
             self.viewports = viewports
             phase = .connected
             clipboard.start()
+        case let .viewportsChanged(viewports):
+            self.viewports = viewports
         case let .clipboard(event):
             clipboard.handle(event)
         case let .agent(state):

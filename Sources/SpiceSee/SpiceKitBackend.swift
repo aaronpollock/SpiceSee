@@ -22,7 +22,10 @@ final class SpiceKitBackend: SessionBackend {
     /// carry the session they delimit: `.end` only clears the current session if it is that session.
     /// Input queued before `.begin` or after `.end` is dropped, not replayed into the next guest,
     /// because there is no current session to send it to. The bounded buffer only caps memory.
-    private enum Queued: Sendable { case begin(SpiceSession), end(SpiceSession), host(InputEvent), guest(GuestInput) }
+    /// `.layout` carries a `ViewportMapper` snapshot into the FIFO so the input consumer can
+    /// translate pointer positions without touching shared mutable state — the same "stamped, not
+    /// queried" rule the codebase applies to `AgentEvent`.
+    private enum Queued: Sendable { case begin(SpiceSession), end(SpiceSession), host(InputEvent), guest(GuestInput), layout(ViewportMapper) }
     private let inputCont: AsyncStream<Queued>.Continuation
 
     init() {
@@ -30,12 +33,14 @@ final class SpiceKitBackend: SessionBackend {
         inputCont = continuation
         Task {
             var current: SpiceSession?
+            var mapper = ViewportMapper()
             for await q in inputs {
                 switch q {
                 case let .begin(s): current = s
                 case let .end(s): if current === s { current = nil }
-                case let .host(e): if let s = current { Self.translate(e).forEach(s.send) }
+                case let .host(e): if let s = current { Self.translate(e, mapper: mapper).forEach(s.send) }
                 case let .guest(g): current?.send(g)
+                case let .layout(m): mapper = m
                 }
             }
         }
@@ -81,57 +86,93 @@ final class SpiceKitBackend: SessionBackend {
                 inputCont.yield(.begin(session))
                 defer { inputCont.yield(.end(session)) }
 
-                let displays = session.info.channels.filter { $0.type == .display }
-                // In M1 there is one display channel and one primary surface; M5 maps surfaces to
-                // viewports properly for multi-monitor.
-                let viewportID = displays.first.map { Int($0.id) } ?? 0
                 continuation.yield(.step(.ticket))
                 continuation.yield(.step(.channels))
                 continuation.yield(.agent(session.info.mainInit.agentConnected != 0 ? .connected : .absent))
 
+                var mapper = ViewportMapper()
                 var announced = false
+
+                func viewportInfos() -> [ViewportInfo] {
+                    let layouts = mapper.layouts
+                    return layouts.enumerated().map { i, l in
+                        ViewportInfo(id: l.viewportID, index: i, total: layouts.count,
+                                     width: l.rect.width, height: l.rect.height)
+                    }
+                }
+                func publishLayout() {
+                    inputCont.yield(.layout(mapper))
+                    let infos = viewportInfos()
+                    guard !infos.isEmpty else { return }
+                    if announced { continuation.yield(.viewportsChanged(infos)) }
+                    else { continuation.yield(.connected(viewports: infos)); announced = true }
+                }
+
                 for await event in session.events {
                     switch event {
                     case .connected:
                         break   // the UI is told once there are pixels to show, below
-                    case let .canvas(.surfaceCreated(d), displayID: _) where d.isPrimary:
+                    case let .canvas(.surfaceCreated(d), displayID: id) where d.isPrimary:
                         // Gate `.connected` on the primary surface: before it exists there is
                         // nothing to put in a viewport, and ViewportInfo carries its size.
-                        let viewports = displays.enumerated().map { i, ch in
-                            ViewportInfo(id: Int(ch.id), index: i, total: displays.count, width: d.width, height: d.height)
+                        mapper.primaryCreated(displayID: id, width: d.width, height: d.height)
+                        publishLayout()
+                    case let .canvas(.surfaceDestroyed(sid), displayID: id):
+                        // Only the primary is a viewport; the mapper only tracks primaries, and a
+                        // destroyed primary must NOT re-announce an empty list — the guest is about
+                        // to recreate it at a new size (the resize path), so hold the windows.
+                        if sid == 0 { mapper.primaryDestroyed(displayID: id) }
+                    case let .monitorsConfig(heads, displayID: id):
+                        mapper.headsChanged(displayID: id, heads: heads)
+                        publishLayout()
+                    case let .canvas(.updated(u), displayID: id) where u.isPrimary:
+                        for s in mapper.slices(displayID: id, dirtyX: Int(u.rect.left), dirtyY: Int(u.rect.top),
+                                               width: Int(u.rect.width), height: Int(u.rect.height)) {
+                            let whole = s.width == Int(u.rect.width) && s.height == Int(u.rect.height)
+                            continuation.yield(.frame(FrameUpdate(
+                                viewportID: s.viewportID,
+                                surfaceWidth: s.headWidth, surfaceHeight: s.headHeight,
+                                x: s.destX, y: s.destY, width: s.width, height: s.height,
+                                pixels: whole ? u.pixels : ViewportMapper.extract(
+                                    u.pixels, rowPixels: Int(u.rect.width),
+                                    x: s.srcX, y: s.srcY, width: s.width, height: s.height))))
                         }
-                        continuation.yield(.connected(viewports: viewports.isEmpty
-                            ? [ViewportInfo(id: 0, index: 0, total: 1, width: d.width, height: d.height)]
-                            : viewports))
-                        announced = true
-                    case let .canvas(.updated(u), displayID: _) where u.isPrimary:
-                        continuation.yield(.frame(FrameUpdate(viewportID: viewportID,
-                                                              surfaceWidth: u.surfaceWidth, surfaceHeight: u.surfaceHeight,
-                                                              x: Int(u.rect.left), y: Int(u.rect.top),
-                                                              width: Int(u.rect.width), height: Int(u.rect.height),
-                                                              pixels: u.pixels)))
                     case .canvas(.updated, displayID: _), .canvas(.surfaceCreated, displayID: _):
                         break   // off-screen surfaces are scratch buffers, not viewport content
                     case let .canvas(.unsupported(what), displayID: _):
                         log.notice("canvas: \(what, privacy: .public)")
-                    case .canvas(.surfaceDestroyed, displayID: _):
-                        break
-                    case .monitorsConfig:
-                        break   // multi-display routing lands in a later task
                     case let .pointerMode(mode):
                         continuation.yield(.pointerMode(mode == .client ? .client : .server))
                     case let .cursor(change, displayID):
-                        continuation.yield(.cursor(viewportID: Int(displayID), Self.translate(change)))
+                        for l in mapper.layouts where l.displayID == displayID {
+                            switch change {
+                            case .shape:
+                                continuation.yield(.cursor(viewportID: l.viewportID, Self.translate(change)))
+                            case let .moved(x, y):
+                                continuation.yield(.cursor(viewportID: l.viewportID,
+                                                           .moved(x: x - l.rect.x, y: y - l.rect.y)))
+                            }
+                        }
                     case let .agent(connected):
                         continuation.yield(.agent(connected ? .connected : .absent))
                     case let .clipboard(event):
                         if let mapped = Self.translate(event) { continuation.yield(.clipboard(mapped)) }
                     case let .streamFrame(f, displayID: id):
-                        continuation.yield(.streamFrame(Self.translate(f, viewportID: Int(id))))
+                        for l in mapper.layouts where l.displayID == id {
+                            var u = Self.translate(f, viewportID: l.viewportID)
+                            u.dest.x -= l.rect.x; u.dest.y -= l.rect.y
+                            u.clip = u.clip.map { $0.map { r in
+                                var r = r; r.x -= l.rect.x; r.y -= l.rect.y; return r } }
+                            continuation.yield(.streamFrame(u))
+                        }
                     case let .streamDestroyed(id: sid, displayID: id):
-                        continuation.yield(.streamDestroyed(viewportID: Int(id), streamID: sid))
+                        for l in mapper.layouts where l.displayID == id {
+                            continuation.yield(.streamDestroyed(viewportID: l.viewportID, streamID: sid))
+                        }
                     case let .allStreamsDestroyed(displayID: id):
-                        continuation.yield(.streamDestroyed(viewportID: Int(id), streamID: nil))
+                        for l in mapper.layouts where l.displayID == id {
+                            continuation.yield(.streamDestroyed(viewportID: l.viewportID, streamID: nil))
+                        }
                     case let .migrated(t):
                         // The adapter only knows the host it dialled; SessionModel substitutes the
                         // connection's display name, which is what the sheet actually quotes.
@@ -193,7 +234,7 @@ final class SpiceKitBackend: SessionBackend {
         for s in [XTScancode.delete, .leftAlt, .leftControl] { inputCont.yield(.guest(.keyUp(s))) }
     }
 
-    private static func translate(_ e: InputEvent) -> [GuestInput] {
+    private static func translate(_ e: InputEvent, mapper: ViewportMapper) -> [GuestInput] {
         switch e {
         case let .keyDown(code, m):
             return KeyMap.scancode(keyCode: code, commandMapsTo: target(m.commandMapsTo), optionMapsTo: target(m.optionMapsTo)).map { [.keyDown($0)] } ?? []
@@ -201,7 +242,10 @@ final class SpiceKitBackend: SessionBackend {
             return KeyMap.scancode(keyCode: code, commandMapsTo: target(m.commandMapsTo), optionMapsTo: target(m.optionMapsTo)).map { [.keyUp($0)] } ?? []
         case let .capsLock(on): return [.hostCapsLock(on)]
         case .releaseAllKeys: return [.releaseAllKeys]
-        case let .pointerPosition(x, y, id): return [.pointerPosition(x: UInt32(max(0, x)), y: UInt32(max(0, y)), displayID: UInt8(clamping: id))]
+        case let .pointerPosition(x, y, id):
+            guard let o = mapper.origin(of: id) else { return [] }
+            return [.pointerPosition(x: UInt32(max(0, x + o.x)), y: UInt32(max(0, y + o.y)),
+                                     displayID: o.displayID)]
         case let .pointerMotion(dx, dy): return [.pointerMotion(dx: Int32(clamping: dx), dy: Int32(clamping: dy))]
         case let .buttonDown(b): return [.buttonDown(button(b))]
         case let .buttonUp(b): return [.buttonUp(button(b))]

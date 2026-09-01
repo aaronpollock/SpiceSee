@@ -89,6 +89,8 @@ enum ClipboardEvent: Sendable, Equatable {
 enum BackendEvent: Sendable {
     case step(ConnectStep)
     case connected(viewports: [ViewportInfo])
+    /// The guest's monitor layout changed mid-session (new heads, or a primary at a new size).
+    case viewportsChanged([ViewportInfo])
     case agent(AgentState)
     case clipboard(ClipboardEvent)
     case pointerMode(PointerMode)
