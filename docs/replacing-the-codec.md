@@ -29,13 +29,15 @@ not signed by SpiceSee's developer — an ad hoc signature is enough.
 - LZ: `sc_lz_create`, `sc_lz_destroy`, `sc_lz_begin`, `sc_lz_decode`, `sc_lz_encode_rgb32`, `sc_lz_encode_xxxa`
 - GLZ: `sc_glz_window_create`, `sc_glz_window_clear`, `sc_glz_window_destroy`, `sc_glz_create`, `sc_glz_destroy`, `sc_glz_decode`
 
-with the `sc_image_type` enumeration and the semantics documented in the header (in particular:
-every entry point returns non-zero on a corrupt stream instead of aborting, and `sc_glz_decode`'s
-output buffer is owned by the window until the next decode). The framework as shipped exports more
-than the interface: `nm` lists 23 `sc_*` symbols, of which six (`sc_fatal` and the `sc_glz_image_*`
-accessors) are internal helpers not declared in the header, plus the vendored decoders' own symbols
-(`quic_decode`, `spice_malloc`, …). A replacement need only provide the 17 functions above; the app
-calls nothing else.
+with the `sc_image_type` enumeration and the return contract documented in the header: the
+`*_begin` and `*_decode` functions return 0 on success and a negative value on corrupt input
+(instead of aborting); the `*_encode_*` functions return the number of bytes written or a negative
+value; the `*_create` functions return a pointer, NULL on failure; and `sc_glz_decode`'s output
+buffer is owned by the window until the next decode. The framework as shipped also exports internal
+helpers that share the `sc_` prefix but are not declared in the header (`sc_fatal`, `sc_fatal_env`,
+and the `sc_glz_image_*` accessors), plus the vendored decoders' own symbols (`quic_decode`,
+`spice_malloc`, …). The interface is exactly the functions declared in `spice_codec.h`, listed
+above, and the app calls nothing else.
 
 ## Building a replacement
 

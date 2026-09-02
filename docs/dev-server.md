@@ -698,6 +698,10 @@ The user's half:
 - [ ] On a Mac other than the build machine: download the DMG from the site, drag SpiceSee to
       Applications, open it — no Gatekeeper prompt beyond the standard "downloaded from the
       internet" confirmation — and connect to the dev guest.
+- [ ] Follow `docs/replacing-the-codec.md` literally against the notarized build: build the
+      framework with the documented `clang` line, drop it in, ad hoc re-sign, launch, connect. The
+      2026-08-26 check verified the build against the golden, not the drop-in into a
+      hardened-runtime Developer ID app — and the drop-in is the point of §6(b).
 - [ ] Set `MARKETING_VERSION` to `1.0.1` in `project.yml`, commit, run `scripts/release.sh` again,
       upload. On the installed 1.0.0, Settings → Updates → Check Now offers 1.0.1, installs it, and
       relaunches.

@@ -17,7 +17,7 @@ an M7 exit item.
 
 ## 1. Sparkle
 
-**Dependency.** `project.yml` adds the `sparkle-project/Sparkle` package (2.x, `from: "2.6.0"`)
+**Dependency.** `project.yml` adds the `sparkle-project/Sparkle` package (pinned with `exactVersion: "2.9.6"`; bumped deliberately)
 and the `SpiceSee` target depends on its `Sparkle` product. `SpiceSeeTests` compiles the app's
 sources into itself, so it takes the same dependency. Xcode's archive/export re-signs Sparkle's
 XPC services and helper with the app's identity; the Debug build leaves them ad hoc, which is
