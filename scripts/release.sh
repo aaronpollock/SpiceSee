@@ -36,6 +36,7 @@ fi
 BUILD=$(git rev-list --count HEAD)
 VERSION=$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p' project.yml)
 [ -n "$VERSION" ] || fail "MARKETING_VERSION not found in project.yml"
+DMG="dist/SpiceSee-$VERSION.dmg"
 grep -qE 'SUPublicEDKey: "[A-Za-z0-9+/=]{40,}"' project.yml || fail "SUPublicEDKey in project.yml is not a real key"
 security find-identity -v -p codesigning | grep -q "$IDENTITY" || fail "no '$IDENTITY' identity in the keychain"
 if [ $DRY_RUN = 0 ]; then
@@ -44,8 +45,9 @@ fi
 scripts/check-vendored-notices.sh || fail "vendored notices check failed"
 
 echo "release: SpiceSee $VERSION (build $BUILD)${CHANNEL:+ [$CHANNEL]}"
-rm -rf build dist
+rm -rf build
 mkdir -p build dist
+rm -f "$DMG"
 
 # --- archive and export ---------------------------------------------------------------------
 xcodegen generate >/dev/null
@@ -54,7 +56,7 @@ xcodebuild archive -quiet \
   -project SpiceSee.xcodeproj -scheme SpiceSee -configuration Release \
   -destination 'generic/platform=macOS' -archivePath "$ARCHIVE" \
   DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$IDENTITY" \
-  CURRENT_PROJECT_VERSION="$BUILD"
+  CURRENT_PROJECT_VERSION="$BUILD" ARCHS=arm64
 xcodebuild -exportArchive -quiet \
   -archivePath "$ARCHIVE" -exportOptionsPlist scripts/ExportOptions.plist -exportPath build/export
 APP=build/export/SpiceSee.app
@@ -69,7 +71,6 @@ otool -L "$APP/Contents/MacOS/SpiceSee" | grep -q '@rpath/CSpiceCodec.framework/
 codesign -d --entitlements - "$APP" 2>/dev/null | grep -q disable-library-validation || fail "library-validation entitlement missing"
 
 # --- DMG ------------------------------------------------------------------------------------
-DMG="dist/SpiceSee-$VERSION.dmg"
 make_dmg() {
   rm -rf build/dmg
   mkdir -p build/dmg
@@ -80,7 +81,7 @@ make_dmg() {
 }
 
 notarize() {
-  out=$(xcrun notarytool submit "$1" --keychain-profile "$PROFILE" --wait 2>&1) || true
+  out=$(xcrun notarytool submit "$1" --keychain-profile "$PROFILE" --wait --timeout 30m 2>&1) || true
   echo "$out"
   echo "$out" | grep -q "status: Accepted" \
     || fail "notarization of $1 was not accepted — xcrun notarytool log <id> --keychain-profile $PROFILE"
@@ -106,8 +107,10 @@ spctl --assess --type open --context context:primary-signature -v "$DMG" 2>&1 | 
 SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData -path '*/SourcePackages/artifacts/sparkle/Sparkle/bin' -type d 2>/dev/null | head -1)
 [ -n "$SPARKLE_BIN" ] || fail "Sparkle tools not found under DerivedData — build the app once in Xcode/xcodebuild"
 # Signs the DMG with the keychain's EdDSA key and writes dist/appcast.xml; release notes are
-# picked up from dist/SpiceSee-$VERSION.html when present.
-"$SPARKLE_BIN/generate_appcast" --download-url-prefix "$DOWNLOAD_PREFIX" ${CHANNEL:+--channel "$CHANNEL"} dist
+# picked up from dist/SpiceSee-$VERSION.html when present. dist/ is kept between releases so
+# earlier DMGs stay in the appcast; deltas are out of scope.
+"$SPARKLE_BIN/generate_appcast" --download-url-prefix "$DOWNLOAD_PREFIX" --maximum-deltas 0 \
+  ${CHANNEL:+--channel "$CHANNEL"} dist
 
 echo "release: staged in dist/ —"
 ls -l dist
