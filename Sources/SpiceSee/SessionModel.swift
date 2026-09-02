@@ -96,7 +96,14 @@ final class SessionModel {
     }
 
     func connect(_ connection: SavedConnection, password: String?) {
+        // One session at a time. A live session's windows close on `viewports` emptying, and that
+        // has to happen here, before the new session's viewports can arrive — otherwise the old
+        // windows survive and render the new guest beside its own.
         audio.stop()
+        clipboard.stop()
+        for v in viewports { publish(.streamDestroyed(nil), to: v.id) }
+        viewports = []
+        pointerCaptured = false
         self.connection = connection
         endpoint = connection.endpoint
         scaling = .fit
@@ -114,6 +121,9 @@ final class SessionModel {
         graceTask?.cancel()
         pump?.cancel()
         pump = Task { [backend] in
+            // Awaited here, in order, not in a detached task: one that ran after the new session
+            // was stored would close that one instead.
+            await backend.disconnect()
             let target = ConnectionTarget(host: connection.host,
                                           port: connection.port == 0 ? nil : connection.port,
                                           tlsPort: connection.tlsPort,
