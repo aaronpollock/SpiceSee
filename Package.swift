@@ -19,7 +19,7 @@ let package = Package(
         .target(name: "SpiceKit", dependencies: ["SpiceCore", "SpiceCanvas", "SpiceMedia"]),
         .target(name: "SpiceMedia", dependencies: ["SpiceWire"]),
         .executableTarget(name: "spicerec"),
-        .executableTarget(name: "spicesee-cli", dependencies: ["SpiceKit", "SpiceCanvas", "SpiceCore", "SpiceWire"]),
+        .executableTarget(name: "spicesee-cli", dependencies: ["SpiceKit", "SpiceCanvas", "SpiceCore", "SpiceWire", "SpiceMedia"]),
         .testTarget(name: "SpiceWireTests", dependencies: ["SpiceWire"]),
         .testTarget(name: "SpiceCoreTests", dependencies: ["SpiceCore"], resources: [.copy("Fixtures")]),
         .testTarget(name: "SpiceCanvasTests", dependencies: ["SpiceCanvas", .product(name: "CSpiceCodec", package: "CSpiceCodec")]),

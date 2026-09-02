@@ -1,7 +1,9 @@
+import AVFoundation
 import Foundation
 import SpiceCanvas
 import SpiceCore
 import SpiceKit
+import SpiceMedia
 import SpiceWire
 
 func usage() -> Never {
@@ -10,6 +12,7 @@ func usage() -> Never {
            spicesee-cli dump <host> <port> <seconds> <out.png> [password]
            spicesee-cli clipboard <host> <port> [password] [--send <text>] [--send-image <png>] [--save-image <out.png>] [--seconds <n>]
            spicesee-cli resize <host> <port> <width> <height> [password] [--seconds <n>]
+           spicesee-cli audio <host> <port> <seconds> <out.wav> [password]
            spicesee-cli vv <file.vv> [seconds out.png]
     """)
     exit(2)
@@ -175,6 +178,57 @@ func resizeProbe(_ config: ConnectionConfig, width: UInt32, height: UInt32, seco
     }
 }
 
+/// Records the playback channel to a WAV so M6 can be checked by ear from this machine: someone
+/// plays a sound in the guest, this file should contain it. Prints the negotiation as it happens.
+func audioProbe(_ config: ConnectionConfig, seconds: Double, out: URL) async throws {
+    let session = try await SpiceSession.connect(config)
+    print("connected; recording audio for \(seconds)s")
+    let deadline = Task {
+        try? await Task.sleep(for: .seconds(seconds))
+        await session.disconnect()
+    }
+    defer { deadline.cancel() }
+
+    var file: AVAudioFile?
+    var format: AVAudioFormat?
+    var frames = 0
+    for await event in session.events {
+        switch event {
+        case let .audio(.started(rate, channels, opus)):
+            print("START rate=\(rate) channels=\(channels) mode=\(opus ? "OPUS" : "RAW")")
+            let fmt = AVAudioFormat(standardFormatWithSampleRate: Double(rate), channels: AVAudioChannelCount(channels))!
+            format = fmt
+            if file == nil {
+                file = try AVAudioFile(forWriting: out, settings: [
+                    AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: rate, AVNumberOfChannelsKey: channels,
+                    AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false,
+                ], commonFormat: .pcmFormatFloat32, interleaved: false)
+            }
+        case let .audio(.pcm(pcm, _)):
+            guard let file, let format else { continue }
+            let channels = Int(format.channelCount)
+            let count = AVAudioFrameCount(pcm.count / channels)
+            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: count), let data = buffer.floatChannelData else { continue }
+            for c in 0 ..< channels { for i in 0 ..< Int(count) { data[c][i] = pcm[i * channels + c] } }
+            buffer.frameLength = count
+            try file.write(from: buffer)
+            frames += Int(count)
+        case let .audio(.volume(levels)):
+            print("VOLUME \(levels.map { String(format: "%.2f", $0) }.joined(separator: " "))")
+        case let .audio(.mute(on)):
+            print("MUTE \(on)")
+        case .audio(.stopped):
+            print("STOP")
+        case .disconnected:
+            if let format { print("wrote \(frames) frames (\(String(format: "%.1f", Double(frames) / format.sampleRate)) s) to \(out.path)") }
+            else { print("no PLAYBACK_START arrived — is anything playing in the guest?") }
+            return
+        default:
+            break
+        }
+    }
+}
+
 let args = CommandLine.arguments
 guard args.count >= 3 else { usage() }
 
@@ -210,6 +264,17 @@ case "dump":
     let password = args.count > 6 ? args[6] : nil
     do {
         try await capture(ConnectionConfig(host: host, port: port, password: password), seconds: seconds, out: out)
+    } catch {
+        print("error: \(describe(error))"); exit(1)
+    }
+
+case "audio":
+    let host = args[2]
+    guard args.count >= 6, let port = UInt16(args[3]), let seconds = Double(args[4]) else { usage() }
+    let out = URL(fileURLWithPath: args[5])
+    let password = args.count > 6 ? args[6] : nil
+    do {
+        try await audioProbe(ConnectionConfig(host: host, port: port, password: password), seconds: seconds, out: out)
     } catch {
         print("error: \(describe(error))"); exit(1)
     }
