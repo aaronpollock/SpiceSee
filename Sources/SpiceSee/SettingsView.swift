@@ -242,10 +242,10 @@ private struct UpdatesPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Metric.Settings.rowRhythm) {
-            Toggle("Check for updates automatically", isOn: settings.binding(\.checkForUpdatesAutomatically))
+            Toggle("Check for updates automatically", isOn: .constant(true))
 
             VStack(alignment: .leading, spacing: Metric.Settings.rowRhythm) {
-                Toggle("Download and install in the background", isOn: settings.binding(\.installInBackground))
+                Toggle("Download and install in the background", isOn: .constant(false))
                 Toggle("Include pre-release builds", isOn: settings.binding(\.includePrereleases))
             }
             .padding(.leading, 20)
@@ -253,7 +253,7 @@ private struct UpdatesPane: View {
             Spacer(minLength: 0)
 
             HStack {
-                Text(settings.versionSummary)
+                Text(settings.versionSummary(lastChecked: nil))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()

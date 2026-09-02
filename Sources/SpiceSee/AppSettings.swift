@@ -17,10 +17,9 @@ final class AppSettings {
     var releaseChord: ReleaseChord = .controlOption
     var sendLockKeys = true
 
-    var checkForUpdatesAutomatically = true
-    var installInBackground = false
+    /// Sparkle persists automatic-check and background-install itself; this is the one updater
+    /// setting that is ours, read back by `UpdaterDelegate` under the same key it is saved under.
     var includePrereleases = false
-    var lastUpdateCheck: Date?
 
     private let defaults = UserDefaults.standard
 
@@ -34,7 +33,7 @@ final class AppSettings {
         deleteVVAfterConnecting = defaults.object(forKey: "deleteVV") as? Bool ?? true
         removeSingleUseOnDisconnect = defaults.bool(forKey: "removeSingleUseOnDisconnect")
         sendLockKeys = defaults.object(forKey: "sendLockKeys") as? Bool ?? true
-        checkForUpdatesAutomatically = defaults.object(forKey: "autoUpdate") as? Bool ?? true
+        includePrereleases = defaults.bool(forKey: "includePrereleases")
     }
 
     func save() {
@@ -45,18 +44,18 @@ final class AppSettings {
         defaults.set(deleteVVAfterConnecting, forKey: "deleteVV")
         defaults.set(removeSingleUseOnDisconnect, forKey: "removeSingleUseOnDisconnect")
         defaults.set(sendLockKeys, forKey: "sendLockKeys")
-        defaults.set(checkForUpdatesAutomatically, forKey: "autoUpdate")
+        defaults.set(includePrereleases, forKey: "includePrereleases")
     }
 
-    /// "SpiceSee 1.0 (build 142) · last checked today at 08:57"
-    var versionSummary: String {
+    /// "SpiceSee 1.0.0 (build 142) · last checked today at 08:57"
+    func versionSummary(lastChecked: Date?) -> String {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = info?["CFBundleVersion"] as? String ?? "1"
-        guard let lastUpdateCheck else { return "SpiceSee \(version) (build \(build))" }
+        guard let lastChecked else { return "SpiceSee \(version) (build \(build))" }
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
-        let when = Calendar.current.isDateInToday(lastUpdateCheck) ? "today at \(f.string(from: lastUpdateCheck))" : f.string(from: lastUpdateCheck)
+        let when = Calendar.current.isDateInToday(lastChecked) ? "today at \(f.string(from: lastChecked))" : f.string(from: lastChecked)
         return "SpiceSee \(version) (build \(build)) · last checked \(when)"
     }
 }
