@@ -15,7 +15,11 @@ private func mainBytesWithPlayback() throws -> [UInt8] {
 @Test func playbackMessagesSurfaceAsAudioEventsAndDisconnectedComesLast() async throws {
     var mode = SpiceWriter(); mode.u32(0); mode.u16(AudioDataMode.raw.rawValue)
     var start = SpiceWriter(); start.u32(2); start.u16(AudioFormat.s16); start.u32(48000); start.u32(0)
-    var data = SpiceWriter(); data.u32(0); data.bytes([0, 0, 0, 0x40])        // L=0, R=0.5
+    // mmTime is far ahead of the mm clock seeded from MAIN_INIT (0): AudioPlayer drops a packet
+    // more than 80ms "late" against wall-clock elapsed time, and a full `swift test` run under
+    // heavy parallel load can easily take longer than that to reach this message. A large mmTime
+    // keeps this test about routing, not about racing the scheduler.
+    var data = SpiceWriter(); data.u32(60_000); data.bytes([0, 0, 0, 0x40])   // L=0, R=0.5
     let body = frame(PlaybackServerMsg.mode.rawValue, mode.bytes)
              + frame(PlaybackServerMsg.start.rawValue, start.bytes)
              + frame(PlaybackServerMsg.data.rawValue, data.bytes)
@@ -40,7 +44,7 @@ private func mainBytesWithPlayback() throws -> [UInt8] {
         if case .disconnected = e { break }
     }
     #expect(audio == [.started(sampleRate: 48000, channels: 2, opus: false),
-                      .pcm(frames: [0, 0.5], mmTime: 0),
+                      .pcm(frames: [0, 0.5], mmTime: 60_000),
                       .stopped])
     #expect(disconnectedLast)
 }
