@@ -23,8 +23,9 @@ targets:
       properties:
         CFBundleName: SpiceSee
         CFBundleDisplayName: SpiceSee
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "142"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: public.app-category.utilities
         LSMinimumSystemVersion: "14.0"
         NSPrincipalClass: NSApplication
         NSHumanReadableCopyright: "© 2026 SCT"
@@ -55,7 +56,9 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         PRODUCT_BUNDLE_IDENTIFIER: com.spicesee.app
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ChiliRed
-        MARKETING_VERSION: "1.0"
+        MARKETING_VERSION: "1.0.0"
+        # The release script passes the git commit count; a development build is visibly build 0.
+        CURRENT_PROJECT_VERSION: "0"
 
   SpiceSeeTests:
     type: bundle.unit-test
