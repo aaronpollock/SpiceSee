@@ -89,6 +89,7 @@ final class AudioOutput {
         playing = false
         queuedBeforePlay = 0
         format = nil
+        loggedStartFailure = false
         if engine.isRunning { engine.stop() }
     }
 

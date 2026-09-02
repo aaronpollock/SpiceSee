@@ -47,7 +47,9 @@ import Testing
         let engine = try offlineEngine()
         let output = AudioOutput(engine: engine)
         output.handle(.started(sampleRate: 48000, channels: 2, opus: false))
-        for _ in 0 ..< 10 { output.handle(chunk(ms: 20)) }   // outlasts every render below
+        // 12 × 960 frames = 11520 queued, more than the 5 × 2048 = 10240 rendered below, so the
+        // player never runs dry and every silence asserted here is the mute's doing.
+        for _ in 0 ..< 12 { output.handle(chunk(ms: 20)) }
         #expect(try rms(engine) > 0.1)
         output.muted = true
         // AVAudioMixerNode smooths a volume change across one render cycle (ordinary anti-click

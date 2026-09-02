@@ -1,5 +1,4 @@
 import AudioToolbox
-import os
 
 public struct AudioDecodeError: Error, Sendable { public var status: Int32 }
 
