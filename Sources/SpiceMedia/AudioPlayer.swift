@@ -5,8 +5,9 @@ import SpiceWire
 private let maxLatenessMs: Int64 = 80
 
 public enum AudioEvent: Sendable, Equatable {
-    case started(sampleRate: Int, channels: Int, /// The codec the server negotiated (PLAYBACK_MODE), not whether local decode succeeded — the probe prints it as MODE=OPUS.
-                 opus: Bool)
+    /// `opus` is the codec the server negotiated (PLAYBACK_MODE), not whether local decode
+    /// succeeded — the probe prints it as MODE=OPUS.
+    case started(sampleRate: Int, channels: Int, opus: Bool)
     case pcm(frames: [Float], mmTime: UInt32)
     case volume([Float])
     case mute(Bool)
@@ -51,11 +52,18 @@ public actor AudioPlayer {
         switch message {
         case let .mode(_, raw):
             mode = AudioDataMode(rawValue: raw)
-            if mode == nil || mode == .celt051, !unsupportedModeLogged {
+            unsupportedModeLogged = false          // a fresh MODE is fresh news: re-arm the one-shot
+            if mode == nil || mode == .celt051 {
                 log.notice("playback: unsupported audio mode \(raw); dropping data")
                 unsupportedModeLogged = true
             }
         case let .start(s):
+            // Wire-controlled u32s: 2^30 channels would trap `UInt32(channels * 4)` in the decoder's
+            // PCM format, and anything merely large allocates 5760 × channels floats per packet.
+            guard (1...8).contains(s.channels), (8_000...192_000).contains(s.frequency), s.format == AudioFormat.s16 else {
+                log.error("playback: implausible START \(s.frequency) Hz × \(s.channels) fmt \(s.format); ignoring")
+                return
+            }
             format = (Int(s.frequency), Int(s.channels))
             decoder = nil
             let usesOpus = mode == .opus
@@ -65,8 +73,21 @@ public actor AudioPlayer {
             }
             cont.yield(.started(sampleRate: Int(s.frequency), channels: Int(s.channels), opus: usesOpus))
         case let .data(time, payload):
-            guard format != nil, let mode else { return }
-            if let now = serverNow(), Int64(now) - Int64(time) > maxLatenessMs { droppedLate += 1; return }
+            guard format != nil else { return }
+            guard let mode else {
+                if !unsupportedModeLogged {
+                    log.notice("playback: DATA before any MODE; dropping until the server sends one")
+                    unsupportedModeLogged = true
+                }
+                return
+            }
+            if let now = serverNow(), Int64(now) - Int64(time) > maxLatenessMs {
+                droppedLate += 1
+                if droppedLate == 1 || droppedLate % 100 == 0 {
+                    log.notice("playback: dropped \(self.droppedLate) late packets (\(Int64(now) - Int64(time)) ms behind the mm clock)")
+                }
+                return
+            }
             switch mode {
             case .raw:
                 cont.yield(.pcm(frames: Self.floats(fromS16: payload), mmTime: time))

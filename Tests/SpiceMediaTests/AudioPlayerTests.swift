@@ -43,7 +43,9 @@ private func drain(_ p: AudioPlayer) async -> [AudioEvent] {
     await p.handle(.data(time: 5_000, payload: [0xFF, 0xFF, 0xFF]))       // 5 s late and garbage: never decoded
     #expect(await p.decodeAttempts == 0)
     #expect(await p.droppedLate == 1)
-    await p.handle(.data(time: 10_000, payload: try opusFixturePackets()[0]))
+    // Stamped ahead of the clock seeded above, not level with it: the fixture load between the two
+    // `handle` calls is easily >80 ms of wall clock, which would drop this packet too.
+    await p.handle(.data(time: 60_000, payload: try opusFixturePackets()[0]))
     #expect(await p.decodeAttempts == 1)
 }
 
@@ -99,4 +101,13 @@ private func drain(_ p: AudioPlayer) async -> [AudioEvent] {
     await p.handle(.data(time: 0, payload: s16([1, 2])))
     let events = await drain(p)
     #expect(events == [.started(sampleRate: 48000, channels: 2, opus: false), .stopped])
+}
+
+@Test func implausibleStartIsIgnored() async {
+    let p = AudioPlayer(opusAvailable: true)
+    await p.handle(.mode(time: 0, mode: AudioDataMode.raw.rawValue))
+    await p.handle(start(48000, channels: 1 << 30))   // would trap UInt32(channels * 4) in pcmFormat
+    await p.handle(.data(time: 0, payload: s16([1, 2])))
+    await p.handle(start())                           // a sane START after it still works
+    #expect(await drain(p) == [.started(sampleRate: 48000, channels: 2, opus: false)])
 }
