@@ -682,8 +682,8 @@ toolbar mute on the mixer — muting one never substitutes for the other.
 
 Machine-driveable half (this Mac, after the plan's Task 5):
 
-- [ ] `scripts/release.sh --dry-run` exits 0 and `dist/SpiceSee-1.0.0.dmg` passes the codesign
-      inspection in the plan's Task 5 Step 4.
+- [x] `scripts/release.sh --dry-run` exits 0 and `dist/SpiceSee-1.0.0.dmg` passes the codesign
+      inspection in the plan's Task 5 Step 4. (dry run 2026-09-02, build 208)
 
 The user's half:
 
