@@ -66,6 +66,8 @@ targets:
       - path: Tests/SpiceSeeTests
       - path: Sources/SpiceSee
         excludes: [Licenses, Assets.xcassets, Info.plist, SpiceSee.entitlements]
+      - path: Sources/SpiceSee/Licenses
+        buildPhase: resources
     dependencies:
       - package: SpiceSee
         product: SpiceKit

@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// A third-party component listed in the Acknowledgements window.
-private struct AcknowledgementComponent: Identifiable {
+struct AcknowledgementComponent: Identifiable {
     let id: String
     let name: String
     let spdx: String
@@ -31,15 +31,6 @@ private struct AcknowledgementComponent: Identifiable {
             showsFrameworkCallout: false
         ),
         AcknowledgementComponent(
-            id: "libopus",
-            name: "libopus",
-            spdx: "BSD-3-Clause",
-            title: "libopus",
-            summary: "Audio codec used to decode SPICE audio streams, linked as a static library.",
-            licenseFileName: "BSD-3-Clause",
-            showsFrameworkCallout: false
-        ),
-        AcknowledgementComponent(
             id: "sparkle",
             name: "Sparkle",
             spdx: "MIT",
@@ -51,23 +42,17 @@ private struct AcknowledgementComponent: Identifiable {
     ]
 }
 
-// TODO(release): final source URL
-private let acknowledgementsSourceURL = URL(string: "https://github.com/spicesee/spicesee")!
+/// Public repository, which is what the LGPL written offer in the framework callout points at.
+let acknowledgementsSourceURL = URL(string: "https://github.com/aaronpollock/SpiceSee")!
 
-private let placeholderLicenseText = "PLACEHOLDER — populated by the orchestrator"
-
-private func loadLicenseText(fileName: String) -> String? {
-    // The build flattens Sources/SpiceSee/Licenses into Resources/, so the subdirectory lookup
-    // misses; fall back to the bundle root rather than shipping without the licence text.
-    let url = Bundle.main.url(forResource: fileName, withExtension: "txt", subdirectory: "Licenses")
-        ?? Bundle.main.url(forResource: fileName, withExtension: "txt")
-    guard let url, let text = try? String(contentsOf: url, encoding: .utf8) else {
-        return nil
-    }
-    if text.trimmingCharacters(in: .whitespacesAndNewlines) == placeholderLicenseText {
-        return nil
-    }
-    return text
+/// The build flattens Sources/SpiceSee/Licenses into Resources/, so the subdirectory lookup
+/// misses; fall back to the bundle root rather than shipping without the licence text.
+/// `bundle` is a parameter so the test bundle can check its own copy of the resources.
+func loadLicenseText(fileName: String, in bundle: Bundle = .main) -> String? {
+    let url = bundle.url(forResource: fileName, withExtension: "txt", subdirectory: "Licenses")
+        ?? bundle.url(forResource: fileName, withExtension: "txt")
+    guard let url else { return nil }
+    return try? String(contentsOf: url, encoding: .utf8)
 }
 
 struct AcknowledgementsView: View {
