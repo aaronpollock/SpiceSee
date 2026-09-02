@@ -47,16 +47,18 @@ import Testing
         let engine = try offlineEngine()
         let output = AudioOutput(engine: engine)
         output.handle(.started(sampleRate: 48000, channels: 2, opus: false))
-        for _ in 0 ..< 5 { output.handle(chunk(ms: 20)) }
+        for _ in 0 ..< 10 { output.handle(chunk(ms: 20)) }   // outlasts every render below
         #expect(try rms(engine) > 0.1)
         output.muted = true
-        // AVAudioMixerNode's `outputVolume` is smoothed by the underlying AUMultiChannelMixer over
-        // up to ~4096 samples — confirmed empirically, and not bypassable via the public API (a
-        // direct, immediate-event AUParameter set ramps identically). Render past that window
-        // before asserting exact silence; the intervening render is real audio, not silence.
-        _ = try rms(engine, frames: 4096)
+        // AVAudioMixerNode smooths a volume change across one render cycle (ordinary anti-click
+        // behaviour) — discard one render on each side of the assertion to clear the ramp.
+        _ = try rms(engine)
         #expect(try rms(engine) == 0)
         #expect(output.playerVolume == 1)     // the guest's own level is untouched
+        output.muted = false
+        _ = try rms(engine)
+        // Audio was still queued and playing throughout — the silence above was the mute's doing.
+        #expect(try rms(engine) > 0.1)
     }
 
     @Test func guestMuteAndVolumeDriveThePlayerNotTheMixer() throws {
