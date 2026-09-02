@@ -677,3 +677,29 @@ ties a frame to a sample. The record (microphone) channel is not opened.
 main actor, is the whole output path; the ~50 ms prebuffer is the only jitter buffer in the system.
 Two volume controls multiply rather than compose: guest volume/mute lands on the `AVAudioPlayerNode`,
 toolbar mute on the mixer — muting one never substitutes for the other.
+
+## M7 exit check (manual)
+
+Machine-driveable half (this Mac, after the plan's Task 5):
+
+- [ ] `scripts/release.sh --dry-run` exits 0 and `dist/SpiceSee-1.0.0.dmg` passes the codesign
+      inspection in the plan's Task 5 Step 4.
+
+The user's half:
+
+- [ ] `xcrun notarytool store-credentials notary --apple-id aaron.pollock@outlook.com --team-id HBHQCPQ22A`
+      (once; needs an app-specific password from appleid.apple.com).
+- [ ] `scripts/release.sh` completes. **Record here whether Apple accepted the
+      `disable-library-validation` entitlement** — the backlog's open question. Expected: accepted;
+      if the submission comes back `Invalid`, `xcrun notarytool log <id> --keychain-profile notary`
+      says why.
+- [ ] Upload the contents of `dist/` to https://somecoolthings.com/spicesee/ so that
+      `https://somecoolthings.com/spicesee/appcast.xml` and the DMG resolve.
+- [ ] On a Mac other than the build machine: download the DMG from the site, drag SpiceSee to
+      Applications, open it — no Gatekeeper prompt beyond the standard "downloaded from the
+      internet" confirmation — and connect to the dev guest.
+- [ ] Set `MARKETING_VERSION` to `1.0.1` in `project.yml`, commit, run `scripts/release.sh` again,
+      upload. On the installed 1.0.0, Settings → Updates → Check Now offers 1.0.1, installs it, and
+      relaunches.
+
+Ticking the last two ships M7.

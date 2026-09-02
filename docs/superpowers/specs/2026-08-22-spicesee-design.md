@@ -20,8 +20,9 @@ reconnect prompt.
 semi-seamless migration, VP8/VP9, forwarding OS-reserved shortcuts (Cmd-Tab; v2 via CGEventTap),
 Mac App Store.
 
-**Deployment:** universal binary (arm64 + x86_64), macOS 14+, Developer ID + notarized DMG,
-Sparkle 2 updates, Homebrew cask. Closed-source-capable.
+**Deployment:** arm64, macOS 14+, Developer ID + notarized DMG at https://somecoolthings.com/spicesee,
+Sparkle 2 updates. No Homebrew cask (decided 2026-08-28: it asks nothing of the build and would only
+be a second front door to the same file). Closed-source-capable.
 
 ## 2. Architecture
 
@@ -228,10 +229,12 @@ multi-head session spans multiple Mac displays. Visual design is a separate phas
 
 ## 8. Build and release
 
-SPM for libraries; Xcode project for the bundle, entitlements, and embedding
-`CSpiceCodec.framework`. Swift 6 strict concurrency. Universal, macOS 14+. Developer ID,
-hardened runtime, library-validation entitlement, `notarytool`, stapled DMG, Sparkle 2 (MIT),
-Homebrew cask. GitHub Actions macOS runner for tests and release builds.
+SPM for libraries; Xcode project (generated from `project.yml` by xcodegen) for the bundle,
+entitlements, and embedding `CSpiceCodec.framework`. Swift 6 strict concurrency. arm64, macOS 14+.
+Developer ID, hardened runtime, library-validation entitlement, `notarytool`, stapled DMG,
+Sparkle 2 (MIT). Release builds come from `scripts/release.sh` on the developer's Mac and are
+uploaded by hand; no CI, no cask. Details and the decisions behind them:
+`2026-09-02-spicesee-m7-ship-design.md`.
 
 ## 9. Milestones
 
@@ -244,7 +247,7 @@ Homebrew cask. GitHub Actions macOS runner for tests and release builds.
 | M4 | Canvas complete | Windows/QXL guest with no corruption; MJPEG + H.264 streams |
 | M5 | Agent | Clipboard both ways, resize-follows-window, multi-monitor windows |
 | M6 | Audio | Opus playback |
-| M7 | Ship | Connection manager, prefs, signed/notarized DMG, Sparkle, cask |
+| M7 | Ship | Connection manager, prefs, signed/notarized DMG, Sparkle — `scripts/release.sh` stages both |
 
 ## References
 
