@@ -620,3 +620,54 @@ arrangement — enabled heads left to right at y=0. Host window positions do not
 desktop in any meaningful way (different screen counts, scales and origins, and the guest arranges
 its own monitors), so a position sent from here would be noise the guest has to reconcile. It
 becomes a real field only if a multi-head guest is ever seen needing it.
+
+## M6 exit check (manual)
+
+Machine-driveable half (needs a sound playing in the guest — a YouTube tab, a Windows system sound):
+
+- [ ] `swift run spicesee-cli audio 192.168.50.6 5930 15 /tmp/guest-audio.wav` prints
+      `START rate=48000 channels=2 mode=OPUS` and writes a WAV you can hear the guest in. `mode=RAW`
+      means the Opus capability was not announced (the AudioToolbox probe failed on this Mac) or the
+      server ignored it; either way sound still plays, but say which.
+
+**Probed 2026-09-01, nobody at the guest console:**
+
+```
+connected; recording audio for 15.0s
+VOLUME 0.85 0.85
+MUTE false
+no PLAYBACK_START arrived — is anything playing in the guest?
+```
+
+The playback channel opened and negotiated — PLAYBACK_VOLUME and PLAYBACK_MUTE both parsed from the
+real server — and stayed silent for the full 15 s, which is expected with nothing playing in the
+guest. `/tmp/guest-audio.wav` was confirmed absent afterward. The START/OPUS half of the checklist
+item above still wants a run with sound actually playing.
+
+In the app:
+
+- [ ] Guest sound plays from the Mac's speakers with no audible stutter over about a minute.
+- [ ] Moving the guest's volume slider changes the level (PLAYBACK_VOLUME → the player node).
+- [ ] The toolbar mute silences it and un-mute restores it (the mixer; the guest's level is kept).
+- [ ] Pausing the guest's player sends PLAYBACK_STOP and the app goes silent without clicks; resuming
+      starts cleanly after the ~50 ms prebuffer.
+- [ ] `--mock --scenario desktop --autoconnect` ticks a quiet 440 Hz tone once a second; the mute
+      button stops it.
+
+**Opus decode is Apple's, not libopus.** `OpusDecoder.isAvailable()` probes `AudioConverterNew`
+with `kAudioFormatOpus` at connect time and the capability is announced only when that passes.
+Verified on this Mac (macOS 26.x); **a macOS 14 machine has not been checked** — the deployment
+floor is 14 and Opus landed in AudioToolbox in that release, but if it fails there the fallback
+is raw PCM at ~1.5 Mbps, not silence. The fixture `Tests/SpiceMediaTests/Fixtures/tone-48k-stereo.opus.bin`
+was encoded by libopus 1.6.1 via `Tools/opusref.c` so the decoder is never tested against itself.
+The `opus` flag on the seam's `.started` event names the codec PLAYBACK_MODE **negotiated**, not
+whether local decode is actually working — a probe that passed at connect but then throws per-frame
+still reports `opus: true`.
+
+**No lip-sync.** Audio and video streams are each paced to the mm clock independently; nothing
+ties a frame to a sample. The record (microphone) channel is not opened.
+
+**Audio never touches a realtime render thread.** `AudioOutput.scheduleBuffer`, called from the
+main actor, is the whole output path; the ~50 ms prebuffer is the only jitter buffer in the system.
+Two volume controls multiply rather than compose: guest volume/mute lands on the `AVAudioPlayerNode`,
+toolbar mute on the mixer — muting one never substitutes for the other.
