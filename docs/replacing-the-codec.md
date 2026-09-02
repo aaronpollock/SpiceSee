@@ -31,8 +31,11 @@ not signed by SpiceSee's developer — an ad hoc signature is enough.
 
 with the `sc_image_type` enumeration and the semantics documented in the header (in particular:
 every entry point returns non-zero on a corrupt stream instead of aborting, and `sc_glz_decode`'s
-output buffer is owned by the window until the next decode). The framework as shipped also exports
-its internal symbols (`_quic_decode`, `_spice_malloc`, …); the app uses none of them.
+output buffer is owned by the window until the next decode). The framework as shipped exports more
+than the interface: `nm` lists 23 `sc_*` symbols, of which six (`sc_fatal` and the `sc_glz_image_*`
+accessors) are internal helpers not declared in the header, plus the vendored decoders' own symbols
+(`quic_decode`, `spice_malloc`, …). A replacement need only provide the 17 functions above; the app
+calls nothing else.
 
 ## Building a replacement
 
