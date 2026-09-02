@@ -220,13 +220,17 @@ public actor SpiceSession {
                     await player.setMMTime(info.mainInit.multiMediaTime)
                     let audioPump = Task { [cont] in for await e in player.events { cont.yield(.audio(e)) } }
                     tasks.append(audioPump)
-                    let pump = Task { [weak self] in
+                    let pump = Task { [cont, log] in
                         for await m in ch.messages { await player.handle(m) }
                         // Same drain shape as the canvas and stream pumps: every decoded chunk is on
                         // `cont` before the channel is declared over, so .disconnected stays last.
                         await player.finish()
                         _ = await audioPump.value
-                        await self?.channelEnded(desc)
+                        // Audio is non-fatal, unlike display or cursor: a guest whose sound device
+                        // goes away keeps a working desktop, so the output is idled and the session
+                        // runs on. `closeChannels()` still closes this channel on teardown.
+                        log.notice("playback channel closed by the server; audio off, session continues")
+                        cont.yield(.audio(.stopped))
                     }
                     audioPumps.append(pump); tasks.append(pump)
                 default:

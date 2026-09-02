@@ -43,8 +43,69 @@ private func mainBytesWithPlayback() throws -> [UInt8] {
         }
         if case .disconnected = e { break }
     }
+    // Two `.stopped`: the server's PLAYBACK_STOP, then the one the pump yields when the channel
+    // itself closes — audio is non-fatal, so that is the session's only word about it.
     #expect(audio == [.started(sampleRate: 48000, channels: 2, opus: false),
                       .pcm(frames: [0, 0.5], mmTime: 60_000),
-                      .stopped])
+                      .stopped, .stopped])
     #expect(disconnectedLast)
+}
+
+/// A main transport that serves its script and then holds the connection open, so the session is
+/// still live when the playback channel hits EOF. `InMemoryTransport` would end main first and the
+/// test would prove nothing. (`ClipboardSessionTests.RecordingTransport` minus the recording — SPM
+/// test targets cannot share sources across files' private types.)
+private actor HoldingTransport: Transport {
+    private let input: [UInt8]
+    private var cursor = 0
+    private var waiters: [CheckedContinuation<[UInt8], Error>] = []
+    private var closed = false
+    init(input: [UInt8]) { self.input = input }
+
+    func read(exactly n: Int) async throws -> [UInt8] {
+        guard !closed else { throw SpiceError(.closed, underlying: "closed") }
+        if input.count - cursor >= n { defer { cursor += n }; return Array(input[cursor ..< cursor + n]) }
+        return try await withCheckedThrowingContinuation { waiters.append($0) }
+    }
+    func write(_ bytes: [UInt8]) {}
+    func close() {
+        closed = true
+        waiters.forEach { $0.resume(throwing: SpiceError(.closed, underlying: "closed")) }
+        waiters.removeAll()
+    }
+}
+
+private actor Marks {
+    private(set) var marks: [String] = []
+    func add(_ m: String) { marks.append(m) }
+}
+
+/// A guest whose sound device goes away must keep its desktop: unlike display or cursor, a closed
+/// playback channel ends audio only.
+@Test func aClosedPlaybackChannelDoesNotEndTheSession() async throws {
+    let main = HoldingTransport(input: try mainBytesWithPlayback())
+    let session = try await SpiceSession.connect(password: nil) { desc in
+        if desc.type == .main { return main }
+        return InMemoryTransport(input: try fakeLink(body: []))          // playback: EOF at once
+    }
+    let marks = Marks()
+    let collector = Task { [events = session.events] in
+        for await e in events {
+            switch e {
+            case .audio(.stopped): await marks.add("stopped")
+            case .disconnected: await marks.add("disconnected"); return
+            default: continue
+            }
+        }
+    }
+    for _ in 0 ..< 200 {
+        if await !marks.marks.isEmpty { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    #expect(await marks.marks == ["stopped"])
+    try await Task.sleep(for: .milliseconds(300))
+    #expect(await marks.marks == ["stopped"])          // the session outlives the playback channel
+    await session.disconnect()
+    await collector.value
+    #expect(await marks.marks == ["stopped", "disconnected"])
 }
