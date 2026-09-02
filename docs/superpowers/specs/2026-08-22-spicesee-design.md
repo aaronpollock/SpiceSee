@@ -66,7 +66,7 @@ Compliance via LGPL-2.1 §6(b):
 - Entitlement `com.apple.security.cs.disable-library-validation = true` so a user may substitute
   a modified framework under the hardened runtime. Notarization accepts this.
 
-This rules out the Mac App Store. Distribution is direct download + Homebrew cask.
+This rules out the Mac App Store. Distribution is a direct download (notarized DMG); no Homebrew cask (§8).
 
 ## 3. SpiceWire and SpiceCore
 
