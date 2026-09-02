@@ -1,4 +1,5 @@
 import SwiftUI
+import Sparkle
 
 @main
 struct SpiceSeeApp: App {
@@ -9,6 +10,9 @@ struct SpiceSeeApp: App {
     @State private var session = SessionModel(backend: ConnectionStore.isRunningMock
         ? MockSessionBackend(scenario: MockSessionBackend.launchScenario)
         : SpiceKitBackend())
+    /// Started at launch so scheduled checks run; the delegate is stateless and reads defaults.
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true, updaterDelegate: UpdaterDelegate(), userDriverDelegate: nil)
 
     var body: some Scene {
         Window("SpiceSee", id: "manager") {
@@ -65,6 +69,7 @@ struct SpiceSeeApp: App {
             }
             CommandGroup(replacing: .appInfo) {
                 Button("About SpiceSee") { NSApp.orderFrontStandardAboutPanel(nil) }
+                Button("Check for Updates…") { updaterController.updater.checkForUpdates() }
                 Button("Acknowledgements…") { openWindow(id: "acknowledgements") }
             }
         }
@@ -86,7 +91,7 @@ struct SpiceSeeApp: App {
         .windowResizability(.contentMinSize)
 
         Settings {
-            SettingsView(settings: settings)
+            SettingsView(settings: settings, updater: updaterController.updater)
         }
     }
 

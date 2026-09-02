@@ -30,6 +30,10 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSApplicationCategoryType: public.app-category.utilities
+        SUFeedURL: https://somecoolthings.com/spicesee/appcast.xml
+        SUPublicEDKey: "cO5q2eKAkPKzRCvP9yAIpUJY5eOzTHh/1pJaCORCV7c="
+        # Our Updates pane owns the automatic-check toggle; without this Sparkle also asks on first launch.
+        SUEnableAutomaticChecks: true
         LSMinimumSystemVersion: "14.0"
         NSPrincipalClass: NSApplication
         NSHumanReadableCopyright: "© 2026 SCT"

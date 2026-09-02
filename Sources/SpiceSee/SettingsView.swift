@@ -1,7 +1,9 @@
 import SwiftUI
+import Sparkle
 
 struct SettingsView: View {
     let settings: AppSettings
+    let updater: SPUUpdater
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -14,7 +16,7 @@ struct SettingsView: View {
                 .tabItem { Label("Keyboard", systemImage: "keyboard") }
                 .frame(width: Metric.Window.preferences.width, height: Metric.Settings.keyboardHeight)
 
-            UpdatesPane(settings: settings)
+            UpdatesPane(settings: settings, updater: updater)
                 .tabItem { Label("Updates", systemImage: "arrow.up.circle") }
                 .frame(width: Metric.Window.preferences.width, height: Metric.Settings.updatesHeight)
         }
@@ -237,15 +239,31 @@ private struct Keycap: View {
 
 // MARK: - Updates
 
+/// The two automatic toggles are Sparkle's own persisted properties, mirrored into local state
+/// and written back only on a user change (Sparkle's documented pattern — the updater must not be
+/// poked on every render). Pre-release opt-in is ours; `UpdaterDelegate` reads it.
 private struct UpdatesPane: View {
     let settings: AppSettings
+    let updater: SPUUpdater
+    @State private var checksAutomatically: Bool
+    @State private var downloadsAutomatically: Bool
+
+    init(settings: AppSettings, updater: SPUUpdater) {
+        self.settings = settings
+        self.updater = updater
+        _checksAutomatically = State(initialValue: updater.automaticallyChecksForUpdates)
+        _downloadsAutomatically = State(initialValue: updater.automaticallyDownloadsUpdates)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Metric.Settings.rowRhythm) {
-            Toggle("Check for updates automatically", isOn: .constant(true))
+            Toggle("Check for updates automatically", isOn: $checksAutomatically)
+                .onChange(of: checksAutomatically) { _, on in updater.automaticallyChecksForUpdates = on }
 
             VStack(alignment: .leading, spacing: Metric.Settings.rowRhythm) {
-                Toggle("Download and install in the background", isOn: .constant(false))
+                Toggle("Download and install in the background", isOn: $downloadsAutomatically)
+                    .disabled(!checksAutomatically)
+                    .onChange(of: downloadsAutomatically) { _, on in updater.automaticallyDownloadsUpdates = on }
                 Toggle("Include pre-release builds", isOn: settings.binding(\.includePrereleases))
             }
             .padding(.leading, 20)
@@ -253,21 +271,17 @@ private struct UpdatesPane: View {
             Spacer(minLength: 0)
 
             HStack {
-                Text(settings.versionSummary(lastChecked: nil))
+                Text(settings.versionSummary(lastChecked: updater.lastUpdateCheckDate))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Check Now", action: checkNow)
+                Button("Check Now") { updater.checkForUpdates() }
             }
         }
         .toggleStyle(.checkbox)
         .font(.system(size: 13))
         .padding(.horizontal, 26)
         .padding(.vertical, 20)
-    }
-
-    private func checkNow() {
-        // Sparkle SPUUpdater lands in M7
     }
 }
 
@@ -286,7 +300,8 @@ private struct UpdatesPane: View {
 }
 
 #Preview("Updates") {
-    UpdatesPane(settings: AppSettings())
+    UpdatesPane(settings: AppSettings(),
+                updater: SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil).updater)
         .frame(width: Metric.Window.preferences.width, height: Metric.Settings.updatesHeight)
         .preferredColorScheme(.light)
 }
