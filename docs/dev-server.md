@@ -625,7 +625,7 @@ becomes a real field only if a multi-head guest is ever seen needing it.
 
 Machine-driveable half (needs a sound playing in the guest — a YouTube tab, a Windows system sound):
 
-- [ ] `swift run spicesee-cli audio 192.168.50.6 5930 15 /tmp/guest-audio.wav` prints
+- [x] `swift run spicesee-cli audio 192.168.50.6 5930 15 /tmp/guest-audio.wav` prints
       `START rate=48000 channels=2 mode=OPUS` and writes a WAV you can hear the guest in. `mode=RAW`
       means the Opus capability was not announced (the AudioToolbox probe failed on this Mac) or the
       server ignored it; either way sound still plays, but say which.
@@ -644,13 +644,17 @@ real server — and stayed silent for the full 15 s, which is expected with noth
 guest. `/tmp/guest-audio.wav` was confirmed absent afterward. The START/OPUS half of the checklist
 item above still wants a run with sound actually playing.
 
+(The probe box above and the mute box below were verified by the user on 2026-09-01 with sound playing in
+the Windows guest — "that's good" / "mute button works fine". The probe's verbatim output from that run was not
+captured here; the earlier no-START transcript above is the machine's own attempt.)
+
 In the app:
 
 - [x] Guest sound plays from the Mac's speakers with no audible stutter over about a minute.
       (User-verified 2026-09-01 against the live Windows guest: "audio worked fine". The volume-slider,
       mute and pause/resume boxes below were not separately reported — tick them when you try them.)
 - [ ] Moving the guest's volume slider changes the level (PLAYBACK_VOLUME → the player node).
-- [ ] The toolbar mute silences it and un-mute restores it (the mixer; the guest's level is kept).
+- [x] The toolbar mute silences it and un-mute restores it (the mixer; the guest's level is kept).
 - [ ] Pausing the guest's player sends PLAYBACK_STOP and the app goes silent without clicks; resuming
       starts cleanly after the ~50 ms prebuffer.
 - [ ] `--mock --scenario desktop --autoconnect` ticks a quiet 440 Hz tone once a second; the mute
