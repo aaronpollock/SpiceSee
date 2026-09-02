@@ -191,14 +191,26 @@ func audioProbe(_ config: ConnectionConfig, seconds: Double, out: URL) async thr
 
     var file: AVAudioFile?
     var format: AVAudioFormat?
+    var currentChannels: Int?
     var frames = 0
     for await event in session.events {
         switch event {
         case let .audio(.started(rate, channels, opus)):
             print("START rate=\(rate) channels=\(channels) mode=\(opus ? "OPUS" : "RAW")")
-            let fmt = AVAudioFormat(standardFormatWithSampleRate: Double(rate), channels: AVAudioChannelCount(channels))!
-            format = fmt
-            if file == nil {
+            currentChannels = channels
+            if let format {
+                // The WAV is pinned to the first START's format; a guest that stops and restarts
+                // with a different rate/channel count cannot change an already-open file's layout.
+                if Int(format.sampleRate) != rate || Int(format.channelCount) != channels {
+                    print("format changed to rate=\(rate) channels=\(channels); keeping the first (rate=\(Int(format.sampleRate)) channels=\(Int(format.channelCount))) for the WAV")
+                }
+            } else {
+                guard let fmt = AVAudioFormat(standardFormatWithSampleRate: Double(rate), channels: AVAudioChannelCount(channels)) else {
+                    print("unsupported format rate=\(rate) channels=\(channels) — waiting for a usable START")
+                    currentChannels = nil
+                    continue
+                }
+                format = fmt
                 file = try AVAudioFile(forWriting: out, settings: [
                     AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: rate, AVNumberOfChannelsKey: channels,
                     AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false,
@@ -207,6 +219,10 @@ func audioProbe(_ config: ConnectionConfig, seconds: Double, out: URL) async thr
         case let .audio(.pcm(pcm, _)):
             guard let file, let format else { continue }
             let channels = Int(format.channelCount)
+            // pcm is laid out for whatever START last reported. If that no longer matches the
+            // pinned file format's channel count, deinterleaving by `channels` would scramble
+            // samples across channels rather than just mis-time them — drop the buffer instead.
+            guard currentChannels == channels else { continue }
             let count = AVAudioFrameCount(pcm.count / channels)
             guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: count), let data = buffer.floatChannelData else { continue }
             for c in 0 ..< channels { for i in 0 ..< Int(count) { data[c][i] = pcm[i * channels + c] } }
