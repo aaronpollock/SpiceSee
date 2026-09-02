@@ -646,7 +646,9 @@ item above still wants a run with sound actually playing.
 
 In the app:
 
-- [ ] Guest sound plays from the Mac's speakers with no audible stutter over about a minute.
+- [x] Guest sound plays from the Mac's speakers with no audible stutter over about a minute.
+      (User-verified 2026-09-01 against the live Windows guest: "audio worked fine". The volume-slider,
+      mute and pause/resume boxes below were not separately reported — tick them when you try them.)
 - [ ] Moving the guest's volume slider changes the level (PLAYBACK_VOLUME → the player node).
 - [ ] The toolbar mute silences it and un-mute restores it (the mixer; the guest's level is kept).
 - [ ] Pausing the guest's player sends PLAYBACK_STOP and the app goes silent without clicks; resuming
