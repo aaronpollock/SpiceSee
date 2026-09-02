@@ -204,7 +204,8 @@ final class SpiceKitBackend: SessionBackend {
                         }
                         continuation.finish()
                         return
-                    case .audio: break   // wired in Task 7
+                    case let .audio(e):
+                        continuation.yield(.audio(Self.translate(e)))
                     }
                 }
                 continuation.yield(.disconnected)
@@ -312,6 +313,16 @@ final class SpiceKitBackend: SessionBackend {
         switch c {
         case let .shape(s): .shape(s.map { CursorImage(width: $0.width, height: $0.height, hotX: $0.hotX, hotY: $0.hotY, pixels: $0.pixels) })
         case let .moved(x, y): .moved(x: x, y: y)
+        }
+    }
+
+    private static func translate(_ e: SpiceMedia.AudioEvent) -> AudioEvent {
+        switch e {
+        case let .started(rate, channels, opus): .started(sampleRate: rate, channels: channels, opus: opus)
+        case let .pcm(frames, mmTime): .pcm(frames: frames, mmTime: mmTime)
+        case let .volume(levels): .volume(levels)
+        case let .mute(on): .mute(on)
+        case .stopped: .stopped
         }
     }
 

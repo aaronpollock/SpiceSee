@@ -61,6 +61,7 @@ final class MockSessionBackend: SessionBackend {
                     continuation.yield(.frame(Self.desktop(width: 2560, height: 1440, viewportID: 1, band: (32, 42, 60))))
                     continuation.yield(.cursor(viewportID: 0, .shape(Self.arrowCursor)))
                     continuation.yield(.cursor(viewportID: 0, .moved(x: 300, y: 260)))
+                    continuation.yield(.audio(.started(sampleRate: 48000, channels: 2, opus: true)))
                     if scenario != .noAgent {
                         try await Task.sleep(for: .milliseconds(900))
                         continuation.yield(.agent(.connected))
@@ -96,9 +97,14 @@ final class MockSessionBackend: SessionBackend {
                             // the ORIGINAL viewport-0 size: a mock resize may leave it at a stale
                             // offset, but the resizer's full repaint above already proves the resize.
                             var on = true
+                            var tick = 0
                             while !Task.isCancelled {
                                 try? await Task.sleep(for: .milliseconds(500))
                                 continuation.yield(.frame(Self.caret(on: on, surface: size)))
+                                if tick % 2 == 1 {
+                                    continuation.yield(.audio(Self.tick()))
+                                }
+                                tick += 1
                                 on.toggle()
                             }
                         }
@@ -161,5 +167,17 @@ final class MockSessionBackend: SessionBackend {
         }
         return FrameUpdate(viewportID: 0, surfaceWidth: surface.width, surfaceHeight: surface.height,
                            x: 120, y: 200, width: w, height: h, pixels: px)
+    }
+
+    /// 100 ms of a quiet 440 Hz tone, stereo interleaved — enough to hear the mute toggle work.
+    private static func tick() -> AudioEvent {
+        let n = 4800
+        var frames = [Float](repeating: 0, count: n * 2)
+        for i in 0 ..< n {
+            let env = Float(min(i, n - 1 - i)) / 480              // 10 ms fade in/out: no clicks
+            let v = 0.1 * min(env, 1) * sinf(Float(i) * 2 * .pi * 440 / 48000)
+            frames[i * 2] = v; frames[i * 2 + 1] = v
+        }
+        return .pcm(frames: frames, mmTime: 0)
     }
 }
