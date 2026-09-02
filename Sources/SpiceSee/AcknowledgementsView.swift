@@ -160,7 +160,7 @@ struct AcknowledgementsView: View {
             (
                 Text("These decoders ship as ")
                     + Text("CSpiceCodec.framework").font(Font.mono(Metric.Acknowledgements.summary))
-                    + Text(" inside the app bundle, and library validation is disabled so you can substitute your own build. Source and the written offer are linked below.")
+                    + Text(" inside the app bundle, and library validation is disabled so you can substitute your own build. The source link below includes docs/replacing-the-codec.md, which describes the interface and the build.")
             )
             .font(.system(size: Metric.Acknowledgements.summary))
             .foregroundStyle(.secondary)
