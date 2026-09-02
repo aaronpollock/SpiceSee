@@ -12,6 +12,7 @@ extension SavedConnection {
         hostSubject = vv.hostSubject
         caPEM = vv.caPEM
         proxy = vv.proxy.map { "\($0.host):\($0.port)" }
+        isSingleUse = vv.proxy != nil
         savePasswordInKeychain = false
     }
 }

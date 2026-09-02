@@ -12,6 +12,13 @@ struct ConnectionManagerView: View {
 
     /// Set by the − button; non-nil is what presents the confirmation.
     @State private var pendingDeletion: SavedConnection?
+    /// The row the live session belongs to, captured on connect: by the time the phase leaves
+    /// `.connected` for a reconnect, `session.connection` is already the next row.
+    @State private var liveConnection: SavedConnection?
+    /// A single-use row whose session has ended, waiting for the failure sheet (if any) to clear.
+    @State private var spentConnection: SavedConnection?
+    /// Non-nil is what presents the "spent" prompt.
+    @State private var spentPrompt: SavedConnection?
     private let opener = VVOpener()
 
     var body: some View {
@@ -33,6 +40,41 @@ struct ConnectionManagerView: View {
         } message: {
             Text("This removes the saved connection from SpiceSee. The guest itself is not affected.")
         }
+        .onChange(of: session.phase) { old, new in sessionPhaseChanged(from: old, to: new) }
+        .alert(spentTitle, isPresented: isPromptingSpent) {
+            // Delete is the default here, unlike the − button: the row cannot connect again, so
+            // removing it loses nothing.
+            Button("Delete", role: .destructive) {
+                if let spentPrompt { store.remove(spentPrompt.id) }
+            }
+            .keyboardShortcut(.defaultAction)
+            Button("Keep", role: .cancel) {}
+        } message: {
+            Text("Proxmox console tickets are single-use, so this connection can't be used again. Open a new console from the web UI to reconnect.")
+        }
+    }
+
+    private var spentTitle: String {
+        "Delete “\(spentPrompt?.name ?? "")”? Its ticket has been used."
+    }
+
+    private var isPromptingSpent: Binding<Bool> {
+        Binding(get: { spentPrompt != nil }, set: { if !$0 { spentPrompt = nil } })
+    }
+
+    /// A single-use row is offered for deletion once its session ends. A failure presents its own
+    /// sheet first, so the prompt waits for the phase to settle at `.idle` behind it.
+    private func sessionPhaseChanged(from old: SessionModel.Phase, to new: SessionModel.Phase) {
+        if new == .connected { liveConnection = session.connection }
+        if old == .connected, let live = liveConnection {
+            liveConnection = nil
+            if live.isSingleUse == true { spentConnection = live }
+        }
+        if case .failed = new { return }
+        guard let spent = spentConnection else { return }
+        spentConnection = nil
+        guard store.connections.contains(where: { $0.id == spent.id }) else { return }
+        if settings.removeSingleUseOnDisconnect { store.remove(spent.id) } else { spentPrompt = spent }
     }
 
     private var deletionTitle: String {
@@ -59,6 +101,13 @@ struct ConnectionManagerView: View {
                             isConnected: isConnected(connection)
                         )
                         .tag(connection.id)
+                        // A gesture on the row is hit-tested against its text, not its frame, and
+                        // a click it claims never reaches the List — so text clicks stopped
+                        // selecting while whitespace clicks did. The content shape sends every
+                        // click through the same path, and the single tap selects explicitly.
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(TapGesture().onEnded { store.selection = connection.id })
+                        .simultaneousGesture(TapGesture(count: 2).onEnded { connect(connection) })
                         .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
@@ -99,6 +148,13 @@ struct ConnectionManagerView: View {
 
     private func removeSelected() {
         pendingDeletion = store.selected
+    }
+
+    /// Double-click. No Keychain yet, so this connects without a password, as an untouched
+    /// password field would.
+    private func connect(_ connection: SavedConnection) {
+        guard !isConnecting(connection), !isConnected(connection) else { return }
+        session.connect(connection, password: nil)
     }
 
     private func isConnecting(_ connection: SavedConnection) -> Bool {

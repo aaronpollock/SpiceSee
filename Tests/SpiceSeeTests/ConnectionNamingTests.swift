@@ -99,6 +99,7 @@ import Testing
         #expect(rows[0].name == "New Connection")
         #expect(rows[0].host == "192.168.50.6")
         #expect(rows[0].nameIsCustom == nil)
+        #expect(rows[0].isSingleUse == nil)
     }
 
     /// A legacy row still called "New Connection" was plainly never named, so it should start
@@ -158,5 +159,24 @@ import Testing
         c.host = "other.lan"
         c.hostDidChange()
         #expect(c.name == "other.lan")
+    }
+
+    // MARK: Single-use rows
+
+    /// A Proxmox console file is spent once its session ends: the ticket is one-shot and the host is
+    /// an opaque token only the proxy can resolve. The proxy is what marks the row as single-use.
+    @Test func aProxmoxVVFileMakesASingleUseConnection() {
+        let vv = VVFile(host: "pvespiceproxy:abc:100:pve::deadbeef", port: nil, tlsPort: 61000, password: "ticket",
+                        hostSubject: nil, caPEM: nil, title: "VM 100 - win11", deleteAfterConnecting: true,
+                        proxy: HTTPConnectProxy(host: "pve.lan", port: 3128))
+        let c = SavedConnection(vv: vv, name: "win11")
+        #expect(c.isSingleUse == true)
+    }
+
+    @Test func aVVFileWithoutAProxyIsReusable() {
+        let vv = VVFile(host: "qemu.lan", port: 5900, tlsPort: nil, password: nil,
+                        hostSubject: nil, caPEM: nil, title: nil, deleteAfterConnecting: false)
+        let c = SavedConnection(vv: vv, name: vv.host)
+        #expect(c.isSingleUse != true)
     }
 }

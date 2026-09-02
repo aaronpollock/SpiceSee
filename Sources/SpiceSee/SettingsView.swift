@@ -91,6 +91,11 @@ private struct GeneralPane: View {
                 .toggleStyle(.checkbox)
             }
 
+            SettingsRow(label: "On disconnect:") {
+                Toggle("Remove spent Proxmox connections without asking", isOn: settings.binding(\.removeSingleUseOnDisconnect))
+                    .toggleStyle(.checkbox)
+            }
+
             Spacer(minLength: 0)
 
             HStack {

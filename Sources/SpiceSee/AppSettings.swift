@@ -9,6 +9,8 @@ final class AppSettings {
     var openWindowPerMonitor = true
     var syncClipboardWhenAgentAvailable = true
     var deleteVVAfterConnecting = true
+    /// A Proxmox row is spent once its session ends; on, it goes without asking.
+    var removeSingleUseOnDisconnect = false
 
     var commandMapsTo: GuestModifier = .super
     var optionMapsTo: GuestModifier = .alt
@@ -30,6 +32,7 @@ final class AppSettings {
         openWindowPerMonitor = defaults.object(forKey: "openWindowPerMonitor") as? Bool ?? true
         syncClipboardWhenAgentAvailable = defaults.object(forKey: "syncClipboard") as? Bool ?? true
         deleteVVAfterConnecting = defaults.object(forKey: "deleteVV") as? Bool ?? true
+        removeSingleUseOnDisconnect = defaults.bool(forKey: "removeSingleUseOnDisconnect")
         sendLockKeys = defaults.object(forKey: "sendLockKeys") as? Bool ?? true
         checkForUpdatesAutomatically = defaults.object(forKey: "autoUpdate") as? Bool ?? true
     }
@@ -40,6 +43,7 @@ final class AppSettings {
         defaults.set(openWindowPerMonitor, forKey: "openWindowPerMonitor")
         defaults.set(syncClipboardWhenAgentAvailable, forKey: "syncClipboard")
         defaults.set(deleteVVAfterConnecting, forKey: "deleteVV")
+        defaults.set(removeSingleUseOnDisconnect, forKey: "removeSingleUseOnDisconnect")
         defaults.set(sendLockKeys, forKey: "sendLockKeys")
         defaults.set(checkForUpdatesAutomatically, forKey: "autoUpdate")
     }

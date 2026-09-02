@@ -32,6 +32,10 @@ struct SavedConnection: Identifiable, Hashable, Codable {
     /// From a `.vv`: the pveproxy endpoint (`host:port`) every channel must CONNECT through.
     /// Optional for the same store-compatibility reason as `nameIsCustom`.
     var proxy: String?
+    /// From a Proxmox `.vv`: the ticket was one-shot and the host an opaque token only the proxy
+    /// resolves, so the row cannot connect again once its session ends. Optional for the same
+    /// store-compatibility reason as `nameIsCustom`.
+    var isSingleUse: Bool?
 
     var endpoint: String { "\(host):\(tlsPort ?? port)" }
     var usesTLS: Bool { tlsPort != nil }
