@@ -46,7 +46,7 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://somecoolthings.com/spicesee/appcast.xml</string>
+	<string>https://somecoolthings.com/spicesee/update</string>
 	<key>SUPublicEDKey</key>
 	<string>cO5q2eKAkPKzRCvP9yAIpUJY5eOzTHh/1pJaCORCV7c=</string>
 	<key>UTImportedTypeDeclarations</key>

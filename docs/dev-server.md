@@ -693,8 +693,11 @@ The user's half:
       `disable-library-validation` entitlement** — the backlog's open question. Expected: accepted;
       if the submission comes back `Invalid`, `xcrun notarytool log <id> --keychain-profile notary`
       says why.
-- [ ] Upload the contents of `dist/` to https://somecoolthings.com/spicesee/ so that
-      `https://somecoolthings.com/spicesee/appcast.xml` and the DMG resolve.
+- [ ] Upload the contents of `dist/` to https://somecoolthings.com/spicesee/ so that the current
+      DMG is served at `https://somecoolthings.com/spicesee/download` (the appcast's only
+      enclosure URL), and the site serves `dist/appcast.xml` at both
+      `https://somecoolthings.com/spicesee/update` (the `SUFeedURL` from 1.0.1 on) and
+      `https://somecoolthings.com/spicesee/appcast.xml` (baked into the shipped 1.0.0, build 215).
 - [ ] On a Mac other than the build machine: download the DMG from the site, drag SpiceSee to
       Applications, open it — no Gatekeeper prompt beyond the standard "downloaded from the
       internet" confirmation — and connect to the dev guest.

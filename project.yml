@@ -30,7 +30,7 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSApplicationCategoryType: public.app-category.utilities
-        SUFeedURL: https://somecoolthings.com/spicesee/appcast.xml
+        SUFeedURL: https://somecoolthings.com/spicesee/update
         SUPublicEDKey: "cO5q2eKAkPKzRCvP9yAIpUJY5eOzTHh/1pJaCORCV7c="
         # Our Updates pane owns the automatic-check toggle; without this Sparkle also asks on first launch.
         SUEnableAutomaticChecks: true

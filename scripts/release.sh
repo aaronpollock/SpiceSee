@@ -15,6 +15,7 @@ TEAM=HBHQCPQ22A
 PROFILE=notary
 IDENTITY="Developer ID Application"
 DOWNLOAD_PREFIX=https://somecoolthings.com/spicesee/
+DOWNLOAD_URL=https://somecoolthings.com/spicesee/download
 
 DRY_RUN=0
 CHANNEL=""
@@ -111,6 +112,11 @@ SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData -path '*/SourcePackages
 # earlier DMGs stay in the appcast; deltas are out of scope.
 "$SPARKLE_BIN/generate_appcast" --download-url-prefix "$DOWNLOAD_PREFIX" --maximum-deltas 0 \
   ${CHANNEL:+--channel "$CHANNEL"} dist
+# The site serves the current DMG from one fixed URL, and generate_appcast can only append the
+# filename to a prefix, so rewrite the enclosures it wrote. The EdDSA signature covers the file
+# bytes, not the URL, so this does not invalidate it.
+sed -i '' "s|url=\"${DOWNLOAD_PREFIX}[^\"]*\"|url=\"${DOWNLOAD_URL}\"|" dist/appcast.xml
+grep -q "url=\"${DOWNLOAD_URL}\"" dist/appcast.xml || fail "appcast enclosure was not rewritten to ${DOWNLOAD_URL}"
 
 echo "release: staged in dist/ —"
 ls -l dist
