@@ -83,8 +83,11 @@ private func drain(_ conn: NWConnection) {
 /// The whole `.vv` path in one piece: `SpiceSession.connect(config)` must route through the
 /// file's proxy and hand it the host token verbatim — this is the line the missing-proxy bug
 /// lived on.
-@Test func sessionConnectsThroughTheConfigProxy() async throws {
-    let token = "pvespiceproxy:6a95fbc4:114:pve1::35f9bc"
+@Test(arguments: [
+    "pvespiceproxy:6a95fbc4:114:pve1::35f9bc",
+    "pvespiceproxy:6a95fbc4:114:pve1:61000::35f9bc",
+])
+func sessionConnectsThroughTheConfigProxy(token: String) async throws {
     let (heads, headCont) = AsyncStream.makeStream(of: String.self)
     let listener = try startProxy(serving: try cannedServer(), heads: headCont)
     defer { listener.cancel() }

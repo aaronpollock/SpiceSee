@@ -94,3 +94,5 @@ targets:
         SWIFT_VERSION: "6.0"
         SWIFT_STRICT_CONCURRENCY: complete
         PRODUCT_BUNDLE_IDENTIFIER: com.spicesee.app.tests
+        # Tests compile the app sources into this bundle and import that module by name.
+        PRODUCT_MODULE_NAME: SpiceSee

@@ -61,7 +61,7 @@ final class SpiceKitBackend: SessionBackend {
                         proxy: try target.proxy.map { try HTTPConnectProxy(parsing: $0) }))
                 } catch let error as SpiceError {
                     log.error("connect failed: \(String(describing: error))")
-                    continuation.yield(.failed(Self.failure(for: error, endpoint: endpoint)))
+                    continuation.yield(.failed(Self.failure(for: error, target: target)))
                     continuation.finish()
                     return
                 } catch {
@@ -192,13 +192,13 @@ final class SpiceKitBackend: SessionBackend {
                         // A failed secondary channel degrades the session; only main is fatal.
                         if desc.type == .main {
                             log.error("main channel failed: \(String(describing: error))")
-                            continuation.yield(.failed(Self.failure(for: error, endpoint: endpoint)))
+                            continuation.yield(.failed(Self.failure(for: error, target: target)))
                         } else {
                             log.error("\(String(describing: desc.type))/\(desc.id) failed, continuing: \(String(describing: error))")
                         }
                     case let .disconnected(error):
                         if let error, !announced {
-                            continuation.yield(.failed(Self.failure(for: error, endpoint: endpoint)))
+                            continuation.yield(.failed(Self.failure(for: error, target: target)))
                         } else {
                             continuation.yield(.disconnected)
                         }
@@ -327,14 +327,35 @@ final class SpiceKitBackend: SessionBackend {
     }
 
     /// The category comes from `SpiceKit`, which is tested; the wording is the design's and stays here.
-    private static func failure(for error: SpiceError, endpoint: String) -> ConnectFailure {
+    static func failure(for error: SpiceError, target: ConnectionTarget) -> ConnectFailure {
+        let endpoint = target.endpoint
         switch ConnectFailureKind.of(error) {
-        case .passwordRejected: .passwordRejected
-        case .refused: .refused(endpoint: endpoint)
+        case .passwordRejected: return .passwordRejected
+        // Network.framework reports CONNECT rejections as socket errors, so proxied
+        // failures need guidance covering both the proxy and the guest server.
+        case .refused:
+            if let proxy = target.proxy {
+                return .other(title: "Could not connect through the SPICE proxy",
+                       message: "SpiceSee could not establish a session through \(proxy). Check the proxy and the guest’s SPICE server, including its TLS settings. If this connection came from Proxmox, download a fresh console file and open it immediately; the ticket may have expired.")
+            } else {
+                return .refused(endpoint: endpoint)
+            }
         case let .hostSubjectMismatch(expected, presented):
-            .hostSubjectMismatch(expected: expected, presented: presented, host: endpoint)
-        case .other: .other(title: "The connection failed",
-                            message: "SpiceSee could not keep a session open with \(endpoint).")
+            return .hostSubjectMismatch(expected: expected, presented: presented, host: endpoint)
+        case .other:
+            switch error.kind {
+            case let .tls(.untrusted(reason)), let .tls(.badCertificate(reason)):
+                let guidance = target.proxy != nil || target.caPEM != nil
+                    ? "Check the server's certificate and download a fresh console file after correcting it."
+                    : "Check the server's certificate, the configured host name, and your system's trusted certificate authorities."
+                let detail = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+                return .other(title: "The server's certificate is not trusted",
+                              message: "TLS certificate verification failed: \(detail). \(guidance)")
+            default:
+                return .other(title: "The connection failed",
+                              message: "SpiceSee could not keep a session open with \(endpoint).")
+            }
         }
     }
 }

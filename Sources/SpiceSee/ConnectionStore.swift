@@ -128,6 +128,8 @@ extension ConnectionStore {
             connections[i].tlsPort = connection.tlsPort
             connections[i].hostSubject = connection.hostSubject
             connections[i].caPEM = connection.caPEM
+            connections[i].proxy = connection.proxy
+            connections[i].isSingleUse = connection.isSingleUse
             connections[i].lastConnected = connection.lastConnected
             stored = connections[i]
         } else {

@@ -55,8 +55,11 @@ private func readyPort(of listener: NWListener) async throws -> UInt16 {
 /// The Proxmox flow: the dialled host is an opaque token, meaningful only to the proxy, and it
 /// must arrive in the CONNECT target verbatim — unbracketed and unescaped — with the port
 /// appended after one final colon.
-@Test func connectsThroughAnHTTPConnectProxy() async throws {
-    let token = "pvespiceproxy:6a95f870:114:pve1.example.com::ead7168f"
+@Test(arguments: [
+    "pvespiceproxy:6a95f870:114:pve1.example.com::ead7168f",
+    "pvespiceproxy:6a95f870:114:pve1.example.com:61000::ead7168f",
+])
+func connectsThroughAnHTTPConnectProxy(token: String) async throws {
     let (heads, headCont) = AsyncStream.makeStream(of: String.self)
     let listener = try startProxy(status: "200 Connection established", heads: headCont)
     defer { listener.cancel() }

@@ -59,8 +59,8 @@ func describe(_ error: Error) -> String {
     }
 }
 
-func printMainInit(host: String, port: UInt16, tls: TLSPolicy?, password: String?) async throws {
-    let t = try await NWTransport.connect(host: host, port: port, tls: tls)
+func printMainInit(host: String, port: UInt16, tls: TLSPolicy?, password: String?, proxy: HTTPConnectProxy? = nil) async throws {
+    let t = try await NWTransport.connect(host: host, port: port, tls: tls, proxy: proxy)
     let main = try await MainChannel.open(transport: t, password: password)
     let info = await main.info
     print("MAIN_INIT session=\(info.mainInit.sessionID) mouse=\(info.mainInit.currentMouseMode) agent=\(info.mainInit.agentConnected) tokens=\(info.mainInit.agentTokens) mmtime=\(info.mainInit.multiMediaTime)")
@@ -344,7 +344,7 @@ case "vv":
                 print("error: the file names no port"); exit(1)
             }
             let policy = config.usesTLS ? try TLSPolicy(caPEM: config.caPEM, hostSubject: config.hostSubject, host: config.host) : nil
-            try await printMainInit(host: config.host, port: port, tls: policy, password: config.password)
+            try await printMainInit(host: config.host, port: port, tls: policy, password: config.password, proxy: config.proxy)
         }
     } catch {
         print("error: \(describe(error))"); exit(1)
